@@ -1,0 +1,93 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { scryptSync } from 'node:crypto';
+import { once } from 'node:events';
+import { WebSocket } from 'ws';
+import * as Y from 'yjs';
+import { createApp } from '../server.js';
+import { readBook, writeBook } from '../shared/model.js';
+
+test('authenticated projects, real-time changes, access dates, snapshots, and restart durability', async () => {
+  const dataDir = await mkdtemp(join(tmpdir(),'freedom-test-'));
+  let app = createApp({ dataDir, users: {}, production: false });
+  app.server.listen(0,'127.0.0.1'); await once(app.server,'listening');
+  let base = 'http://127.0.0.1:' + app.server.address().port;
+  const sockets = [];
+  async function login(name) {
+    const res = await fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+    assert.equal(res.status,200); return res.headers.get('set-cookie').split(';')[0];
+  }
+  async function request(path, cookie, method='GET',body) {
+    return fetch(base+path,{method,headers:{cookie,'Content-Type':'application/json'},body: body && JSON.stringify(body)});
+  }
+  function connect(id,cookie) {
+    const ws = new WebSocket(base.replace('http','ws')+'/live/'+id,{headers:{cookie}});
+    sockets.push(ws); const messages = [], waiters = [];
+    ws.on('message',data => { const m = JSON.parse(data); const i = waiters.findIndex(w=>w.type===m.type); if(i>=0)waiters.splice(i,1)[0].resolve(m);else messages.push(m); });
+    return { ws, next(type) { const i=messages.findIndex(m=>m.type===type); if(i>=0)return Promise.resolve(messages.splice(i,1)[0]); return new Promise((resolve,reject)=>{ const timer=setTimeout(()=>reject(new Error('Timed out: '+type)),5000); waiters.push({type,resolve:m=>{clearTimeout(timer);resolve(m);}}); }); } };
+  }
+  try {
+    assert.equal((await fetch(base+'/api/projects')).status,401);
+    assert.equal((await fetch(base+'/.env')).status,404);
+    const alice=await login('Alice'), bob=await login('Bob');
+    const rejected=await request('/api/projects',alice,'POST',{name:'bad',book:{random:true}}); assert.equal(rejected.status,400);
+    const created=await request('/api/projects',alice,'POST',{name:'Job 1',book:{sheets:[{id:'s',rows:[{id:'r',name:'Saw',count:1,cost:10}]}]}});
+    assert.equal(created.status,201); const project=await created.json();
+    const opened=await request('/api/projects/'+project.id+'/open',bob,'POST');
+    assert.equal((await opened.json()).modified_at,project.modified_at);
+    const a=connect(project.id,alice),b=connect(project.id,bob);
+    const ad=new Y.Doc(), bd=new Y.Doc();
+    Y.applyUpdate(ad,Buffer.from((await a.next('sync')).state,'base64'));
+    Y.applyUpdate(bd,Buffer.from((await b.next('sync')).state,'base64'));
+    let av=readBook(ad), bv=readBook(bd), an=structuredClone(av), bn=structuredClone(bv);
+    an.sheets[0].rows[0].count=8; bn.sheets[0].rows[0].cost=55;
+    writeBook(ad,av,an); writeBook(bd,bv,bn);
+    a.ws.send(JSON.stringify({type:'update',seq:1,update:Buffer.from(Y.encodeStateAsUpdate(ad)).toString('base64')}));
+    b.ws.send(JSON.stringify({type:'update',seq:1,update:Buffer.from(Y.encodeStateAsUpdate(bd)).toString('base64')}));
+    await a.next('ack'); await b.next('ack');
+    Y.applyUpdate(ad,Buffer.from((await a.next('update')).update,'base64'));
+    Y.applyUpdate(bd,Buffer.from((await b.next('update')).update,'base64'));
+    assert.deepEqual(readBook(ad),readBook(bd));
+    assert.equal(readBook(ad).sheets[0].rows[0].count,8); assert.equal(readBook(ad).sheets[0].rows[0].cost,55);
+    const exported=await (await request('/api/projects/'+project.id+'/export',alice)).json();
+    assert.equal(exported.sheets[0].rows[0].cost,55);
+    for (const ws of sockets) ws.close();
+    await app.close();
+    const saved=JSON.parse(await readFile(join(dataDir,'projects',project.id,'project.json'),'utf8'));
+    assert.equal(saved.sheets[0].rows[0].count,8);
+    app=createApp({dataDir,users:{},production:false}); app.server.listen(0,'127.0.0.1'); await once(app.server,'listening');
+    base='http://127.0.0.1:'+app.server.address().port;
+    const list=await (await request('/api/projects',alice)).json();
+    assert.equal(list[0].name,'Job 1');
+    const restored=await (await request('/api/projects/'+project.id+'/export',bob)).json(); assert.equal(restored.sheets[0].rows[0].cost,55);
+  } finally { for(const ws of sockets)ws.terminate(); await app.close(); await rm(dataDir,{recursive:true,force:true}); }
+});
+
+test('production refuses to start without accounts',()=>{
+  assert.throws(()=>createApp({production:true,users:{}}),/APP_USERS/);
+});
+
+test('password accounts reject bad credentials and cross-origin writes',async()=>{
+  const dataDir=await mkdtemp(join(tmpdir(),'freedom-auth-'));
+  const salt='0123456789abcdef0123456789abcdef';
+  const hash='scrypt:'+salt+':'+scryptSync('test-password-123',salt,32).toString('hex');
+  const app=createApp({dataDir,users:{Alice:hash},production:false});
+  app.server.listen(0,'127.0.0.1'); await once(app.server,'listening');
+  const base='http://127.0.0.1:'+app.server.address().port;
+  try {
+    for (const password of ['wrong','test-password-123']) {
+      const res=await fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Alice',password})});
+      assert.equal(res.status,password==='wrong'?401:200);
+      if(res.status===200) {
+        const cookie=res.headers.get('set-cookie').split(';')[0];
+        const blocked=await fetch(base+'/api/projects',{method:'POST',headers:{cookie,origin:'https://untrusted.example','Content-Type':'application/json'},body:JSON.stringify({name:'Bad',book:{sheets:[]}})});
+        assert.equal(blocked.status,403);
+        const logout=await fetch(base+'/api/logout',{method:'POST',headers:{cookie}});assert.equal(logout.status,200);
+        assert.equal((await fetch(base+'/api/projects',{headers:{cookie}})).status,401);
+      }
+    }
+  } finally {await app.close();await rm(dataDir,{recursive:true,force:true});}
+});

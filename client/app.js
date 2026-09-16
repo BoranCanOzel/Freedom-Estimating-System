@@ -1,0 +1,351 @@
+import * as Y from 'yjs';
+import { readBook, writeBook, validateBook } from '../shared/model.js';
+import './style.css';
+
+const $ = id => document.getElementById(id);
+const clone = value => structuredClone(value);
+const encode = data => { let s = ''; for (let i = 0; i < data.length; i += 8192) s += String.fromCharCode(...data.subarray(i, i + 8192)); return btoa(s); };
+const decode = data => Uint8Array.from(atob(data), c => c.charCodeAt(0));
+let user, current, connection, projects = [], filter = '', busy = false;
+const bridge = window.estimator;
+const cacheDB = new Promise((resolve, reject) => {
+  const request = indexedDB.open('freedom-collaboration', 1);
+  request.onupgradeneeded = () => request.result.createObjectStore('documents');
+  request.onsuccess = () => resolve(request.result);
+  request.onerror = () => reject(request.error);
+});
+async function cache(key, value) {
+  const db = await cacheDB;
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('documents', value === undefined ? 'readonly' : 'readwrite');
+    const store = tx.objectStore('documents'), request = value === undefined ? store.get(key) : store.put(value, key);
+    tx.oncomplete = () => resolve(request.result); tx.onerror = () => reject(tx.error);
+  });
+}
+async function api(path, options = {}) {
+  const response = await fetch('/api' + path, { ...options, headers: { 'Content-Type': 'application/json', ...options.headers } });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Request failed.');
+  return data;
+}
+function message(text, bad = false) { $('server-message').textContent = text; $('server-message').classList.toggle('error', bad); }
+function status(text, bad = false) {
+  $('server-status').textContent = text; $('server-status').classList.toggle('error', bad);
+  $('status').textContent = text; $('status').classList.toggle('bad', bad);
+}
+function element(tag, text, className) { const el = document.createElement(tag); if (text) el.textContent = text; if (className) el.className = className; return el; }
+function date(value) { return value ? new Date(value).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'Never'; }
+function selector(el) {
+  if (!(el instanceof Element) || el.closest('#server-bar, #server-drawer, dialog')) return '';
+  if (el.id) return '#' + CSS.escape(el.id);
+  const row = el.closest('[data-id]');
+  if (row) {
+    const root = row.closest('[id]');
+    const base = (root ? '#' + CSS.escape(root.id) + ' ' : '') + '[data-id="' + CSS.escape(row.dataset.id) + '"]';
+    if (row === el) return base;
+    const parts = [];
+    while (el !== row) { const index = [...el.parentElement.children].filter(x => x.tagName === el.tagName).indexOf(el) + 1; parts.unshift(el.tagName.toLowerCase() + ':nth-of-type(' + index + ')'); el = el.parentElement; }
+    return base + ' > ' + parts.join(' > ');
+  }
+  const root = el.closest('[id]');
+  if (!root) return '';
+  const parts = [];
+  while (el !== root) { const index = [...el.parentElement.children].filter(x => x.tagName === el.tagName).indexOf(el) + 1; parts.unshift(el.tagName.toLowerCase() + ':nth-of-type(' + index + ')'); el = el.parentElement; }
+  return '#' + CSS.escape(root.id) + ' > ' + parts.join(' > ');
+}
+function focused() {
+  const el = document.activeElement;
+  return { selector: selector(el), start: el.selectionStart, end: el.selectionEnd, value: el.value,
+    scrolls: [...document.querySelectorAll('.scroll,.proj-body,.lib-body')].map(e => [e, e.scrollTop, e.scrollLeft]) };
+}
+function renderRemote(data, fresh = false) {
+  const focus = focused();
+  bridge.receive(data, fresh);
+  if (!fresh && focus.selector) {
+    const el = document.querySelector(focus.selector);
+    if (el && ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) {
+      el.focus({ preventScroll: true });
+      if (typeof focus.start === 'number' && el.setSelectionRange && el.type !== 'number') {
+        const delta = (el.value || '').length - (focus.value || '').length;
+        try { el.setSelectionRange(Math.max(0, focus.start + delta), Math.max(0, focus.end + delta)); } catch {}
+      }
+    }
+  }
+  for (const [el, top, left] of focus.scrolls) if (el.isConnected) { el.scrollTop = top; el.scrollLeft = left; }
+}
+
+class LiveProject {
+  constructor(project) {
+    this.project = project; this.doc = new Y.Doc(); this.seq = 0; this.acked = 0;
+    this.ready = false; this.closed = false; this.peers = []; this.persisting = Promise.resolve();
+    this.cacheKey = user + ':' + project.id; this.baseline = {}; this.retry = 0;
+  }
+  async start() {
+    const previous = await cache(this.cacheKey);
+    if (previous) Y.applyUpdate(this.doc, previous, 'cache');
+    this.doc.on('update', (_update, origin) => {
+      const state = Y.encodeStateAsUpdate(this.doc);
+      this.persisting = this.persisting.catch(() => {}).then(() => cache(this.cacheKey, state));
+      this.persisting.catch(() => { this.cacheFailed = true; status('Device backup failed — keep this tab open', true); });
+      if (origin === 'local') {
+        this.seq++;
+        if (this.socket?.readyState === WebSocket.OPEN && this.synced) this.sendUpdate(_update);
+        this.paintStatus();
+      }
+    });
+    this.connect();
+  }
+  connect() {
+    if (this.closed) return;
+    this.synced = false;
+    this.socket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/live/${this.project.id}`);
+    status(this.ready ? 'Reconnecting…' : 'Opening project…');
+    this.socket.onmessage = event => {
+      if (this.closed) return;
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'sync' || msg.type === 'update') {
+          if (this.ready) this.changed();
+          Y.applyUpdate(this.doc, decode(msg.state || msg.update), 'remote');
+          this.applying = true;
+          try { renderRemote(readBook(this.doc), !this.ready); this.baseline = clone(bridge.getShared()); }
+          finally { this.applying = false; }
+          if (msg.type === 'sync') {
+            this.peerId = msg.peerId; this.synced = true; this.ready = true; this.retry = 0;
+            document.body.classList.add('server-active');
+            // The merged state includes edits recovered from this browser after a disconnect.
+            this.seq++; this.sendUpdate(Y.encodeStateAsUpdate(this.doc));
+          }
+          this.sendPresence(); this.paintPeers();
+        } else if (msg.type === 'ack') {
+          this.acked = Math.max(this.acked, msg.seq); this.paintStatus();
+        } else if (msg.type === 'presence') { this.peers = msg.peers; this.paintPeers(); }
+        else if (msg.type === 'error') { this.failed = true; status(msg.error, true); message('Your changes are still in this browser. Export JSON before closing if the error persists.', true); }
+      } catch (e) { status('Could not apply a shared update. Export your work before reloading.', true); console.error(e); }
+    };
+    this.socket.onclose = event => {
+      this.synced = false; this.peers = []; this.paintPeers();
+      if (this.closed) return;
+      if (event.code === 4001) { status('Session expired — export pending changes and sign in again', true); return; }
+      this.paintStatus();
+      this.retryTimer = setTimeout(() => this.connect(), Math.min(1000 * 2 ** this.retry++, 10000));
+    };
+    this.socket.onerror = () => {};
+  }
+  sendUpdate(update) { this.socket.send(JSON.stringify({ type: 'update', update: encode(update), seq: this.seq })); }
+  changed() {
+    if (!this.ready || this.closed || this.applying) return;
+    const next = bridge.getShared();
+    writeBook(this.doc, this.baseline, next);
+    this.baseline = clone(next);
+    this.sendPresence();
+  }
+  paintStatus() {
+    if (this.failed || this.cacheFailed) return;
+    status(!this.synced ? 'Offline · reconnecting · edits kept on this device' : this.acked < this.seq ? 'Saving…' : 'All changes saved');
+  }
+  sendPresence(pointer) {
+    if (pointer) this.pointer = pointer;
+    if (!this.synced || this.socket.readyState !== WebSocket.OPEN) return;
+    clearTimeout(this.presenceTimer);
+    this.presenceTimer = setTimeout(() => {
+      if (this.socket.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify({ type: 'presence', presence: {
+        ...bridge.getLocation(), field: selector(document.activeElement), ...(this.pointer || {visible:false})
+      } }));
+    }, 50);
+  }
+  paintPeers() {
+    $('server-people').replaceChildren(); $('server-cursors').replaceChildren();
+    const here = bridge.getLocation();
+    const zoom = Number.parseFloat(getComputedStyle(document.body).zoom) || 1;
+    for (const peer of this.peers) {
+      if (peer.id === this.peerId) continue;
+      let hash = 0; for (const c of peer.name) hash = (hash * 31 + c.charCodeAt(0)) | 0;
+      const color = `hsl(${Math.abs(hash) % 360} 65% 42%)`;
+      const badge = element('span', peer.name, 'server-person'); badge.style.setProperty('--peer', color);
+      badge.title = peer.view === here.view && peer.takeoff === here.takeoff ? 'Viewing this takeoff' : 'Viewing another takeoff or tab';
+      $('server-people').append(badge);
+      if (peer.view !== here.view || peer.takeoff !== here.takeoff || (here.view === 'sheet' && peer.sheet !== here.sheet)) continue;
+      try {
+        const target = peer.anchor && document.querySelector(peer.anchor);
+        if (peer.visible && target) {
+          const rect = target.getBoundingClientRect();
+          if (rect.width && rect.height) {
+            const cursor = element('div', '➤ ' + peer.name, 'server-cursor');
+            cursor.style.cssText = `left:${(rect.left + peer.x * rect.width) / zoom}px;top:${(rect.top + peer.y * rect.height) / zoom}px;color:${color}`;
+            $('server-cursors').append(cursor);
+          }
+        }
+        const field = peer.field && document.querySelector(peer.field);
+        if (field) {
+          const rect = field.getBoundingClientRect(), mark = element('div', '', 'server-field');
+          mark.style.cssText = `left:${rect.left / zoom}px;top:${rect.top / zoom}px;width:${rect.width / zoom}px;height:${rect.height / zoom}px;border-color:${color}`;
+          $('server-cursors').append(mark);
+        }
+      } catch {}
+    }
+  }
+  async close() {
+    this.changed();
+    await this.persisting;
+    this.closed = true; clearTimeout(this.retryTimer); clearTimeout(this.presenceTimer);
+    this.socket?.close(); this.doc.destroy();
+    $('server-people').replaceChildren(); $('server-cursors').replaceChildren();
+  }
+}
+
+function panel(open = true) { $('server-drawer').hidden = !open; $('server-projects').setAttribute('aria-expanded', String(open)); if (open) refresh().catch(e => message(e.message, true)); }
+async function refresh() { projects = await api('/projects'); renderProjects(); }
+function renderProjects() {
+  const host = $('server-list'); host.replaceChildren();
+  const visible = projects.filter(p => p.name.toLowerCase().includes(filter));
+  if (!visible.length) host.append(element('p', filter ? 'No matching projects.' : 'Create a project or import an existing JSON file.', 'server-empty'));
+  for (const project of visible) {
+    const item = element('button', '', 'server-project' + (current?.id === project.id ? ' selected' : ''));
+    item.type = 'button';
+    item.append(element('strong', project.name));
+    item.append(element('span', 'Opened ' + date(project.my_opened_at || project.accessed_at)));
+    item.append(element('span', 'Edited ' + date(project.modified_at) + ' · ' + project.modified_by));
+    if (project.online.length) item.append(element('span', '● ' + [...new Set(project.online)].join(', '), 'server-online'));
+    item.onclick = () => run(() => openProject(project)); host.append(item);
+  }
+}
+async function closeProject() {
+  await connection?.close(); connection = null; current = null;
+  document.body.classList.remove('server-active');
+  $('server-title').textContent = 'Freedom Estimating';
+  $('server-close').disabled = $('server-edit').disabled = $('server-export').disabled = true;
+  status('No project open'); panel();
+}
+async function openProject(project) {
+  if (current?.id === project.id && connection?.ready) { panel(false); return; }
+  await connection?.close(); connection = null;
+  document.body.classList.remove('server-active');
+  current = await api('/projects/' + project.id + '/open', { method: 'POST' });
+  $('server-title').textContent = current.name;
+  $('server-close').disabled = $('server-edit').disabled = $('server-export').disabled = false;
+  connection = new LiveProject(current); await connection.start(); panel(false);
+}
+async function createProject(name, book) {
+  const project = await api('/projects', { method: 'POST', body: JSON.stringify({ name, book }) });
+  await openProject(project); await refresh(); message('');
+}
+async function run(action) {
+  if (busy) return;
+  busy = true;
+  try { await action(); } catch (e) { message(e.message, true); } finally { busy = false; }
+}
+function nameDialog(title, value, action) {
+  $('server-name-title').textContent = title; $('server-name-input').value = value;
+  $('server-name-dialog').showModal(); $('server-name-input').focus();
+  $('server-name-form').onsubmit = event => {
+    event.preventDefault(); const name = $('server-name-input').value.trim();
+    if (name) { $('server-name-dialog').close(); run(() => action(name)); }
+  };
+}
+function exportLocal() {
+  const data = { _app: 'project-breakdown', _v: 3, ...bridge.exportBook() };
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+  const link = element('a'); link.href = url; link.download = (current?.name || 'estimate').replace(/[<>:"/\\|?*]/g, '-') + '.json'; link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+document.body.insertAdjacentHTML('afterbegin', `
+  <header id="server-bar">
+    <button id="server-projects" type="button" aria-expanded="true" aria-controls="server-drawer">☰ Projects</button>
+    <strong id="server-title">Freedom Estimating</strong><div id="server-people" aria-label="Collaborators"></div>
+    <span id="server-status" role="status">Connecting…</span><button id="server-signout" type="button">Sign out</button>
+  </header>
+  <aside id="server-drawer" aria-label="Saved projects">
+    <div class="server-drawer-head"><strong>Projects</strong><button id="server-hide" aria-label="Hide projects">×</button></div>
+    <nav>
+      <button id="server-new">＋ New Project</button><button id="server-open">▤ Open Project</button>
+      <button id="server-edit" disabled>✎ Edit Project Name</button><button id="server-import">↥ Import Projects</button>
+      <button id="server-export" disabled>↧ Export JSON</button><button id="server-close" disabled>⏻ Close Project</button>
+    </nav>
+    <label class="server-search">Find a project<input id="server-search" type="search" placeholder="Search saved projects…"></label>
+    <div id="server-list"></div>
+  </aside>
+  <div id="server-welcome"><h1>Your projects, together.</h1><p>Create a project or import your existing JSON file from the Projects panel.</p><p>Edits save automatically. Open the same project on another browser to collaborate.</p></div>
+  <div id="server-message" role="alert"></div><div id="server-cursors" aria-hidden="true"></div>
+  <input id="server-import-file" type="file" accept=".json,application/json" multiple hidden>
+  <dialog id="server-login"><form id="server-login-form"><h2>Freedom Estimating</h2><p id="server-login-hint">Sign in to your shared projects.</p>
+    <label>Name<input id="server-login-name" autocomplete="username" required maxlength="80"></label>
+    <label id="server-password-label">Password<input id="server-login-password" type="password" autocomplete="current-password"></label>
+    <p id="server-login-error" role="alert"></p><button type="submit">Sign in</button></form></dialog>
+  <dialog id="server-name-dialog"><form id="server-name-form"><h2 id="server-name-title"></h2>
+    <label>Project name<input id="server-name-input" required maxlength="160"></label><div class="server-dialog-actions"><button type="button" id="server-name-cancel">Cancel</button><button type="submit">Save</button></div>
+  </form></dialog>`);
+document.body.classList.add('server-mode');
+$('server-projects').onclick = () => panel($('server-drawer').hidden);
+$('server-hide').onclick = () => panel(false);
+$('server-open').onclick = () => { panel(); $('server-search').focus(); };
+$('server-search').oninput = event => { filter = event.target.value.toLowerCase(); renderProjects(); };
+$('server-new').onclick = () => nameDialog('New project', '', name => createProject(name, bridge.blank(name)));
+$('server-edit').onclick = () => nameDialog('Edit project name', current.name, async name => {
+  current = await api('/projects/' + current.id, { method: 'PATCH', body: JSON.stringify({ name }) });
+  $('server-title').textContent = current.name; await refresh();
+});
+$('server-name-cancel').onclick = () => $('server-name-dialog').close();
+$('server-close').onclick = () => run(closeProject);
+$('server-export').onclick = exportLocal;
+$('server-import').onclick = () => $('server-import-file').click();
+$('server-import-file').onchange = event => run(async () => {
+  const files = [...event.target.files]; event.target.value = '';
+  for (const file of files) {
+    if (file.size > 25 * 1024 * 1024) throw new Error(file.name + ' exceeds the 25 MB limit.');
+    const raw = validateBook(JSON.parse(await file.text()));
+    await createProject(file.name.replace(/\.json$/i, ''), bridge.prepare(raw));
+  }
+});
+// Existing file controls use the server project workflow as well.
+for (const id of ['loadFile', 'loadFile2']) {
+  $(id).textContent = 'Import project';
+  $(id).addEventListener('click', event => { event.stopImmediatePropagation(); $('server-import-file').click(); }, true);
+}
+for (const id of ['saveFile', 'saveFile2']) {
+  $(id).textContent = 'Export JSON';
+  $(id).addEventListener('click', event => { event.stopImmediatePropagation(); exportLocal(); }, true);
+}
+$('server-signout').onclick = () => run(async () => { await closeProject(); await api('/logout', { method: 'POST' }); location.reload(); });
+window.freedomSession = { changed: () => connection?.changed(), notify: text => message(text) };
+window.addEventListener('beforeunload', event => { if (connection && connection.seq > connection.acked) { event.preventDefault(); event.returnValue = ''; } });
+let lastPointer = 0;
+document.addEventListener('pointermove', event => {
+  if (!connection?.ready || Date.now() - lastPointer < 60) return;
+  lastPointer = Date.now();
+  const target = event.target.closest('[data-id], [id]');
+  const anchor = selector(target);
+  if (!anchor) return connection.sendPresence({ visible: false });
+  const rect = target.getBoundingClientRect();
+  connection.sendPresence({ visible: true, anchor, x: (event.clientX - rect.left) / rect.width, y: (event.clientY - rect.top) / rect.height });
+});
+document.addEventListener('pointerleave', () => connection?.sendPresence({ visible: false }));
+document.addEventListener('focusin', () => connection?.sendPresence());
+document.addEventListener('scroll', () => connection?.paintPeers(), true);
+window.addEventListener('resize', () => connection?.paintPeers());
+document.addEventListener('visibilitychange', () => { if (document.hidden) connection?.sendPresence({ visible: false }); });
+async function signedIn(name) {
+  user = name; $('server-signout').textContent = name + ' · Sign out';
+  $('server-login').close(); await refresh(); status('No project open');
+}
+async function boot() {
+  await bridge.ready;
+  const session = await api('/session');
+  if (session.user) await signedIn(session.user);
+  else {
+    $('server-password-label').hidden = !session.passwordRequired;
+    $('server-login-hint').textContent = session.passwordRequired ? 'Sign in to your shared projects.' : 'Enter your name for this local development session.';
+    $('server-login').showModal();
+    $('server-login').addEventListener('cancel', event => event.preventDefault());
+    $('server-login-form').onsubmit = async event => {
+      event.preventDefault();
+      try {
+        const result = await api('/login', { method: 'POST', body: JSON.stringify({ name: $('server-login-name').value, password: $('server-login-password').value }) });
+        await signedIn(result.user);
+      } catch (e) { $('server-login-error').textContent = e.message; }
+    };
+  }
+  setInterval(() => { if (user && !$('server-drawer').hidden) refresh().catch(() => {}); }, 10000);
+}
+boot().catch(e => { status('Server unavailable', true); message(e.message + ' Start the Node.js server to use shared projects.', true); });

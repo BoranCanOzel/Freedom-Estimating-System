@@ -1,6 +1,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Project Breakdown</title>
+<link rel="stylesheet" href="/assets/app.css">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=Fira+Sans:wght@400;500;600;700&family=Fira+Sans+Condensed:wght@500;600;700&display=swap');
 
@@ -6381,6 +6382,10 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   /* ---------- storage ---------- */
   let timer;
   function save(){
+    if (window.freedomSession) {
+      window.freedomSession.changed();
+      return;
+    }
     clearTimeout(timer);
     timer = setTimeout(async () => {
       try{
@@ -6417,6 +6422,12 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       if (!r.id) r.id = id();
       if (!r.type) r.type = 'item';
       if (r.type === 'item' && !(r.kind in KINDS)) r.kind = 'labor';
+      if (r.type === 'item') {
+        if (r.name == null) r.name = '';
+        ['count','time','days'].forEach(k => { if (r[k] == null) r[k] = 1; });
+        if (r.cost == null) r.cost = '';
+        if (r.markup == null) r.markup = 0;
+      }
     });
     return st;
   }
@@ -9405,6 +9416,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   }
 
   function openEditor(mode, t){
+    if (t) t = structuredClone(t); // drafts must not mutate the shared record before Save
     edMode = mode;
     markListOpts();
     if (mode === 'item'){
@@ -11254,6 +11266,113 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
   window.addEventListener('pageshow', e => { if (e.persisted) showView(); });
 
-  load().then(showView);
+  // The server adapter keeps navigation local and shares canonical data only.
+  const personalRoot = new Set(['view','active','activeTakeoff','activeList','activeLib',
+    'theme','dark','zoom','libW','projW','edW','sumWidths','sumOpen','sumDetail',
+    'statusHidden','fieldPicks','picsOn','gameCard','stOpen']);
+  const personalNested = new Set(['active','collapsed','shut','noteOpen','widths','hiddenCols','loadShut']);
+  const aliases = new Set(['sheets','companies','templates','folders','_app','_v']);
+  let personal = new Map();
+  function separate(value, path = [], capture = true){
+    if (Array.isArray(value)) return value.map((v, i) => separate(v, path.concat(v && v.id || i), capture));
+    if (!value || typeof value !== 'object') return value;
+    const out = {};
+    Object.keys(value).forEach(k => {
+      if (!path.length && aliases.has(k)) return;
+      if ((!path.length && personalRoot.has(k)) || (path.length && personalNested.has(k))) {
+        if (capture) personal.set(JSON.stringify(path.concat(k)), structuredClone(value[k]));
+      } else out[k] = separate(value[k], path.concat(k), capture);
+    });
+    return out;
+  }
+  function restorePersonal(value, path = []){
+    if (!value || typeof value !== 'object') return;
+    if (Array.isArray(value)) { value.forEach((v,i) => restorePersonal(v, path.concat(v && v.id || i))); return; }
+    const fields = path.length ? personalNested : personalRoot;
+    fields.forEach(k => { const key = JSON.stringify(path.concat(k)); if (personal.has(key)) value[k] = structuredClone(personal.get(key)); });
+    Object.keys(value).filter(k => !fields.has(k)).forEach(k => restorePersonal(value[k], path.concat(k)));
+  }
+  function materialize(data){
+    const bk = structuredClone(data);
+    restorePersonal(bk);
+    if (Array.isArray(bk.rows)) return {view:'sheet', active:null, sheets:[normalize(Object.assign(bk, {num:1}))]};
+    const list = (bk.lists || []).find(l => l.id === bk.activeList) || (bk.lists || [])[0];
+    const companies = list ? list.companies : bk.companies || [];
+    const takes = companies.flatMap(c => (c.projects || []).flatMap(p => p.takeoffs || []));
+    const take = takes.find(t => t.id === bk.activeTakeoff) || takes[0];
+    if (take) { bk.sheets = take.sheets; bk.activeTakeoff = take.id; }
+    if (!Array.isArray(bk.sheets) || !bk.sheets.length) bk.sheets = [seed(1)];
+    return bk;
+  }
+  function findRecord(value, recordId){
+    if (!value || typeof value !== 'object') return null;
+    if (value.id === recordId) return value;
+    for (const child of Object.values(value)) {
+      const found = findRecord(child, recordId);
+      if (found) return found;
+    }
+    return null;
+  }
+  function rebaseDraft(local, before, after){
+    if (JSON.stringify(local) === JSON.stringify(before)) return structuredClone(after);
+    if (JSON.stringify(before) === JSON.stringify(after)) return structuredClone(local);
+    if (Array.isArray(local) && Array.isArray(before) && Array.isArray(after) &&
+        [...local,...before,...after].every(v => v && typeof v.id === 'string')) {
+      const result = after.filter(v => !before.some(b => b.id === v.id) || local.some(l => l.id === v.id))
+        .map(v => { const l = local.find(x => x.id === v.id), b = before.find(x => x.id === v.id); return l && b ? rebaseDraft(l,b,v) : structuredClone(v); });
+      local.filter(v => !before.some(b => b.id === v.id) && !result.some(r => r.id === v.id)).forEach(v => result.push(structuredClone(v)));
+      return result;
+    }
+    if (local && before && after && !Array.isArray(local) && !Array.isArray(after) &&
+        typeof local === 'object' && typeof before === 'object' && typeof after === 'object') {
+      const result = {};
+      new Set([...Object.keys(local), ...Object.keys(before), ...Object.keys(after)]).forEach(k => {
+        const v = rebaseDraft(local[k], before[k], after[k]);
+        if (v !== undefined) result[k] = v;
+      });
+      return result;
+    }
+    return structuredClone(local);
+  }
+  window.estimator = {
+    getShared(){ projectTree(); templates(); return separate(book); },
+    getLocation(){ return {view:book.view, sheet:book.active, takeoff:book.activeTakeoff}; },
+    exportBook(){ return structuredClone(book); },
+    receive(data, fresh = false){
+      const draft = ({item:itemDraft, section:secDraft, scope:scopeDraft, part:partDraft,
+        construct:conDraft, service:svcDraft, company:coDraft, project:prDraft,
+        takeoff:tkDraft, subtype:subDraft})[edMode];
+      const recordId = draft && (draft.__rowId || draft.id);
+      const before = recordId ? findRecord(book, recordId) : null;
+      if (fresh) { personal = new Map(); closeEditor(); }
+      else separate(book);
+      adoptBook(materialize(data));
+      if (!fresh && before && draft) {
+        const after = findRecord(book, recordId);
+        if (after) {
+          const merged = rebaseDraft(draft, before, after);
+          // Row cards have a null template ID and a separate live-row ID.
+          if (draft.__rowId) { merged.id = null; merged.__rowId = draft.__rowId; }
+          Object.keys(draft).forEach(k => delete draft[k]); Object.assign(draft, merged);
+          renderEditor();
+        } else { closeEditor(); window.freedomSession?.notify('The record you were editing was removed by another user.'); }
+      }
+      showView(); renderProjects();
+    },
+    prepare(data){
+      const previousBook = book, previousState = state, previousPersonal = personal;
+      try {
+        personal = new Map(); adoptBook(materialize(data)); projectTree(); templates();
+        return separate(book, [], false);
+      } finally { book = previousBook; state = previousState; personal = previousPersonal; }
+    },
+    blank(name){
+      const sh = seed(2); sh.num = 1; sh.title = '';
+      const tk = {id:id(),name:'Takeoff 1',custom:{},sheets:[sh]};
+      return this.prepare({lists:[{id:id(),name:'Projects',companies:[{id:id(),name:'Company 1',custom:{},projects:[{id:id(),name,status:'Open',custom:{},takeoffs:[tk]}]}]}]});
+    }
+  };
+  window.estimator.ready = load().then(showView);
 })();
 </script>
+<script src="/assets/app.js" defer></script>

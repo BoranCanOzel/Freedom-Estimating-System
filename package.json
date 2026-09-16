@@ -1,0 +1,24 @@
+{
+  "name": "freedom-estimating-system",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24.0.0" },
+  "scripts": {
+    "build": "esbuild client/app.js --bundle --format=iife --outfile=dist/app.js",
+    "start": "node --env-file-if-exists=.env server.js",
+    "prestart": "npm run build",
+    "test": "node --test tests/*.test.js",
+    "test:browser": "playwright test",
+    "password": "node scripts/password.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "ws": "^8.18.3",
+    "yjs": "^13.6.27"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "esbuild": "^0.25.9"
+  }
+}
