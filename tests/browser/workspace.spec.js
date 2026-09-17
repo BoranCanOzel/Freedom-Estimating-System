@@ -8,14 +8,41 @@ function workbook() {
     {id:'south',name:'South job',status:'Completed',custom:{Region:'South'},takeoffs:[{id:'ts',name:'South takeoff',sheets:[sheet('ss','South scope')]}]}
   ]}]}],customFields:{company:['Account'],project:['Region'],takeoff:['Estimator']},filterFields:['Region']};
 }
-async function openWorkbook(page) {
+async function openWorkbook(page, data = workbook()) {
   await page.goto('/'); await page.locator('#server-login-name').fill('Workspace tester');
   await page.locator('#server-login-form button').click(); await expect(page.locator('#server-login')).not.toBeVisible();
   await page.locator('#workspace-file > summary').click();
   const chooser = page.waitForEvent('filechooser'); await page.locator('#server-import').click();
-  await (await chooser).setFiles({name:'Organized '+Date.now()+'.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(workbook()))});
+  await (await chooser).setFiles({name:'Organized '+Date.now()+'.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(data))});
   await expect(page.locator('#server-status')).toHaveText('All changes saved');
 }
+
+test('new pictured items follow Hide and Show without forcing existing rows open', async ({page}) => {
+  const data = workbook();
+  data.templates = {items:[{id:'pictured',name:'Pictured item',kind:'labor',cost:25,
+    img:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'}],sections:[],scopes:[]};
+  await openWorkbook(page, data);
+  await page.locator('#workspace-view > summary').click();
+  await page.locator('#hidePics').click();
+  await page.locator('#workspace-view > summary').press('Escape');
+  await page.locator('#libToggle').click();
+  const add = page.locator('.tpl').filter({hasText:'Pictured item'}).getByTitle('Add to the end of this option');
+  await add.click();
+  const rows = page.locator('#body tr[data-type="item"]').filter({has:page.locator('.pic-strip img')});
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first().locator('.pic-strip')).not.toHaveClass(/open/);
+  await page.locator('#libToggle').click();
+  await rows.first().locator('.card-btn').click();
+  await page.locator('#edSave').click();
+  await expect(rows.first().locator('.pic-strip')).not.toHaveClass(/open/);
+  await page.locator('#workspace-view > summary').click();
+  await page.locator('#showPics').click();
+  await page.locator('#workspace-view > summary').press('Escape');
+  await page.locator('#libToggle').click();
+  await add.click();
+  await expect(rows).toHaveCount(2);
+  await expect(rows.last().locator('.pic-strip')).toHaveClass(/open/);
+});
 
 test('one project drawer retains hierarchy, custom details and filters', async ({page}) => {
   const errors=[];page.on('pageerror',e=>errors.push(e.message));

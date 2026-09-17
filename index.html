@@ -6952,17 +6952,17 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         r.cost  = t.cost;
       }
       else r.cost = t.cost;
-      if (t.img){ r.pics = [{id:id(), name:'picture', url:t.img}]; r.picsOpen = true; }
+      if (t.img){ r.pics = [{id:id(), name:'picture', url:t.img}]; }
       return [r];
     }
     if (kind === 'item'){
       const r = {id:id(), type:'item', kind:t.kind || 'labor', name:t.name || '', note:t.note || '',
                  count:t.count, time:t.time, days:t.days, cost:t.cost, markup:t.markup};
-      if (t.img){ r.pics = [{id:id(), name:'picture', url:t.img}]; r.picsOpen = true; }
+      if (t.img){ r.pics = [{id:id(), name:'picture', url:t.img}]; }
       return [r];
     }
     const head = {id:id(), type:'section', name:t.name || '', note:t.note || '', units:{}};
-    if (t.img){ head.pics = [{id:id(), name:'picture', url:t.img}]; head.picsOpen = true; }
+    if (t.img){ head.pics = [{id:id(), name:'picture', url:t.img}]; }
     const mid = (t.items || []).map(i => ({
       id:id(), type:'item', kind:i.kind || 'labor', name:i.name || '', note:i.note || '',
       count:i.count, time:i.time, days:i.days, cost:i.cost, markup:i.markup
@@ -6974,7 +6974,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     const rows = [];
     if ((t.name || '').trim()){
       const label = {id:id(), type:'item', kind:'none', name:(t.name || '').split('\n')[0], note:''};
-      if (t.img){ label.pics = [{id:id(), name:'scope picture', url:t.img}]; label.picsOpen = true; }
+      if (t.img){ label.pics = [{id:id(), name:'scope picture', url:t.img}]; }
       rows.push(label);
     }
     (t.parts || []).forEach(p => {
@@ -9492,7 +9492,6 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
           row.pics = row.pics || [];
           if (row.pics.length) row.pics[0].url = conDraft.img;
           else row.pics.push({id:id(), name:'picture', url:conDraft.img});
-          row.picsOpen = true;
         }
       }
       closeEditor();
@@ -9510,7 +9509,6 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
           row.pics = row.pics || [];
           if (row.pics.length) row.pics[0].url = svcDraft.img;
           else row.pics.push({id:id(), name:'picture', url:svcDraft.img});
-          row.picsOpen = true;
         }
       }
       closeEditor(); renderAll(); flash('service updated');
@@ -9548,7 +9546,6 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
           row.pics = row.pics || [];
           if (row.pics.length) row.pics[0].url = itemDraft.img;
           else row.pics.push({id:id(), name:'picture', url:itemDraft.img});
-          row.picsOpen = true;
         }
       }
       closeEditor();
@@ -9614,7 +9611,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       const out = {};
       Object.keys(v).forEach(k => { out[k] = freshIds(v[k]); });
       if (out.id) out.id = id();
-      delete out.picsOpen;             // a copy starts with its picture strip shut
+      delete out.picsOpen;             // a copy follows the current picture visibility setting
       return out;
     }
     return v;
