@@ -1,0 +1,84 @@
+body.server-mode{--workspace-project-width:360px}
+body.server-mode [hidden]{display:none!important}
+body.server-mode #server-bar{gap:10px;min-height:46px;height:auto;flex-wrap:wrap;padding:5px 8px}
+#workspace-menus{display:flex;align-items:center;gap:2px;flex:none}
+.workspace-menu{position:relative;font-family:var(--f-sans);font-size:13px}
+.workspace-menu>summary{list-style:none;cursor:pointer;padding:7px 10px;border-radius:4px;white-space:nowrap;color:var(--ink)}
+.workspace-menu>summary::-webkit-details-marker{display:none}
+.workspace-menu>summary::after{content:'⌄';font-size:11px;margin-left:7px;color:var(--muted)}
+.workspace-menu[open]>summary,.workspace-menu>summary:hover{background:var(--calc)}
+.workspace-menu-content{position:absolute;top:calc(100% + 7px);left:0;width:280px;max-width:calc(100vw - 24px);max-height:calc(100vh - 100px);overflow:auto;z-index:620;padding:8px;background:var(--card);border:1px solid var(--rule);border-radius:7px;box-shadow:0 14px 40px #0004;text-align:left}
+body.server-mode :is(#server-bar,#server-drawer) .workspace-menu-content button{display:block;width:100%;padding:8px 10px;border:0;border-radius:4px;background:transparent;color:var(--ink);font:500 12px var(--f-sans);text-align:left;text-transform:none;letter-spacing:normal;box-shadow:none;text-shadow:none;cursor:pointer;white-space:normal}
+body.server-mode :is(#server-bar,#server-drawer) .workspace-menu-content button:hover{background:var(--calc)}
+body.server-mode :is(#server-bar,#server-drawer) .workspace-menu-content button:disabled{opacity:.45;cursor:default}
+.workspace-menu-content .menu-label{font:600 10px var(--f-sans);letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding:6px 10px 4px;margin:0}
+.menu-divider{height:1px;background:var(--rule);margin:6px 2px}
+body.server-mode .workspace-menu-content .round-pick{display:flex;width:100%;justify-content:space-between;gap:12px;padding:8px 10px;align-items:center}
+body.server-mode .workspace-menu-content .round-pick label{font:500 12px var(--f-sans);letter-spacing:normal;text-transform:none;color:var(--ink)}
+body.server-mode .workspace-menu-content select{background:var(--paper);color:var(--ink);padding:5px;border:1px solid var(--rule);border-radius:4px;max-width:110px;font:12px var(--f-sans)}
+.workspace-themes{display:flex;gap:4px;padding:4px 8px}
+body.server-mode #server-bar .workspace-menu-content .workspace-themes button{text-align:center;font-size:11px;padding:7px 4px;border:1px solid var(--rule)}
+body.server-mode #server-bar .workspace-menu-content .workspace-themes button[aria-pressed=true]{background:var(--calc);border-color:var(--amber);color:var(--ink)}
+body.server-mode #workspace-pictures .pic-pair{display:flex;gap:4px;padding:6px 10px;width:100%;font-size:12px;background:transparent;border:0}
+body.server-mode #workspace-pictures .pic-lab{margin-right:auto;color:var(--ink);font:500 12px var(--f-sans)}
+body.server-mode #workspace-pictures button{width:auto;min-width:50px;text-align:center;border:1px solid var(--rule);padding:5px 8px}
+body.server-mode #workspace-pictures button.on{border-color:var(--amber);background:var(--calc)}
+body.server-mode #workspace-option-actions button{color:#c65a4f}
+body.server-mode #workspace-option-actions button.danger{background:#a2372d;color:white}
+#workspace-columns #hiddenCols{display:flex;flex-direction:column;width:100%;gap:3px}
+#workspace-columns #hiddenCols:empty::after{content:'All columns are visible';padding:7px 10px;font-size:12px;color:var(--muted)}
+body.server-mode #status,body.server-mode #projToggle,body.server-mode #projClose,body.server-mode #projects .panel-grab{display:none!important}
+body.server-mode #server-title{flex:1;min-width:90px;max-width:none}
+body.server-mode #server-status{margin-left:0}
+body.server-mode #server-drawer{width:var(--workspace-project-width);top:65px;z-index:505}
+body.server-mode.workspace-projects-open.server-active>.sheet{margin-left:calc(var(--workspace-project-width) + 14px)}
+body.server-mode #server-drawer button{font-family:var(--f-sans)}
+.workbook-controls{padding:12px;border-bottom:1px solid var(--rule);flex:none}
+.workbook-label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px}
+.workbook-picker{display:flex;gap:6px;align-items:center}
+body.server-mode #server-open{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;font-size:13px;font-weight:600}
+#server-workbook-actions>summary{padding:5px 8px;font-size:20px;line-height:1}
+#server-workbook-actions>summary::after{display:none}
+.workbook-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px}
+body.server-mode .workbook-toolbar button{font-size:11px;padding:5px 8px}
+body.server-mode #server-back{border:0;color:var(--muted)}
+#server-browser{display:flex;flex-direction:column;flex:1;min-height:0}
+#server-hierarchy{display:flex;flex:1;min-height:0;overflow:hidden}
+body.server-mode #projects{position:static;inset:auto;transform:none;transition:none;width:100%;min-width:0;flex:1;border:0;box-shadow:none;z-index:auto;background:var(--card)}
+body.server-mode #projects>.lib-head{padding:9px 12px;background:var(--calc);border-bottom:1px solid var(--rule);flex:none}
+body.server-mode #projects .proj-body{flex:1;min-height:0;overflow:auto}
+body.server-mode #projects .lib-name{font-size:12px;max-width:100%;width:100%}
+body.server-mode #projects .proj-tools{padding:10px 12px}
+body.server-mode #projects .p-btn{padding:2px 4px;border:0;background:transparent;font-size:13px}
+body.server-mode #projects .caret{padding:2px;border:0;background:transparent}
+body.server-mode #projects .p-head{min-height:32px}
+body.server-mode #projects .lib-foot{border-top:1px solid var(--rule);padding:10px 12px;background:var(--calc)}
+body.server-mode #projects .lib-foot button{width:100%;text-align:left;font-size:12px}
+body.server-mode .card>.head .workspace-actions{margin:10px -2px 0;padding:0;gap:6px;border:0;background:none;border-radius:0;box-shadow:none;min-height:0}
+body.server-mode .workspace-actions .btn{padding:5px 10px;font-size:11px}
+body.server-mode .sheet .h-adds{display:none}
+body.server-mode .sheet>.card{padding-bottom:8px}
+body.server-mode .ed{top:65px;bottom:24px;z-index:560;max-height:calc(100vh - 89px)}
+body.server-mode.workspace-projects-open .ed.ed-left{left:calc(42px + var(--workspace-project-width));right:auto;max-width:calc(100vw - var(--workspace-project-width) - 62px)}
+body.server-mode:not(.workspace-projects-open) .ed.ed-left{left:30px;right:auto;max-width:calc(100vw - 60px)}
+body.server-mode .ed.listopts{width:410px;border:1px solid var(--rule);border-radius:7px;background:var(--card);box-shadow:0 12px 40px #0004}
+body.server-mode .ed.listopts .ed-head,body.server-mode .ed.listopts .ed-foot{background:var(--calc);color:var(--ink);text-shadow:none}
+body.server-mode .ed.listopts .ed-body{padding:14px;background:var(--card)}
+.project-settings-tabs{display:flex;gap:3px;padding:3px;background:var(--calc);border-radius:5px;margin:0 0 16px}
+body.server-mode .project-settings-tabs button{flex:1;padding:8px 4px;border:0;border-radius:3px;background:transparent;color:var(--muted);font:500 12px var(--f-sans);cursor:pointer;white-space:nowrap}
+body.server-mode .project-settings-tabs button[aria-selected=true]{color:var(--ink);background:var(--card);box-shadow:0 1px 4px #0002}
+.project-settings-section h3{font:600 16px var(--f-sans);color:var(--ink);margin:4px 0 7px}
+.project-settings-hint{font:12px/1.6 var(--f-sans);color:var(--muted);margin:0 0 16px}
+.project-settings-row{display:flex;gap:8px;align-items:center;margin-bottom:9px}
+body.server-mode .project-settings-row input{flex:1;min-width:0;padding:9px 10px;border:1px solid var(--rule);border-radius:4px;background:var(--paper);color:var(--ink);font:13px var(--f-sans)}
+body.server-mode .project-settings-row .settings-remove{padding:4px 8px;border:0;background:transparent;color:var(--muted);font:18px var(--f-sans);cursor:pointer}
+.settings-remove:disabled{opacity:.3;cursor:default}
+.settings-filter-choice{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--rule);font-size:13px;cursor:pointer}
+.settings-filter-choice input{accent-color:var(--slate)}
+body.server-mode .filter-pop,body.server-mode .print-menu,body.server-mode .confirm-pop,body.server-mode .tab-opts,body.server-mode .help-pop{z-index:650}
+body.server-mode .filter-pop{max-height:calc(100vh - 340px);overflow:auto}
+body.server-mode .workspace-menu summary:focus-visible,body.server-mode button:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+body.server-mode #server-welcome{padding-left:calc(var(--workspace-project-width) + 40px)}
+@media(max-width:900px){body.server-mode.workspace-projects-open.server-active>.sheet{margin-left:0}body.server-mode #server-people{display:none}body.server-mode #server-title{max-width:28vw}body.server-mode #server-status{font-size:10px}body.server-mode.workspace-projects-open .ed.ed-left,body.server-mode:not(.workspace-projects-open) .ed.ed-left{left:20px;right:20px;max-width:calc(100vw - 40px);width:410px}}
+@media(max-width:650px){body.server-mode #server-bar{gap:4px}body.server-mode #workspace-menus{order:2}body.server-mode #server-status{order:3;flex:1;text-align:right}body.server-mode #server-title{max-width:none}body.server-mode #server-signout{max-width:100px;font-size:11px}body.server-mode #server-drawer{top:101px;left:10px;width:calc(100vw - 20px);bottom:12px}body.server-mode .ed{top:101px}body.server-mode #server-welcome{padding:30px}body.server-mode .workspace-menu-content{max-height:calc(100vh - 160px)}}
+@media print{body.server-mode .workspace-actions,body.server-mode #workspace-menus{display:none!important}body.server-mode.workspace-projects-open.server-active>.sheet{margin-left:0}}

@@ -1,12 +1,14 @@
 import * as Y from 'yjs';
 import { readBook, writeBook, validateBook } from '../shared/model.js';
 import './style.css';
+import { setupWorkspace } from './workspace.js';
 
 const $ = id => document.getElementById(id);
 const clone = value => structuredClone(value);
 const encode = data => { let s = ''; for (let i = 0; i < data.length; i += 8192) s += String.fromCharCode(...data.subarray(i, i + 8192)); return btoa(s); };
 const decode = data => Uint8Array.from(atob(data), c => c.charCodeAt(0));
-let user, current, connection, projects = [], filter = '', busy = false;
+let user, current, connection, projects = [], filter = '', busy = false, browsing = true;
+let workspace;
 const bridge = window.estimator;
 const cacheDB = new Promise((resolve, reject) => {
   const request = indexedDB.open('freedom-collaboration', 1);
@@ -113,6 +115,7 @@ class LiveProject {
           if (msg.type === 'sync') {
             this.peerId = msg.peerId; this.synced = true; this.ready = true; this.retry = 0;
             document.body.classList.add('server-active');
+            workspace.sync(); syncProjectPanel();
             // The merged state includes edits recovered from this browser after a disconnect.
             this.seq++; this.sendUpdate(Y.encodeStateAsUpdate(this.doc));
           }
@@ -194,12 +197,30 @@ class LiveProject {
   }
 }
 
-function panel(open = true) { $('server-drawer').hidden = !open; $('server-projects').setAttribute('aria-expanded', String(open)); if (open) refresh().catch(e => message(e.message, true)); }
+function syncProjectPanel() {
+  const browse = browsing || !current;
+  $('server-browser').hidden = !browse;
+  $('server-hierarchy').hidden = browse || !document.body.classList.contains('server-active');
+  $('server-back').hidden = !current || !browse;
+  $('server-open').textContent = current ? current.name + ' \u25be' : 'Browse saved workbooks';
+  $('server-open').title = 'Switch saved workbook';
+  $('server-workbook-actions').hidden = !current;
+  workspace?.sync();
+  requestAnimationFrame(() => bridge.relayout());
+}
+function panel(open = true) {
+  $('server-drawer').hidden = !open;
+  document.body.classList.toggle('workspace-projects-open', open);
+  $('server-projects').setAttribute('aria-expanded', String(open));
+  if (open) { syncProjectPanel(); bridge.refreshProjects(); if (user) refresh().catch(e => message(e.message, true)); }
+  requestAnimationFrame(() => bridge.relayout());
+}
+
 async function refresh() { projects = await api('/projects'); renderProjects(); }
 function renderProjects() {
   const host = $('server-list'); host.replaceChildren();
   const visible = projects.filter(p => p.name.toLowerCase().includes(filter));
-  if (!visible.length) host.append(element('p', filter ? 'No matching projects.' : 'Create a project or import an existing JSON file.', 'server-empty'));
+  if (!visible.length) host.append(element('p', filter ? 'No matching projects.' : 'Create a workbook or import JSON from the File menu.', 'server-empty'));
   for (const project of visible) {
     const item = element('button', '', 'server-project' + (current?.id === project.id ? ' selected' : ''));
     item.type = 'button';
@@ -215,7 +236,7 @@ async function closeProject() {
   document.body.classList.remove('server-active');
   $('server-title').textContent = 'Freedom Estimating';
   $('server-close').disabled = $('server-edit').disabled = $('server-export').disabled = true;
-  status('No project open'); panel();
+  browsing = true; bridge.closeEditor(); syncProjectPanel(); status('No project open'); panel();
 }
 async function openProject(project) {
   if (current?.id === project.id && connection?.ready) { panel(false); return; }
@@ -224,6 +245,7 @@ async function openProject(project) {
   current = await api('/projects/' + project.id + '/open', { method: 'POST' });
   $('server-title').textContent = current.name;
   $('server-close').disabled = $('server-edit').disabled = $('server-export').disabled = false;
+  browsing = false; syncProjectPanel();
   connection = new LiveProject(current); await connection.start(); panel(false);
 }
 async function createProject(name, book) {
@@ -253,20 +275,29 @@ function exportLocal() {
 document.body.insertAdjacentHTML('afterbegin', `
   <header id="server-bar">
     <button id="server-projects" type="button" aria-expanded="true" aria-controls="server-drawer">☰ Projects</button>
+    <nav id="workspace-menus" aria-label="Workspace menus"></nav>
     <strong id="server-title">Freedom Estimating</strong><div id="server-people" aria-label="Collaborators"></div>
     <span id="server-status" role="status">Connecting…</span><button id="server-signout" type="button">Sign out</button>
   </header>
-  <aside id="server-drawer" aria-label="Saved projects">
-    <div class="server-drawer-head"><strong>Projects</strong><button id="server-hide" aria-label="Hide projects">×</button></div>
-    <nav>
-      <button id="server-new">＋ New Project</button><button id="server-open">▤ Open Project</button>
-      <button id="server-edit" disabled>✎ Edit Project Name</button><button id="server-import">↥ Import Projects</button>
-      <button id="server-export" disabled>↧ Export JSON</button><button id="server-close" disabled>⏻ Close Project</button>
-    </nav>
-    <label class="server-search">Find a project<input id="server-search" type="search" placeholder="Search saved projects…"></label>
-    <div id="server-list"></div>
+  <aside id="server-drawer" aria-label="Projects">
+    <div class="server-drawer-head"><strong>Projects</strong><button id="server-hide" aria-label="Hide projects">&times;</button></div>
+    <div class="workbook-controls">
+      <span class="workbook-label">Saved workbook</span>
+      <div class="workbook-picker"><button id="server-open" type="button">Browse saved workbooks</button>
+        <details id="server-workbook-actions" class="workspace-menu" hidden>
+          <summary aria-label="Workbook actions">&ctdot;</summary>
+          <div class="workspace-menu-content"><button id="server-edit" disabled>Rename workbook</button><button id="server-close" disabled>Close workbook</button></div>
+        </details>
+      </div>
+      <div class="workbook-toolbar"><button id="server-new" type="button">+ New workbook</button><button id="server-back" type="button" hidden>Back to current</button></div>
+    </div>
+    <section id="server-browser" aria-label="Saved workbooks">
+      <label class="server-search">Find a workbook<input id="server-search" type="search" placeholder="Search saved workbooks…"></label>
+      <div id="server-list"></div>
+    </section>
+    <div id="server-hierarchy" hidden></div>
   </aside>
-  <div id="server-welcome"><h1>Your projects, together.</h1><p>Create a project or import your existing JSON file from the Projects panel.</p><p>Edits save automatically. Open the same project on another browser to collaborate.</p></div>
+  <div id="server-welcome"><h1>Your projects, together.</h1><p>Create a workbook here, or use File &rarr; Import JSON to bring in existing work.</p><p>Browse companies, projects and takeoffs in one place. Open the same workbook on another browser to collaborate.</p></div>
   <div id="server-message" role="alert"></div><div id="server-cursors" aria-hidden="true"></div>
   <input id="server-import-file" type="file" accept=".json,application/json" multiple hidden>
   <dialog id="server-login"><form id="server-login-form"><h2>Freedom Estimating</h2><p id="server-login-hint">Sign in to your shared projects.</p>
@@ -277,17 +308,20 @@ document.body.insertAdjacentHTML('afterbegin', `
     <label>Project name<input id="server-name-input" required maxlength="160"></label><div class="server-dialog-actions"><button type="button" id="server-name-cancel">Cancel</button><button type="submit">Save</button></div>
   </form></dialog>`);
 document.body.classList.add('server-mode');
+workspace = setupWorkspace();
+syncProjectPanel();
 $('server-projects').onclick = () => panel($('server-drawer').hidden);
 $('server-hide').onclick = () => panel(false);
-$('server-open').onclick = () => { panel(); $('server-search').focus(); };
+$('server-open').onclick = () => { browsing = true; panel(); $('server-search').focus(); };
+$('server-back').onclick = () => { browsing = false; syncProjectPanel(); bridge.refreshProjects(); };
 $('server-search').oninput = event => { filter = event.target.value.toLowerCase(); renderProjects(); };
-$('server-new').onclick = () => nameDialog('New project', '', name => createProject(name, bridge.blank(name)));
-$('server-edit').onclick = () => nameDialog('Edit project name', current.name, async name => {
+$('server-new').onclick = () => nameDialog('New workbook', '', name => createProject(name, bridge.blank(name)));
+$('server-edit').onclick = () => nameDialog('Rename workbook', current.name, async name => {
   current = await api('/projects/' + current.id, { method: 'PATCH', body: JSON.stringify({ name }) });
-  $('server-title').textContent = current.name; await refresh();
+  $('server-title').textContent = current.name; syncProjectPanel(); await refresh();
 });
 $('server-name-cancel').onclick = () => $('server-name-dialog').close();
-$('server-close').onclick = () => run(closeProject);
+$('server-close').onclick = () => { $('server-workbook-actions').open = false; run(closeProject); };
 $('server-export').onclick = exportLocal;
 $('server-import').onclick = () => $('server-import-file').click();
 $('server-import-file').onchange = event => run(async () => {
@@ -327,7 +361,7 @@ window.addEventListener('resize', () => connection?.paintPeers());
 document.addEventListener('visibilitychange', () => { if (document.hidden) connection?.sendPresence({ visible: false }); });
 async function signedIn(name) {
   user = name; $('server-signout').textContent = name + ' · Sign out';
-  $('server-login').close(); await refresh(); status('No project open');
+  $('server-login').close(); await refresh(); syncProjectPanel(); status('No project open');
 }
 async function boot() {
   await bridge.ready;

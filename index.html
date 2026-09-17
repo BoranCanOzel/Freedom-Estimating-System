@@ -2961,7 +2961,7 @@
   </div>
   <div class="proj-body" id="projBody"></div>
   <div class="lib-foot">
-    <button type="button" class="btn alt tiny wide" id="projOptions">Project list options</button>
+    <button type="button" class="btn alt tiny wide" id="projOptions">Project settings</button>
   </div>
 </aside>
 
@@ -4252,6 +4252,7 @@
     const c = cell.getBoundingClientRect();
     const k = card.getBoundingClientRect();
     const s = scroller.getBoundingClientRect();
+    const zoom = num(book.zoom) || 1;
     const left = Math.max(c.left, s.left + 1);
     const right = Math.min(c.right, s.right - 1);
     if (right - left < 56 || c.bottom < s.top){    // the column is not on screen
@@ -4259,9 +4260,9 @@
       return;
     }
     lip.hidden = false;
-    lip.style.top = Math.round(c.bottom - k.top) + 'px';
-    lip.style.left = Math.round(left - k.left + 5) + 'px';
-    lip.style.width = Math.round(right - left - 10) + 'px';
+    lip.style.top = Math.round((c.bottom - k.top) / zoom) + 'px';
+    lip.style.left = Math.round((left - k.left) / zoom + 5) + 'px';
+    lip.style.width = Math.round((right - left) / zoom - 10) + 'px';
   }
 
   function anchorTips(){
@@ -5522,7 +5523,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     const opts = document.createElement('button');
     opts.type = 'button';
     opts.className = 'tab tab-opts-btn';
-    opts.innerHTML = '&#9881;';
+    opts.textContent = 'Scopes';
     opts.title = 'All option scopes and tab colours';
     opts.setAttribute('aria-selected', String(book.view === 'scopes'));
     opts.addEventListener('click', () => { book.view = 'scopes'; showView(); save(); });
@@ -5564,9 +5565,9 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       ['ico type', 'The type icon on the right sets labor, equipment, material and the rest']
     ]],
     ['Getting about', [
-      ['', 'Tabs along the top are the options on this job, the gear lists every scope'],
+      ['', 'Tabs along the top are the options on this job; Scopes lists every scope'],
       ['', 'Tabs down the right edge open the library, the catalog and your notes'],
-      ['', 'The left tab opens companies, projects and takeoffs'],
+      ['', 'Projects at the top left opens saved workbooks, companies, projects and takeoffs'],
       ['', 'Drag a template out of the library onto the sheet, or a line into it to save one']
     ]]
   ];
@@ -5683,6 +5684,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     else if (v === 'load') renderLoad();
     else if (v === 'wage') renderWage();
     else { renderAll(); if (document.body.classList.contains('lib-open')) renderLibrary(); }
+    document.dispatchEvent(new CustomEvent('estimator:view', {detail:{view:v}}));
   }
 
   // totals for any sheet, active or not
@@ -6441,6 +6443,15 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     });
     if (!book.sheets.length) book.sheets = [seed(1)];
     projectTree();
+    // Every takeoff must be ready to render, including imported inactive ones.
+    (book.lists || []).forEach(list => (list.companies || []).forEach(co =>
+      (co.projects || []).forEach(pr => (pr.takeoffs || []).forEach(tk => {
+        (tk.sheets || []).forEach((sh, i) => {
+          normalize(sh);
+          if (!sh.id) sh.id = id();
+          if (!sh.num) sh.num = i + 1;
+        });
+      }))));
     activeTakeoff();
     eachTakeoff(tk => {
       if (!Array.isArray(tk.loadCalc) || !tk.loadCalc.length) return;
@@ -9268,140 +9279,14 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   }
 
   function renderListOpts(box){
-    // parked here until there is a proper options screen
-    const look = document.createElement('div');
-    look.className = 'ed-meta';
-    const lh = document.createElement('div');
-    lh.className = 'ed-folder-head';
-    lh.innerHTML = '<span>Appearance</span>';
-    look.appendChild(lh);
-    const pair = document.createElement('div');
-    pair.className = 'pic-pair';
-    const lab = document.createElement('span');
-    lab.className = 'pic-lab';
-    lab.textContent = 'Theme';
-    const mk = (id, txt, tip, on) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.id = id;
-      b.title = tip;
-      b.textContent = txt;
-      b.addEventListener('click', () => { setTheme(on); });
-      return b;
-    };
-    pair.append(lab, mk('lightMode', 'Light', 'Light background', 'light'),
-                     mk('darkMode', 'Dark', 'Dark background', 'dark'),
-                     mk('medievalMode', 'Medieval', 'Stone, iron and parchment', 'medieval'));
-    look.appendChild(pair);
-    box.appendChild(look);
-    applyTheme();
-
-    const head = document.createElement('div');
-    head.className = 'ed-namebox';
-    head.appendChild(blockHead(book, 'Project status list', 'stLocked', 'stOpen'));
-    if (book.stOpen !== false){
-      const list = document.createElement('div');
-      list.className = 's-lines';
-      statuses().forEach((st, i) => {
-        const r = document.createElement('div');
-        r.className = 'ed-sub';
-        const inp = document.createElement('input');
-        inp.className = 'sub-val';
-        inp.value = st;
-        inp.addEventListener('input', () => { book.statuses[i] = inp.value; });
-        r.append(inp, edBtn('&times;', 'Remove', () => { book.statuses.splice(i, 1); renderEditor(); }, 'rm'));
-        list.appendChild(r);
-      });
-      head.appendChild(list);
-      const add = document.createElement('button');
-      add.type = 'button';
-      add.className = 'btn alt tiny';
-      add.textContent = '+ Add status';
-      add.addEventListener('click', () => { statuses().push('New status'); renderEditor(); });
-      head.appendChild(add);
-    }
-    box.appendChild(head);
-
-    [['company','Company detail'],['project','Project detail'],['takeoff','Takeoff detail']].forEach(([kind, label]) => {
-      const blk = document.createElement('div');
-      blk.className = 'ed-meta';
-      const h = document.createElement('div');
-      h.className = 'ed-folder-head';
-      h.innerHTML = '<span>' + label + '</span>';
-      blk.appendChild(h);
-      const list = customFields(kind);
-      const rows = document.createElement('div');
-      rows.className = 's-lines';
-      list.forEach((f, i) => {
-        const r = document.createElement('div');
-        r.className = 'ed-sub';
-        const inp = document.createElement('input');
-        inp.className = 'sub-val';
-        inp.value = f;
-        inp.addEventListener('input', () => { list[i] = inp.value; });
-        r.append(inp, edBtn('&times;', 'Remove', () => { list.splice(i, 1); renderEditor(); }, 'rm'));
-        rows.appendChild(r);
-      });
-      if (!list.length) rows.innerHTML = '<div class="lib-hint">No extra fields.</div>';
-      blk.appendChild(rows);
-      const add = document.createElement('button');
-      add.type = 'button';
-      add.className = 'btn alt tiny';
-      add.textContent = '+ Add field';
-      add.addEventListener('click', () => { list.push('New field'); renderEditor(); });
-      blk.appendChild(add);
-      box.appendChild(blk);
-    });
-
-    const ff = document.createElement('div');
-    ff.className = 'ed-meta';
-    ff.innerHTML = '<div class="ed-folder-head"><span>Filter fields</span></div>';
-    const hint = document.createElement('div');
-    hint.className = 'lib-hint';
-    hint.textContent = 'Pick project fields to offer in the filter menu.';
-    ff.appendChild(hint);
-    const chips = document.createElement('div');
-    chips.className = 'chip-row tight';
-    const pool = ['Status'].concat(customFields('project'));
-    pool.forEach(f => {
-      if (f === 'Status') return;
-      const c = document.createElement('button');
-      c.type = 'button';
-      c.className = 'chip fchip' + (filterFields().indexOf(f) >= 0 ? ' on' : '');
-      c.textContent = f;
-      c.addEventListener('click', () => {
-        book.filterFields = filterFields().indexOf(f) >= 0
-          ? filterFields().filter(x => x !== f)
-          : filterFields().concat([f]);
-        renderEditor();
-      });
-      chips.appendChild(c);
-    });
-    if (!customFields('project').length){
-      chips.innerHTML = '<div class="lib-hint">Add project fields above first.</div>';
-    }
-    ff.appendChild(chips);
-    box.appendChild(ff);
-
-    const dl = document.createElement('div');
-    dl.className = 'ed-meta';
-    dl.innerHTML = '<div class="ed-folder-head"><span>Download</span></div>';
-    const bar = document.createElement('div');
-    bar.className = 'lib-actions wrap';
-    const b1 = document.createElement('button');
-    b1.type = 'button'; b1.className = 'btn alt tiny'; b1.textContent = 'Company list';
-    b1.addEventListener('click', exportCompanies);
-    const b2 = document.createElement('button');
-    b2.type = 'button'; b2.className = 'btn alt tiny'; b2.textContent = 'Project list';
-    b2.addEventListener('click', exportProjects);
-    bar.append(b1, b2);
-    dl.appendChild(bar);
-    box.appendChild(dl);
+    if (window.freedomWorkspace) window.freedomWorkspace.renderProjectSettings(box);
+    else box.textContent = 'Open the app through the server to manage project settings.';
   }
 
   function renderEditor(){
     const box = document.getElementById('edBody');
     box.innerHTML = '';
+    box.classList.toggle('project-settings-body', edMode === 'listopts');
     if (edMode === 'company') return renderCoEd(box);
     if (edMode === 'project') return renderPrEd(box);
     if (edMode === 'takeoff') return renderTkEd(box);
@@ -9472,13 +9357,16 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     ed.className = 'ed ' + mode + (leftSide ? ' ed-left' : '');
     ed.hidden = false;
     document.getElementById('edTitle').textContent =
-      mode === 'listopts' ? 'Project list options'
+      mode === 'listopts' ? 'Project settings'
       : (t && t.id ? 'Edit ' : 'New ') + (mode === 'scope' ? 'scope' : mode);
     document.getElementById('edHint').textContent =
       mode === 'item' ? 'One card'
       : mode === 'section' ? 'A pack of lines'
       : mode === 'subtype' ? 'Catalog option'
       : 'Sections and lines';
+    document.getElementById('edSave').hidden = mode === 'listopts';
+    document.getElementById('edCancel').textContent = mode === 'listopts' ? 'Done' : 'Cancel';
+    if (mode === 'listopts') document.getElementById('edHint').textContent = 'Changes save automatically';
     renderEditor();
   }
 
@@ -10139,6 +10027,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     document.body.classList.remove('lib-open');
     document.body.classList.remove('proj-open');
     document.getElementById('editor').hidden = true;
+    if (!all && (book.view === 'load' || book.view === 'wage')) { window.print(); return; }
     const box = document.getElementById('printAll');
     box.innerHTML = all
       ? printSummaryHtml() + book.sheets.map(printSheetHtml).join('')
@@ -11061,7 +10950,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       const hint = document.createElement('div');
       hint.className = 'lib-hint';
       hint.style.padding = '4px 2px';
-      hint.textContent = 'Add filter fields in Project list options.';
+      hint.textContent = 'Add filter fields in Project settings.';
       pop.appendChild(hint);
     }
 
@@ -11334,7 +11223,57 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     }
     return structuredClone(local);
   }
+  function settingsRecords(kind){
+    const companies = (book.lists || []).flatMap(l => l.companies || []);
+    if (kind === 'company') return companies;
+    const projects = companies.flatMap(c => c.projects || []);
+    return kind === 'project' ? projects : projects.flatMap(p => p.takeoffs || []);
+  }
   window.estimator = {
+    setTheme,
+    themeName,
+    getAppearance(){ return {theme:themeName(), zoom:book.zoom || 1}; },
+    setAppearance(value){
+      if (THEMES.includes(value.theme)) { book.theme = value.theme; book.dark = value.theme !== 'light'; }
+      if ([1,1.15,1.3,1.5,1.75,2].includes(Number(value.zoom))) book.zoom = Number(value.zoom);
+      applyTheme(); applyZoom();
+    },
+    print: doPrint,
+    exportCompanies,
+    exportProjects,
+    refreshProjects: renderProjects,
+    relayout(){ layout(); sumLayout(); growAll(); },
+    closeEditor,
+    projectSettings: {
+      fields: customFields, statuses, filters: filterFields,
+      save(){ renderProjects(); save(); },
+      renameField(kind, index, name){
+        const list = customFields(kind), old = list[index];
+        if (name === old) return;
+        settingsRecords(kind).forEach(record => {
+          if (record.custom && Object.hasOwn(record.custom, old)) {
+            record.custom[name] = record.custom[old]; delete record.custom[old];
+          }
+        });
+        list[index] = name;
+        if (kind === 'project') {
+          book.filterFields = filterFields().map(f => f === old ? name : f);
+          if (book.fieldPicks && Object.hasOwn(book.fieldPicks, old)) {
+            book.fieldPicks[name] = book.fieldPicks[old]; delete book.fieldPicks[old];
+          }
+        }
+      },
+      removeField(kind, index){
+        const old = customFields(kind).splice(index,1)[0];
+        if (kind === 'project') book.filterFields = filterFields().filter(f => f !== old);
+      },
+      renameStatus(index, name){
+        const old = statuses()[index]; statuses()[index] = name;
+        settingsRecords('project').forEach(pr => { if (pr.status === old) pr.status = name; });
+        book.statusHidden = (book.statusHidden || []).map(s => s === old ? name : s);
+      },
+      setFilter(field, on){ book.filterFields = on ? [...new Set([...filterFields(), field])] : filterFields().filter(f => f !== field); }
+    },
     getShared(){ projectTree(); templates(); return separate(book); },
     getLocation(){ return {view:book.view, sheet:book.active, takeoff:book.activeTakeoff}; },
     exportBook(){ return structuredClone(book); },
@@ -11344,7 +11283,10 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         takeoff:tkDraft, subtype:subDraft})[edMode];
       const recordId = draft && (draft.__rowId || draft.id);
       const before = recordId ? findRecord(book, recordId) : null;
-      if (fresh) { personal = new Map(); closeEditor(); }
+      if (fresh) {
+        personal = new Map([['["theme"]',themeName()],['["dark"]',themeName() !== 'light'],['["zoom"]',book.zoom || 1]]);
+        closeEditor();
+      }
       else separate(book);
       adoptBook(materialize(data));
       if (!fresh && before && draft) {
@@ -11357,6 +11299,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
           renderEditor();
         } else { closeEditor(); window.freedomSession?.notify('The record you were editing was removed by another user.'); }
       }
+      if (!fresh && edMode === 'listopts') renderEditor();
       showView(); renderProjects();
     },
     prepare(data){

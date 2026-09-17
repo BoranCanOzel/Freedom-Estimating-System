@@ -34,9 +34,21 @@ The app intentionally refuses to start in production without valid `APP_USERS`. 
 
 ## Projects and files
 
-The top-left **Projects** panel supports creating, opening, renaming, importing, exporting, and closing saved projects. It shows last opened, last edited, editor name, and online collaborators. Opening a project updates access history without changing its modification date.
+The top-left **Projects** drawer is the single place to browse saved workbooks and their company → project → takeoff hierarchy. The workbook selector opens the saved-file browser, with last opened, last edited, editor name, and online collaborators. Its actions menu renames or closes the workbook. Opening a workbook updates access history without changing its modification date.
 
-Each imported JSON becomes a server workbook, preserving its existing company → project → takeoff hierarchy and template libraries. A legacy single-sheet JSON is also supported. The existing side tab still manages companies and takeoffs inside the open workbook. Renaming a server workbook changes its name in the top-left panel; internal project names remain editable in the existing hierarchy.
+Each imported JSON becomes a server workbook, preserving its existing company → project → takeoff hierarchy and template libraries. A legacy single-sheet JSON is also supported. Companies, projects, takeoffs, named lists, and custom filters remain available inside the same drawer. Renaming a server workbook changes its name in the workbook selector; internal project names remain editable in the hierarchy.
+
+Workspace controls are grouped by purpose:
+
+| Location | Controls |
+| --- | --- |
+| File | JSON import/export, estimate Excel export, printing, company and project directory exports |
+| View | Theme, zoom, pictures, sheet details, summary details, and calculator folding, according to the active view |
+| Estimate | Current option rounding, embedded load calculator, hidden column restoration, reset and delete |
+| Projects → Project settings | Custom fields by company/project/takeoff, project statuses, and available filters |
+| Sheet or calculator heading | Common add-item, add-section, add-option, and add-labor-group actions |
+
+Project settings save automatically. Renaming a custom field retains existing detail values and its filter configuration. Theme and zoom are personal browser preferences that persist across workbook changes. The Scopes tab replaces the former gear icon for the option overview. Destructive estimate actions retain their two-click confirmation.
 
 Storage layout:
 
@@ -83,6 +95,7 @@ Browser tests use installed Microsoft Edge by default. Set `BROWSER_CHANNEL=chro
 - `server.js`: authenticated project API, SQLite persistence, snapshot rotation, WebSocket rooms.
 - `shared/model.js`: stable-ID workbook mapping to Yjs shared text and scalar fields.
 - `client/app.js`: project browser, presence, reconnect, device recovery, and UI integration.
+- `client/workspace.js` and `client/project-settings.js`: contextual menus, the combined project drawer, and project definitions.
 - `index.html`: existing estimator and a small adapter separating shared data from personal navigation.
 - `main.py` is the pre-existing empty placeholder; this implementation does not use Python.
 

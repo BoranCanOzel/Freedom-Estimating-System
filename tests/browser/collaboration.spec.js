@@ -46,7 +46,9 @@ test('two estimators share edits, cursors, reconnects and projects', async ({ br
     await alice.locator('#edSave').click();
     await expect(bob.locator('#body input[aria-label="Item name"]').first()).toHaveValue('Draft name');
     await expect(bob.locator('#body input[aria-label="cost"]').first()).toHaveValue(/^88(?:\.00)?$/);
-    await alice.locator('#server-projects').click();await alice.locator('#server-close').click();
+    await alice.locator('#server-projects').click();
+    await alice.locator('#server-workbook-actions > summary').click();
+    await alice.locator('#server-close').click();
     await alice.getByRole('button').filter({has:alice.getByText(name,{exact:true})}).click();
     await expect(alice.locator('#body input[aria-label="Item name"]').first()).toHaveValue('Draft name');
     await expect(alice.locator('#title')).toHaveValue('Online scope');
