@@ -6,7 +6,7 @@ test('two estimators share edits, cursors, reconnects and projects', async ({ br
   for(const page of [alice,bob])page.on('pageerror',e=>errors.push(e.message));
   async function login(page,name){await page.goto('/');await page.locator('#server-login-name').fill(name);await page.locator('#server-login-form button').click();await expect(page.locator('#server-login')).not.toBeVisible();}
   try {
-    await login(alice,'Alice'); await login(bob,'Bob');
+    await login(alice,'Alice '+Date.now()); await login(bob,'Bob '+Date.now());
     const name='Browser test '+Date.now();
     await alice.locator('#server-new').click();await alice.locator('#server-name-input').fill(name);await alice.locator('#server-name-form button[type=submit]').click();
     await expect(alice.locator('#server-status')).toHaveText('All changes saved');

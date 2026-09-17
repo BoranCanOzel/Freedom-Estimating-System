@@ -18,11 +18,38 @@ async function openWorkbook(page, data = workbook(), name = 'Workspace tester') 
     await page.locator('#server-login-form button').click(); await expect(page.locator('#server-login')).not.toBeVisible();
     if (name === 'Workspace tester') workspaceCookies = await page.context().cookies();
   }
+  await expect(page.locator('#server-status')).toHaveText(/^(All changes saved|No project open)$/,{timeout:20000});
   await page.locator('#workspace-file > summary').click();
   const chooser = page.waitForEvent('filechooser'); await page.locator('#server-import').click();
-  await (await chooser).setFiles({name:'Organized '+Date.now()+'.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(data))});
+  const workbookName='Organized '+Date.now();
+  const refreshed=page.waitForResponse(r=>r.url().endsWith('/api/projects') && r.request().method()==='GET');
+  await (await chooser).setFiles({name:workbookName+'.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(data))});
+  await refreshed;
+  await expect(page.locator('#server-title')).toHaveText(workbookName);
   await expect(page.locator('#server-status')).toHaveText('All changes saved', {timeout:20000});
 }
+
+test('last selected workbook survives sign-out and opens in a fresh browser',async({page,browser,baseURL})=>{
+  const name='Remember workbook '+Date.now();
+  await openWorkbook(page,workbook(),name);
+  await page.locator('#server-projects').click();await page.locator('#server-tab-workbooks').click();
+  const selected='Last selected '+Date.now();
+  await page.locator('#server-new').click();await page.locator('#server-name-input').fill(selected);
+  const refreshed=page.waitForResponse(r=>r.url().endsWith('/api/projects') && r.request().method()==='GET');
+  await page.locator('#server-name-form button[type=submit]').click();
+  await refreshed;
+  await expect(page.locator('#server-title')).toHaveText(selected);
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.locator('#server-signout').click();await expect(page.locator('#server-login')).toBeVisible();
+  const context=await browser.newContext({baseURL});
+  try {
+    const fresh=await context.newPage();await fresh.goto('/');
+    await fresh.locator('#server-login-name').fill(name);await fresh.locator('#server-login-form button').click();
+    await expect(fresh.locator('#server-status')).toHaveText('All changes saved');
+    await expect(fresh.locator('#server-title')).toHaveText(selected);
+    await expect(fresh.locator('#sheetCard')).toBeVisible();
+  } finally {await context.close();}
+});
 
 test('cursor style persists on the account while text and resize cursors remain usable', async ({page}) => {
   await openWorkbook(page,workbook(),'Cursor tester '+Date.now());

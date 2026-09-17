@@ -120,7 +120,10 @@ export function createApp(options = {}) {
     res.clearCookie('freedom_session'); res.json({ ok: true });
   });
   app.get('/api/preferences', (req, res) => {
-    res.json({cursor:db.prepare('SELECT cursor FROM user_preferences WHERE name=?').get(req.user.name)?.cursor || 'system'});
+    const last = db.prepare(`SELECT a.project_id FROM access a JOIN projects p ON p.id=a.project_id
+      WHERE a.name=? ORDER BY a.opened_at DESC, a.project_id LIMIT 1`).get(req.user.name);
+    res.json({cursor:db.prepare('SELECT cursor FROM user_preferences WHERE name=?').get(req.user.name)?.cursor || 'system',
+      lastWorkbook:last?.project_id || null});
   });
   app.put('/api/preferences', (req, res) => {
     const cursor = req.body?.cursor;

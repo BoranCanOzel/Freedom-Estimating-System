@@ -302,7 +302,6 @@ async function closeProject() {
   document.body.classList.remove('server-active');
   $('server-title').textContent = 'Freedom Estimating';
   $('server-close').disabled = $('server-edit').disabled = $('server-export').disabled = true;
-  localStorage.removeItem('freedom:last-workbook:' + user);
   browsing = true; recentMode = false; bridge.closeEditor(); syncProjectPanel(); status('No project open'); panel();
 }
 async function openProject(project) {
@@ -314,7 +313,6 @@ async function openProject(project) {
   $('server-close').disabled = $('server-edit').disabled = $('server-export').disabled = false;
   browsing = recentMode = false; syncProjectPanel();
   $('server-recent-user').replaceChildren();
-  localStorage.setItem('freedom:last-workbook:' + user,current.id);
   connection = new LiveProject(current); await connection.start(); panel(false);
 }
 async function createProject(name, book) {
@@ -455,9 +453,11 @@ async function signedIn(name) {
   user = name; $('server-signout').textContent = name + ' · Sign out';
   const preferences = await api('/preferences');
   workspace.setCursor(preferences.cursor); $('workspace-cursor').disabled = false;
-  $('server-login').close(); await refresh(); syncProjectPanel(); status('No project open');
-  const last = projects.find(p=>p.id===localStorage.getItem('freedom:last-workbook:' + user));
-  if (last) await openProject(last);
+  await refresh(); syncProjectPanel();
+  const last = projects.find(p=>p.id===preferences.lastWorkbook);
+  if (last) { status('Opening project…'); await openProject(last); }
+  else status('No project open');
+  $('server-login').close();
 }
 async function boot() {
   await bridge.ready;
