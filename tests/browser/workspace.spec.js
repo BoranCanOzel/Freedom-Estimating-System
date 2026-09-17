@@ -40,6 +40,16 @@ test('last selected workbook survives sign-out and opens in a fresh browser',asy
   await refreshed;
   await expect(page.locator('#server-title')).toHaveText(selected);
   await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.locator('#rail .tab-add').click();
+  await page.locator('#title').fill('Remember this tab');
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  const lastLocation=await page.evaluate(()=>window.estimator.getLocation());
+  await expect.poll(async()=>{
+    const projects=await (await page.request.get('/api/projects')).json();
+    const id=projects.find(p=>p.name===selected).id;
+    const recent=await (await page.request.get('/api/projects/'+id+'/recent?user='+encodeURIComponent(name))).json();
+    return recent.items[0]?.sheet;
+  }).toBe(lastLocation.sheet);
   await page.locator('#server-signout').click();await expect(page.locator('#server-login')).toBeVisible();
   const context=await browser.newContext({baseURL});
   try {
@@ -47,6 +57,7 @@ test('last selected workbook survives sign-out and opens in a fresh browser',asy
     await fresh.locator('#server-login-name').fill(name);await fresh.locator('#server-login-form button').click();
     await expect(fresh.locator('#server-status')).toHaveText('All changes saved');
     await expect(fresh.locator('#server-title')).toHaveText(selected);
+    await expect(fresh.locator('#title')).toHaveValue('Remember this tab');
     await expect(fresh.locator('#sheetCard')).toBeVisible();
   } finally {await context.close();}
 });
@@ -134,6 +145,10 @@ test('one project drawer retains hierarchy, custom details and filters', async (
   await expect(page.locator('#server-drawer #projects')).toBeVisible();
   await expect(page.locator('#server-browser')).not.toBeVisible();
   await expect(page.locator('.workbook-controls')).not.toBeVisible();
+  await expect(page.locator('#projBody [data-project]')).toHaveCount(0);
+  await page.locator('[data-company="co"] > .p-head > .p-name').click();
+  await expect(page.locator('#projBody [data-takeoff]')).toHaveCount(0);
+  await page.locator('[data-project="south"] > .p-head.lvl2 > .p-name').click();
   const editSize=await page.getByTitle('Edit this project',{exact:true}).first().boundingBox();
   expect(editSize.width).toBeGreaterThanOrEqual(44);expect(editSize.height).toBeGreaterThanOrEqual(44);
   await expect(page.locator('#projBody')).toContainText('Freedom Customer');
@@ -186,12 +201,16 @@ test('project presence, tab highlights, collapse and recent views work for two u
     await expect(page.locator('#rail [data-sheet="sn2"] .tab-presence')).toContainText(other);
     await expect(page.locator('#server-people .server-person')).toHaveAttribute('title',/Freedom Customer → North job → North takeoff → Tab 2/);
     await page.locator('#server-projects').click();
+    await page.locator('[data-company="co"] > .p-head > .p-name').click();
     await expect(page.locator('[data-project="north"] > .p-head.lvl2 .project-presence')).toContainText(other);
     await page.locator('#projCollapse').click();
     await expect(page.locator('#projBody [data-project]')).toHaveCount(0);
     await expect(page.locator('[data-company="co"] > .p-head .project-presence')).toContainText(other);
     // Collapsing is personal and must not collapse the other user's hierarchy.
-    await peer.locator('#server-projects').click();await expect(peer.locator('[data-takeoff="ts"]')).toBeVisible();
+    await peer.locator('#server-projects').click();
+    await peer.locator('[data-company="co"] > .p-head > .p-name').click();
+    await peer.locator('[data-project="south"] > .p-head.lvl2 > .p-name').click();
+    await expect(peer.locator('[data-takeoff="ts"]')).toBeVisible();
     await peer.locator('[data-takeoff="ts"]').click();
     await expect(page.locator('#rail .tab-presence')).toHaveCount(0);
     await expect(page.locator('#server-people .server-person')).toHaveAttribute('title',/South job/);
@@ -209,6 +228,14 @@ test('project presence, tab highlights, collapse and recent views work for two u
     await page.screenshot({path:'test-results/project-navigation.png',fullPage:true});
     await page.locator('#server-tab-recent').click();
     await page.screenshot({path:'test-results/recent-projects.png',fullPage:true});
+    await page.reload();
+    await expect(page.locator('#server-status')).toHaveText('All changes saved');
+    await expect(page.locator('#server-title')).toHaveText(workbookName);
+    await expect(page.locator('#title')).toHaveValue('Second scope');
+    await page.locator('#server-projects').click();
+    await expect(page.locator('#projBody [data-project]')).toHaveCount(0);
+    await page.locator('[data-company="co"] > .p-head > .p-name').click();
+    await expect(page.locator('#projBody [data-takeoff]')).toHaveCount(0);
   } finally {await context.close();}
 });
 

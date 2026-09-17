@@ -10656,6 +10656,8 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     document.getElementById('filterCount').textContent = active ? active + ' on' : '';
 
     projectTree().forEach(co => {
+      if (co.collapsed == null) co.collapsed = true;
+      (co.projects || []).forEach(pr => { if (pr.collapsed == null) pr.collapsed = true; });
       const projs = (co.projects || []).filter(pr => {
         if (hidden.indexOf(pr.status) >= 0) return false;
         for (const f in fieldPicks){
@@ -11196,9 +11198,16 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     fields.forEach(k => { const key = JSON.stringify(path.concat(k)); if (personal.has(key)) value[k] = structuredClone(personal.get(key)); });
     Object.keys(value).filter(k => !fields.has(k)).forEach(k => restorePersonal(value[k], path.concat(k)));
   }
-  function materialize(data){
+  function materialize(data, location){
     const bk = structuredClone(data);
     restorePersonal(bk);
+    const resumeList = location && (bk.lists || []).find(l => l.id === location.list);
+    const resumeTakeoff = resumeList && (resumeList.companies || []).flatMap(c => (c.projects || []).flatMap(p => p.takeoffs || [])).find(t => t.id === location.takeoff);
+    if (resumeTakeoff) {
+      bk.activeList = resumeList.id; bk.activeTakeoff = resumeTakeoff.id;
+      if ((resumeTakeoff.sheets || []).some(s => s.id === location.sheet)) resumeTakeoff.active = bk.active = location.sheet;
+      bk.view = ['sheet','summary','scopes','load','wage'].includes(location.view) ? location.view : 'sheet';
+    }
     if (Array.isArray(bk.rows)) return {view:'sheet', active:null, sheets:[normalize(Object.assign(bk, {num:1}))]};
     const list = (bk.lists || []).find(l => l.id === bk.activeList) || (bk.lists || [])[0];
     const companies = list ? list.companies : bk.companies || [];
@@ -11310,7 +11319,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       showView(); renderProjects(); save(); return true;
     },
     exportBook(){ return structuredClone(book); },
-    receive(data, fresh = false){
+    receive(data, fresh = false, location){
       const draft = ({item:itemDraft, section:secDraft, scope:scopeDraft, part:partDraft,
         construct:conDraft, service:svcDraft, company:coDraft, project:prDraft,
         takeoff:tkDraft, subtype:subDraft})[edMode];
@@ -11321,7 +11330,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         closeEditor();
       }
       else separate(book);
-      adoptBook(materialize(data));
+      adoptBook(materialize(data, fresh ? location : null));
       if (!fresh && before && draft) {
         const after = findRecord(book, recordId);
         if (after) {

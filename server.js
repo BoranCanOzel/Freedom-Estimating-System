@@ -168,7 +168,17 @@ export function createApp(options = {}) {
     const time = now();
     db.prepare('UPDATE projects SET accessed_at=? WHERE id=?').run(time, req.params.id);
     db.prepare('INSERT INTO access VALUES (?,?,?) ON CONFLICT(project_id,name) DO UPDATE SET opened_at=excluded.opened_at').run(req.params.id, req.user.name, time);
-    res.json(publicProject(project(req.params.id)));
+    const row = project(req.params.id);
+    const visits = db.prepare('SELECT * FROM project_visits WHERE workbook_id=? AND name=? ORDER BY viewed_at DESC').all(row.id,req.user.name);
+    let lastLocation = null;
+    if (visits.length) {
+      const doc = new Y.Doc(); Y.applyUpdate(doc,row.state); const book = readBook(doc); doc.destroy();
+      for (const visit of visits) {
+        lastLocation = resolveLocation(book,{list:visit.list_id,takeoff:visit.takeoff_id,sheet:visit.sheet_id,view:visit.view});
+        if (lastLocation) break;
+      }
+    }
+    res.json({...publicProject(row),lastLocation});
   });
   app.patch('/api/projects/:id', (req, res) => {
     if (!project(req.params.id)) return res.status(404).json({ error: 'Project not found.' });

@@ -62,9 +62,9 @@ function focused() {
   return { selector: selector(el), start: el.selectionStart, end: el.selectionEnd, value: el.value,
     scrolls: [...document.querySelectorAll('.scroll,.proj-body,.lib-body')].map(e => [e, e.scrollTop, e.scrollLeft]) };
 }
-function renderRemote(data, fresh = false) {
+function renderRemote(data, fresh = false, location) {
   const focus = focused();
-  bridge.receive(data, fresh);
+  bridge.receive(data, fresh, location);
   if (!fresh && focus.selector) {
     const el = document.querySelector(focus.selector);
     if (el && ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) {
@@ -83,6 +83,9 @@ class LiveProject {
     this.project = project; this.doc = new Y.Doc(); this.seq = 0; this.acked = 0;
     this.ready = false; this.closed = false; this.peers = []; this.persisting = Promise.resolve();
     this.cacheKey = user + ':' + project.id; this.baseline = {}; this.retry = 0;
+    this.locationKey = 'freedom:location:' + this.cacheKey;
+    this.resumeLocation = project.lastLocation;
+    try { this.resumeLocation = JSON.parse(localStorage.getItem(this.locationKey)) || this.resumeLocation; } catch {}
   }
   async start() {
     const previous = await cache(this.cacheKey);
@@ -112,7 +115,7 @@ class LiveProject {
           if (this.ready) this.changed();
           Y.applyUpdate(this.doc, decode(msg.state || msg.update), 'remote');
           this.applying = true;
-          try { renderRemote(readBook(this.doc), !this.ready); this.baseline = clone(bridge.getShared()); }
+          try { renderRemote(readBook(this.doc), !this.ready, this.resumeLocation); this.baseline = clone(bridge.getShared()); }
           finally { this.applying = false; }
           if (msg.type === 'sync') {
             this.peerId = msg.peerId; this.synced = true; this.ready = true; this.retry = 0;
@@ -150,6 +153,12 @@ class LiveProject {
     status(!this.synced ? 'Offline · reconnecting · edits kept on this device' : this.acked < this.seq ? 'Saving…' : 'All changes saved');
   }
   sendPresence(pointer) {
+    if (this.ready) {
+      const location = JSON.stringify(bridge.getLocation());
+      if (location !== this.savedLocation) {
+        try { localStorage.setItem(this.locationKey,location); this.savedLocation = location; } catch {}
+      }
+    }
     if (pointer) this.pointer = pointer;
     if (!this.synced || this.socket.readyState !== WebSocket.OPEN) return;
     clearTimeout(this.presenceTimer);
@@ -313,6 +322,7 @@ async function openProject(project) {
   $('server-close').disabled = $('server-edit').disabled = $('server-export').disabled = false;
   browsing = recentMode = false; syncProjectPanel();
   $('server-recent-user').replaceChildren();
+  try { localStorage.setItem('freedom:last-workbook:' + user,current.id); } catch {}
   connection = new LiveProject(current); await connection.start(); panel(false);
 }
 async function createProject(name, book) {
@@ -454,7 +464,9 @@ async function signedIn(name) {
   const preferences = await api('/preferences');
   workspace.setCursor(preferences.cursor); $('workspace-cursor').disabled = false;
   await refresh(); syncProjectPanel();
-  const last = projects.find(p=>p.id===preferences.lastWorkbook);
+  let remembered;
+  try { remembered = localStorage.getItem('freedom:last-workbook:' + user); } catch {}
+  const last = projects.find(p=>p.id===preferences.lastWorkbook) || projects.find(p=>p.id===remembered);
   if (last) { status('Opening project…'); await openProject(last); }
   else status('No project open');
   $('server-login').close();
