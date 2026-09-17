@@ -24,6 +24,15 @@ test('two estimators share edits, cursors, reconnects and projects', async ({ br
     await alice.locator('#body input[aria-label="Item name"]').first().hover();
     await expect(bob.locator('.server-cursor')).toContainText('Alice');
     await expect(bob.locator('.server-field')).toHaveCount(1);
+    // Scrolling must reuse collaborator nodes rather than rebuilding the header.
+    const retained = await bob.evaluate(async () => {
+      const badge = document.querySelector('.server-person'), cursor = document.querySelector('.server-cursor');
+      const scroller = document.querySelector('#sheetCard .scroll');
+      for(let i=0;i<30;i++) scroller.dispatchEvent(new Event('scroll'));
+      await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame);
+      return {badge:badge===document.querySelector('.server-person'),cursor:cursor===document.querySelector('.server-cursor')};
+    });
+    expect(retained).toEqual({badge:true,cursor:true});
     // Selecting another view must remain personal.
     await alice.locator('#rail .tab-summary').click();
     await expect(alice.locator('#summaryCard')).toBeVisible();await expect(bob.locator('#sheetCard')).toBeVisible();

@@ -4248,21 +4248,24 @@
       lip.hidden = true;
       return;
     }
-    rail.hidden = false;
     const c = cell.getBoundingClientRect();
     const k = card.getBoundingClientRect();
     const s = scroller.getBoundingClientRect();
     const zoom = num(book.zoom) || 1;
     const left = Math.max(c.left, s.left + 1);
     const right = Math.min(c.right, s.right - 1);
+    if (rail.hidden) rail.hidden = false;
     if (right - left < 56 || c.bottom < s.top){    // the column is not on screen
       lip.hidden = true;
       return;
     }
-    lip.hidden = false;
-    lip.style.top = Math.round((c.bottom - k.top) / zoom) + 'px';
-    lip.style.left = Math.round((left - k.left) / zoom + 5) + 'px';
-    lip.style.width = Math.round((right - left) / zoom - 10) + 'px';
+    if (lip.hidden) lip.hidden = false;
+    const top = Math.round((c.bottom - k.top) / zoom) + 'px';
+    const x = Math.round((left - k.left) / zoom + 5) + 'px';
+    const width = Math.round((right - left) / zoom - 10) + 'px';
+    if (lip.style.top !== top) lip.style.top = top;
+    if (lip.style.left !== x) lip.style.left = x;
+    if (lip.style.width !== width) lip.style.width = width;
   }
 
   function anchorTips(){
@@ -6129,7 +6132,10 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
   /* ---------- reordering ---------- */
   const scroller = document.querySelector('#sheetCard .scroll');
-  scroller.addEventListener('scroll', placeGrandTab, {passive:true});
+  let grandFrame = 0;
+  scroller.addEventListener('scroll', () => {
+    if (!grandFrame && num(state.roundTotal)) grandFrame = requestAnimationFrame(() => { grandFrame = 0; placeGrandTab(); });
+  }, {passive:true});
   let drag = null;
 
   // a section header drags as one unit: header, everything inside, and its end row

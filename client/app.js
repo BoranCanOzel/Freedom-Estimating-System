@@ -158,40 +158,70 @@ class LiveProject {
     }, 50);
   }
   paintPeers() {
-    $('server-people').replaceChildren(); $('server-cursors').replaceChildren();
+    if (this.closed || this.peerFrame) return;
+    this.peerFrame = requestAnimationFrame(() => {
+      this.peerFrame = 0;
+      if (!this.closed) this.updatePeers();
+    });
+  }
+  updatePeers() {
+    const peers = this.peers.filter(peer => peer.id !== this.peerId);
+    this.peerNodes ||= new Map();
+    if (!peers.length && !this.peerNodes.size) return;
     const here = bridge.getLocation();
     const zoom = Number.parseFloat(getComputedStyle(document.body).zoom) || 1;
-    for (const peer of this.peers) {
-      if (peer.id === this.peerId) continue;
-      let hash = 0; for (const c of peer.name) hash = (hash * 31 + c.charCodeAt(0)) | 0;
-      const color = `hsl(${Math.abs(hash) % 360} 65% 42%)`;
-      const badge = element('span', peer.name, 'server-person'); badge.style.setProperty('--peer', color);
-      badge.title = peer.view === here.view && peer.takeoff === here.takeoff ? 'Viewing this takeoff' : 'Viewing another takeoff or tab';
-      $('server-people').append(badge);
-      if (peer.view !== here.view || peer.takeoff !== here.takeoff || (here.view === 'sheet' && peer.sheet !== here.sheet)) continue;
-      try {
-        const target = peer.anchor && document.querySelector(peer.anchor);
-        if (peer.visible && target) {
-          const rect = target.getBoundingClientRect();
-          if (rect.width && rect.height) {
-            const cursor = element('div', '➤ ' + peer.name, 'server-cursor');
-            cursor.style.cssText = `left:${(rect.left + peer.x * rect.width) / zoom}px;top:${(rect.top + peer.y * rect.height) / zoom}px;color:${color}`;
-            $('server-cursors').append(cursor);
+    // Read all geometry before touching the DOM; scrolling only moves retained nodes.
+    const geometry = new Map();
+    const measure = selector => {
+      if (!selector) return null;
+      if (!geometry.has(selector)) {
+        let rect = null;
+        try {
+          const target = document.querySelector(selector);
+          if (target) {
+            const bounds = target.getBoundingClientRect();
+            if (bounds.width && bounds.height && bounds.bottom > 0 && bounds.top < innerHeight && bounds.right > 0 && bounds.left < innerWidth) rect = bounds;
           }
-        }
-        const field = peer.field && document.querySelector(peer.field);
-        if (field) {
-          const rect = field.getBoundingClientRect(), mark = element('div', '', 'server-field');
-          mark.style.cssText = `left:${rect.left / zoom}px;top:${rect.top / zoom}px;width:${rect.width / zoom}px;height:${rect.height / zoom}px;border-color:${color}`;
-          $('server-cursors').append(mark);
-        }
-      } catch {}
+        } catch {}
+        geometry.set(selector, rect);
+      }
+      return geometry.get(selector);
+    };
+    const positions = peers.map(peer => {
+      const same = peer.view === here.view && peer.takeoff === here.takeoff && (here.view !== 'sheet' || peer.sheet === here.sheet);
+      return { peer, same, cursor: same && peer.visible ? measure(peer.anchor) : null, field: same ? measure(peer.field) : null };
+    });
+    const active = new Set(peers.map(peer => peer.id));
+    for (const [id, nodes] of this.peerNodes) if (!active.has(id)) {
+      nodes.badge.remove(); nodes.cursor.remove(); nodes.field.remove(); this.peerNodes.delete(id);
+    }
+    for (const {peer, same, cursor, field} of positions) {
+      let nodes = this.peerNodes.get(peer.id);
+      if (!nodes) {
+        let hash = 0; for (const c of peer.name) hash = (hash * 31 + c.charCodeAt(0)) | 0;
+        const color = `hsl(${Math.abs(hash) % 360} 65% 42%)`;
+        nodes = {badge:element('span', peer.name, 'server-person'), cursor:element('div', '? ' + peer.name, 'server-cursor'), field:element('div', '', 'server-field')};
+        nodes.badge.style.setProperty('--peer', color); nodes.cursor.style.color = color; nodes.field.style.borderColor = color;
+        nodes.cursor.style.left = nodes.cursor.style.top = nodes.field.style.left = nodes.field.style.top = '0px';
+        $('server-people').append(nodes.badge); $('server-cursors').append(nodes.cursor, nodes.field);
+        this.peerNodes.set(peer.id, nodes);
+      }
+      const title = same ? 'Viewing this takeoff' : 'Viewing another takeoff or tab';
+      if (nodes.badge.title !== title) nodes.badge.title = title;
+      if (nodes.cursor.hidden !== !cursor) nodes.cursor.hidden = !cursor;
+      if (nodes.field.hidden !== !field) nodes.field.hidden = !field;
+      if (cursor) nodes.cursor.style.transform = `translate3d(${(cursor.left + peer.x * cursor.width) / zoom}px,${(cursor.top + peer.y * cursor.height) / zoom}px,0)`;
+      if (field) {
+        nodes.field.style.transform = `translate3d(${field.left / zoom}px,${field.top / zoom}px,0)`;
+        nodes.field.style.width = field.width / zoom + 'px'; nodes.field.style.height = field.height / zoom + 'px';
+      }
     }
   }
   async close() {
     this.changed();
     await this.persisting;
     this.closed = true; clearTimeout(this.retryTimer); clearTimeout(this.presenceTimer);
+    cancelAnimationFrame(this.peerFrame);
     this.socket?.close(); this.doc.destroy();
     $('server-people').replaceChildren(); $('server-cursors').replaceChildren();
   }
@@ -309,6 +339,13 @@ document.body.insertAdjacentHTML('afterbegin', `
   </form></dialog>`);
 document.body.classList.add('server-mode');
 workspace = setupWorkspace();
+$('workspace-cursor').onchange = async event => {
+  const control = event.target, previous = document.body.dataset.cursor || 'system';
+  control.disabled = true; workspace.setCursor(control.value);
+  try { await api('/preferences', {method:'PUT',body:JSON.stringify({cursor:control.value})}); }
+  catch (error) { workspace.setCursor(previous); message('Cursor setting was not saved: ' + error.message, true); }
+  finally { control.disabled = false; }
+};
 syncProjectPanel();
 $('server-projects').onclick = () => panel($('server-drawer').hidden);
 $('server-hide').onclick = () => panel(false);
@@ -356,11 +393,13 @@ document.addEventListener('pointermove', event => {
 });
 document.addEventListener('pointerleave', () => connection?.sendPresence({ visible: false }));
 document.addEventListener('focusin', () => connection?.sendPresence());
-document.addEventListener('scroll', () => connection?.paintPeers(), true);
+document.addEventListener('scroll', () => connection?.paintPeers(), {capture:true, passive:true});
 window.addEventListener('resize', () => connection?.paintPeers());
 document.addEventListener('visibilitychange', () => { if (document.hidden) connection?.sendPresence({ visible: false }); });
 async function signedIn(name) {
   user = name; $('server-signout').textContent = name + ' · Sign out';
+  const preferences = await api('/preferences');
+  workspace.setCursor(preferences.cursor); $('workspace-cursor').disabled = false;
   $('server-login').close(); await refresh(); syncProjectPanel(); status('No project open');
 }
 async function boot() {

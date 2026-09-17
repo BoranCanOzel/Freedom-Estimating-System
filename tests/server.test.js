@@ -31,8 +31,13 @@ test('authenticated projects, real-time changes, access dates, snapshots, and re
   }
   try {
     assert.equal((await fetch(base+'/api/projects')).status,401);
+    assert.equal((await fetch(base+'/api/preferences')).status,401);
     assert.equal((await fetch(base+'/.env')).status,404);
     const alice=await login('Alice'), bob=await login('Bob');
+    assert.deepEqual(await (await request('/api/preferences',alice)).json(), {cursor:'system'});
+    assert.equal((await request('/api/preferences',alice,'PUT',{cursor:'large-dark'})).status,200);
+    assert.equal((await request('/api/preferences',alice,'PUT',{cursor:'invalid'})).status,400);
+    assert.deepEqual(await (await request('/api/preferences',bob)).json(), {cursor:'system'});
     const rejected=await request('/api/projects',alice,'POST',{name:'bad',book:{random:true}}); assert.equal(rejected.status,400);
     const created=await request('/api/projects',alice,'POST',{name:'Job 1',book:{sheets:[{id:'s',rows:[{id:'r',name:'Saw',count:1,cost:10}]}]}});
     assert.equal(created.status,201); const project=await created.json();
@@ -60,6 +65,8 @@ test('authenticated projects, real-time changes, access dates, snapshots, and re
     assert.equal(saved.sheets[0].rows[0].count,8);
     app=createApp({dataDir,users:{},production:false}); app.server.listen(0,'127.0.0.1'); await once(app.server,'listening');
     base='http://127.0.0.1:'+app.server.address().port;
+    assert.deepEqual(await (await request('/api/preferences',alice)).json(), {cursor:'large-dark'});
+    assert.deepEqual(await (await request('/api/preferences',bob)).json(), {cursor:'system'});
     const list=await (await request('/api/projects',alice)).json();
     assert.equal(list[0].name,'Job 1');
     const restored=await (await request('/api/projects/'+project.id+'/export',bob)).json(); assert.equal(restored.sheets[0].rows[0].cost,55);

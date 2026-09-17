@@ -29,7 +29,8 @@ export function createApp(options = {}) {
       state BLOB NOT NULL);
     CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, name TEXT NOT NULL, expires INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS access (project_id TEXT NOT NULL REFERENCES projects(id), name TEXT NOT NULL,
-      opened_at TEXT NOT NULL, PRIMARY KEY(project_id,name));`);
+      opened_at TEXT NOT NULL, PRIMARY KEY(project_id,name));
+    CREATE TABLE IF NOT EXISTS user_preferences (name TEXT PRIMARY KEY, cursor TEXT NOT NULL);`);
   const rooms = new Map(), loginAttempts = new Map();
   const app = express(), server = createServer(app);
   app.disable('x-powered-by');
@@ -110,6 +111,15 @@ export function createApp(options = {}) {
     db.prepare('DELETE FROM sessions WHERE token=?').run(req.user.token);
     for (const room of rooms.values()) for (const ws of room.clients) if (ws.token === req.user.token) ws.close(4001, 'Signed out');
     res.clearCookie('freedom_session'); res.json({ ok: true });
+  });
+  app.get('/api/preferences', (req, res) => {
+    res.json({cursor:db.prepare('SELECT cursor FROM user_preferences WHERE name=?').get(req.user.name)?.cursor || 'system'});
+  });
+  app.put('/api/preferences', (req, res) => {
+    const cursor = req.body?.cursor;
+    if (!['system','large-dark','large-light','crosshair'].includes(cursor)) return res.status(400).json({error:'Choose a supported cursor style.'});
+    db.prepare('INSERT INTO user_preferences(name,cursor) VALUES (?,?) ON CONFLICT(name) DO UPDATE SET cursor=excluded.cursor').run(req.user.name, cursor);
+    res.json({cursor});
   });
   app.get('/api/projects', (req, res) => {
     const rows = db.prepare(`SELECT p.*, a.opened_at AS my_opened_at FROM projects p

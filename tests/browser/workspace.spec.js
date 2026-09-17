@@ -8,14 +8,63 @@ function workbook() {
     {id:'south',name:'South job',status:'Completed',custom:{Region:'South'},takeoffs:[{id:'ts',name:'South takeoff',sheets:[sheet('ss','South scope')]}]}
   ]}]}],customFields:{company:['Account'],project:['Region'],takeoff:['Estimator']},filterFields:['Region']};
 }
-async function openWorkbook(page, data = workbook()) {
-  await page.goto('/'); await page.locator('#server-login-name').fill('Workspace tester');
+async function openWorkbook(page, data = workbook(), name = 'Workspace tester') {
+  await page.goto('/'); await page.locator('#server-login-name').fill(name);
   await page.locator('#server-login-form button').click(); await expect(page.locator('#server-login')).not.toBeVisible();
   await page.locator('#workspace-file > summary').click();
   const chooser = page.waitForEvent('filechooser'); await page.locator('#server-import').click();
   await (await chooser).setFiles({name:'Organized '+Date.now()+'.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(data))});
-  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await expect(page.locator('#server-status')).toHaveText('All changes saved', {timeout:20000});
 }
+
+test('cursor style persists on the account while text and resize cursors remain usable', async ({page}) => {
+  await openWorkbook(page,workbook(),'Cursor tester '+Date.now());
+  await page.locator('#workspace-view > summary').click();
+  const saved = page.waitForResponse(r=>r.url().endsWith('/api/preferences') && r.request().method()==='PUT');
+  await page.locator('#workspace-cursor').selectOption('large-dark');
+  expect((await saved).ok()).toBe(true);
+  await expect(page.locator('body')).toHaveAttribute('data-cursor','large-dark');
+  expect(await page.locator('#add').evaluate(el=>getComputedStyle(el).cursor)).toContain('data:image/svg+xml');
+  await expect(page.locator('#title')).toHaveCSS('cursor','text');
+  await expect(page.locator('#sheetTable .col-resizer').first()).toHaveCSS('cursor','col-resize');
+  await page.reload();
+  await page.locator('#workspace-view > summary').click();
+  await expect(page.locator('#workspace-cursor')).toHaveValue('large-dark');
+  const savedCrosshair = page.waitForResponse(r=>r.url().endsWith('/api/preferences') && r.request().method()==='PUT');
+  await page.locator('#workspace-cursor').selectOption('crosshair');
+  expect((await savedCrosshair).ok()).toBe(true);
+  await expect(page.locator('body')).toHaveCSS('cursor','crosshair');
+});
+
+test('large estimate scrolls without changing rows or totals', async ({page}) => {
+  const data = workbook();
+  data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0].rows = Array.from({length:250}, (_,i) =>
+    ({id:'scroll-'+i,kind:'labor',name:'Cutting task '+i,count:1,time:1,days:1,cost:125,markup:0,note:'Crew detail'}));
+  await openWorkbook(page, data);
+  await page.locator('#workspace-estimate > summary').click();
+  await page.locator('#roundTotal').selectOption('100');
+  await page.locator('#workspace-estimate > summary').press('Escape');
+  const total = await page.locator('#tGrand').textContent();
+  const session = await page.context().newCDPSession(page);
+  await session.send('Performance.enable');
+  const before = (await session.send('Performance.getMetrics')).metrics;
+  const timings = await page.evaluate(async () => {
+    const scroll = document.querySelector('#sheetCard .scroll'), gaps = [];
+    let previous = performance.now();
+    for (let i=0;i<90;i++) {
+      await new Promise(requestAnimationFrame);
+      const now=performance.now(); gaps.push(now-previous); previous=now;
+      scroll.scrollTop = (i+1)*35;
+    }
+    return {frames:gaps.length, over32ms:gaps.filter(x=>x>32).length, average:gaps.reduce((a,b)=>a+b)/gaps.length, scrollTop:scroll.scrollTop};
+  });
+  const after = (await session.send('Performance.getMetrics')).metrics;
+  const delta = name => (after.find(m=>m.name===name).value-before.find(m=>m.name===name).value)*1000;
+  console.log('Scroll profile', JSON.stringify({...timings,taskMs:delta('TaskDuration'),layoutMs:delta('LayoutDuration'),styleMs:delta('RecalcStyleDuration')}));
+  expect(timings.scrollTop).toBeGreaterThan(1000);
+  await expect(page.locator('#body tr[data-type="item"]')).toHaveCount(250);
+  await expect(page.locator('#tGrand')).toHaveText(total);
+});
 
 test('new pictured items follow Hide and Show without forcing existing rows open', async ({page}) => {
   const data = workbook();

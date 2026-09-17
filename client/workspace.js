@@ -1,5 +1,6 @@
 import { renderProjectSettings } from './project-settings.js';
 import './workspace.css';
+import './textures.css';
 
 const $ = id => document.getElementById(id);
 
@@ -32,6 +33,12 @@ export function setupWorkspace() {
           <button id="medievalMode" type="button" data-theme="medieval">Medieval</button>
         </div>
         <div id="workspace-zoom"></div>
+        <div class="workspace-cursor-setting"><label for="workspace-cursor">Cursor style</label>
+          <select id="workspace-cursor" disabled>
+            <option value="system">System default</option><option value="large-dark">Large dark arrow</option>
+            <option value="large-light">Large light arrow</option><option value="crosshair">Crosshair</option>
+          </select>
+        </div><p class="workspace-preference-hint">Saved to your account.</p>
         <div data-for-view="sheet" class="menu-context"><div class="menu-divider"></div>
           <p class="menu-label">Sheet display</p><div id="workspace-pictures"></div><div id="workspace-detail"></div>
         </div>
@@ -137,5 +144,15 @@ export function setupWorkspace() {
   }
   document.addEventListener('estimator:view', sync);
   sync();
-  return { sync, closeMenus };
+  function setCursor(style) {
+    if (!['system','large-dark','large-light','crosshair'].includes(style)) style = 'system';
+    document.body.dataset.cursor = style;
+    $('workspace-cursor').value = style;
+    if (style.startsWith('large-')) {
+      const light = style === 'large-light';
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M3 2 L3 26 L10 19 L15 30 L20 28 L15 17 L25 17 Z" fill="${light ? '#fff' : '#141414'}" stroke="${light ? '#141414' : '#fff'}" stroke-width="2" stroke-linejoin="round"/></svg>`;
+      document.body.style.setProperty('--workspace-cursor', `url("data:image/svg+xml,${encodeURIComponent(svg)}") 3 2, default`);
+    } else document.body.style.setProperty('--workspace-cursor', style === 'crosshair' ? 'crosshair' : 'auto');
+  }
+  return { sync, closeMenus, setCursor };
 }

@@ -43,18 +43,22 @@ Workspace controls are grouped by purpose:
 | Location | Controls |
 | --- | --- |
 | File | JSON import/export, estimate Excel export, printing, company and project directory exports |
-| View | Theme, zoom, pictures, sheet details, summary details, and calculator folding, according to the active view |
+| View | Theme, zoom, account cursor style, pictures, sheet details, summary details, and calculator folding, according to the active view |
 | Estimate | Current option rounding, embedded load calculator, hidden column restoration, reset and delete |
 | Projects → Project settings | Custom fields by company/project/takeoff, project statuses, and available filters |
-| Sheet or calculator heading | Common add-item, add-section, add-option, and add-labor-group actions |
+| Item column header or calculator heading | Common add-item, add-section, add-option, and add-labor-group actions |
 
 Project settings save automatically. Renaming a custom field retains existing detail values and its filter configuration. Theme and zoom are personal browser preferences that persist across workbook changes. The Scopes tab replaces the former gear icon for the option overview. Destructive estimate actions retain their two-click confirmation.
+
+View → Cursor style offers system default, large dark/light arrows, and crosshair. This setting is stored per signed-in account in SQLite and loaded on sign-in across browsers; it does not change shared workbooks. Text fields and resize handles retain their functional cursors.
+
+Scrolling reuses collaborator markers and batches their position updates once per animation frame. Medieval theme textures are pre-rendered PNGs with the same appearance as the original SVG filters. They are committed in `client/textures/` and bundled by `npm run build`; deployment does not require a browser. To regenerate them after editing the original texture definitions, run `node scripts/rasterize-textures.mjs` on a development machine with Microsoft Edge installed.
 
 Storage layout:
 
 ```text
 DATA_DIR/
-  projects.sqlite          # authoritative project state, metadata, sessions, access history
+  projects.sqlite          # project state, metadata, sessions, access history, user preferences
   projects.sqlite-wal      # SQLite-managed, present while running
   projects.sqlite-shm
   projects/
