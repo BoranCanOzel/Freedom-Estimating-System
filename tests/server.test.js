@@ -8,6 +8,7 @@ import { once } from 'node:events';
 import { WebSocket } from 'ws';
 import * as Y from 'yjs';
 import { createApp } from '../server.js';
+import { setTimeout as delay } from 'node:timers/promises';
 import { readBook, writeBook } from '../shared/model.js';
 
 test('authenticated projects, real-time changes, access dates, snapshots, and restart durability', async () => {
@@ -71,6 +72,41 @@ test('authenticated projects, real-time changes, access dates, snapshots, and re
     assert.equal(list[0].name,'Job 1');
     const restored=await (await request('/api/projects/'+project.id+'/export',bob)).json(); assert.equal(restored.sheets[0].rows[0].cost,55);
   } finally { for(const ws of sockets)ws.terminate(); await app.close(); await rm(dataDir,{recursive:true,force:true}); }
+});
+
+test('recent project views are per user, resolve current names, and survive restart',async()=>{
+  const dataDir=await mkdtemp(join(tmpdir(),'freedom-visits-'));
+  let app=createApp({dataDir,users:{},production:false});
+  app.server.listen(0,'127.0.0.1');await once(app.server,'listening');
+  let base='http://127.0.0.1:'+app.server.address().port;
+  const sockets=[];
+  const login=async name=>{const response=await fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});return response.headers.get('set-cookie').split(';')[0];};
+  const request=(path,cookie)=>fetch(base+path,{headers:{cookie}});
+  try {
+    const alice=await login('Alice'),bob=await login('Bob');
+    const book={lists:[{id:'list',name:'Jobs',companies:[{id:'company',name:'Customer',projects:[{id:'job',name:'Concrete job',takeoffs:[{id:'takeoff',name:'Main takeoff',sheets:[{id:'sheet',num:2,rows:[]}]}]}]}]}]};
+    const response=await fetch(base+'/api/projects',{method:'POST',headers:{cookie:alice,'Content-Type':'application/json'},body:JSON.stringify({name:'Visits workbook',book})});
+    const project=await response.json(), path='/api/projects/'+project.id+'/recent';
+    assert.equal((await fetch(base+path)).status,401);
+    const connect=async cookie=>{const ws=new WebSocket(base.replace('http','ws')+'/live/'+project.id,{headers:{cookie}});sockets.push(ws);await once(ws,'open');return ws;};
+    const a=await connect(alice),b=await connect(bob);
+    const presence={list:'list',takeoff:'takeoff',sheet:'sheet',view:'sheet',companyName:'Spoof',project:'fake'};
+    a.send(JSON.stringify({type:'presence',presence}));
+    let history;
+    for(let i=0;i<100;i++){history=await (await request(path+'?user=Alice',alice)).json();if(history.items.length)break;await delay(20);}
+    assert.equal(history.items.length,1);assert.equal(history.items[0].companyName,'Customer');assert.equal(history.items[0].project,'job');assert.equal(history.items[0].tab,'Tab 2');
+    const first=history.items[0].viewed_at;
+    await delay(50);a.send(JSON.stringify({type:'presence',presence:{...presence,x:.3,visible:true}}));await delay(50);
+    assert.equal((await (await request(path+'?user=Alice',alice)).json()).items[0].viewed_at,first);
+    assert.equal((await (await request(path+'?user=Bob',alice)).json()).items.length,0);
+    b.send(JSON.stringify({type:'presence',presence:{...presence,view:'summary'}}));
+    for(let i=0;i<100;i++){history=await (await request(path,alice)).json();if(history.items.length===2)break;await delay(20);}
+    assert.equal(history.items.length,2);assert.equal(history.items[0].name,'Bob');assert.equal(history.items[0].tab,'Summary');
+    for(const ws of sockets)ws.terminate();await app.close();
+    app=createApp({dataDir,users:{},production:false});app.server.listen(0,'127.0.0.1');await once(app.server,'listening');base='http://127.0.0.1:'+app.server.address().port;
+    history=await (await request(path+'?user=Alice',bob)).json();assert.equal(history.items[0].viewed_at,first);
+    assert.deepEqual(history.users,['Alice','Bob']);
+  } finally {for(const ws of sockets)ws.terminate();await app.close();await rm(dataDir,{recursive:true,force:true});}
 });
 
 test('production refuses to start without accounts',()=>{

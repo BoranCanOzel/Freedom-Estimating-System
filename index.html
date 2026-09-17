@@ -2956,6 +2956,7 @@
     <div class="proj-row2">
       <button type="button" class="btn alt tiny" id="addCompany">+ Company</button>
       <button type="button" class="btn alt tiny" id="projFilterBtn">Filter</button>
+      <button type="button" class="btn alt tiny" id="projCollapse">Collapse all</button>
       <span class="filter-count" id="filterCount"></span>
     </div>
   </div>
@@ -10669,6 +10670,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
       const cw = document.createElement('div');
       cw.className = 'p-co';
+      cw.dataset.company = co.id;
       const ch = document.createElement('div');
       ch.className = 'p-head';
       ch.innerHTML = '<span class="caret tpl-caret' + (co.collapsed ? ' shut' : '') + '">' + caretSvg() + '</span>' +
@@ -10796,6 +10798,12 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     });
 
     if (!box.childNodes.length) box.innerHTML = '<div class="lib-hint">Nothing matches that search.</div>';
+    for (const head of box.querySelectorAll('.p-head')) {
+      const actions = document.createElement('span'); actions.className = 'project-actions';
+      for (const button of head.querySelectorAll(':scope > .p-btn')) actions.append(button);
+      if (actions.children.length) head.append(actions);
+    }
+    document.dispatchEvent(new Event('estimator:projects'));
   }
 
   // drag a project onto a company, or a takeoff onto a project
@@ -10869,6 +10877,10 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     setTimeout(() => { layout(); sumLayout(); }, 260);
   });
   document.getElementById('projSearch').addEventListener('input', renderProjects);
+  document.getElementById('projCollapse').addEventListener('click', () => {
+    projectTree().forEach(co => { co.collapsed = true; (co.projects || []).forEach(pr => { pr.collapsed = true; }); });
+    renderProjects(); save();
+  });
   document.getElementById('addCompany').addEventListener('click', () => openEditor('company', null));
   document.getElementById('projOptions').addEventListener('click', () => {
     const shown = edMode === 'listopts' && !document.getElementById('editor').hidden;
@@ -11278,7 +11290,25 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       setFilter(field, on){ book.filterFields = on ? [...new Set([...filterFields(), field])] : filterFields().filter(f => f !== field); }
     },
     getShared(){ projectTree(); templates(); return separate(book); },
-    getLocation(){ return {view:book.view, sheet:book.active, takeoff:book.activeTakeoff}; },
+    getLocation(){ return {list:book.activeList,view:book.view, sheet:book.active, takeoff:book.activeTakeoff}; },
+    getProjectLists(){ return book.lists || []; },
+    openLocation(location){
+      const list = (book.lists || []).find(l => l.id === location.list);
+      if (!list) return false;
+      let hit;
+      for (const co of list.companies || []) for (const pr of co.projects || []) {
+        const tk = (pr.takeoffs || []).find(t => t.id === location.takeoff);
+        if (tk) hit = {co,pr,tk};
+      }
+      if (!hit) return false;
+      book.activeList = list.id; hit.co.collapsed = hit.pr.collapsed = false;
+      document.getElementById('projSearch').value = '';
+      openTakeoff(hit.tk.id);
+      const sh = book.sheets.find(s => s.id === location.sheet);
+      if (sh) { book.active = hit.tk.active = sh.id; state = sh; }
+      book.view = ['sheet','summary','scopes','load','wage'].includes(location.view) ? location.view : 'sheet';
+      showView(); renderProjects(); save(); return true;
+    },
     exportBook(){ return structuredClone(book); },
     receive(data, fresh = false){
       const draft = ({item:itemDraft, section:secDraft, scope:scopeDraft, part:partDraft,

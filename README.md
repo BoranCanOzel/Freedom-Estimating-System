@@ -34,7 +34,11 @@ The app intentionally refuses to start in production without valid `APP_USERS`. 
 
 ## Projects and files
 
-The top-left **Projects** drawer is the single place to browse saved workbooks and their company → project → takeoff hierarchy. The workbook selector opens the saved-file browser, with last opened, last edited, editor name, and online collaborators. Its actions menu renames or closes the workbook. Opening a workbook updates access history without changing its modification date.
+The top-left **Projects** drawer opens the company → project → takeoff hierarchy. Company/project actions have large, always-visible buttons, and **Collapse all** folds the tree for your session without affecting collaborators. The separate **Workbooks…** tab at the bottom opens workbook switching, creation, renaming, and closing. Those controls stay hidden in Projects and Recently viewed. This browser remembers the last open workbook per account and reopens it after a reload; explicitly closing it clears that choice.
+
+**Recently viewed** lists projects in the current workbook, newest first, with customer, takeoff, tab, viewer, and timestamp. **Viewed by** defaults to your account and can select another user or Everyone. A visit is recorded when the user changes location, not when they move their cursor. One latest location is kept per user/project; opening it returns to that takeoff and tab. History begins when this version is deployed and survives server restarts. Deleted projects/takeoffs are omitted.
+
+Collaborator names appear on the customer, project, and takeoff they are viewing, including collapsed parent rows. Within the same takeoff, numbered tabs and other views are highlighted with viewer names. Header badges provide the full customer → project → takeoff → tab path on hover. The Workbooks tab also shows each user's location inside their workbook. Presence updates live within the open workbook; the workbook browser refreshes every ten seconds.
 
 Each imported JSON becomes a server workbook, preserving its existing company → project → takeoff hierarchy and template libraries. A legacy single-sheet JSON is also supported. Companies, projects, takeoffs, named lists, and custom filters remain available inside the same drawer. Renaming a server workbook changes its name in the workbook selector; internal project names remain editable in the hierarchy.
 

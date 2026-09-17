@@ -2,13 +2,15 @@ import * as Y from 'yjs';
 import { readBook, writeBook, validateBook } from '../shared/model.js';
 import './style.css';
 import { setupWorkspace } from './workspace.js';
+import { setupProjectPresence } from './project-presence.js';
+import { resolveLocation } from '../shared/navigation.js';
 
 const $ = id => document.getElementById(id);
 const clone = value => structuredClone(value);
 const encode = data => { let s = ''; for (let i = 0; i < data.length; i += 8192) s += String.fromCharCode(...data.subarray(i, i + 8192)); return btoa(s); };
 const decode = data => Uint8Array.from(atob(data), c => c.charCodeAt(0));
 let user, current, connection, projects = [], filter = '', busy = false, browsing = true;
-let workspace;
+let workspace, projectPresence, recentMode = false, recentRequest = 0;
 const bridge = window.estimator;
 const cacheDB = new Promise((resolve, reject) => {
   const request = indexedDB.open('freedom-collaboration', 1);
@@ -122,13 +124,13 @@ class LiveProject {
           this.sendPresence(); this.paintPeers();
         } else if (msg.type === 'ack') {
           this.acked = Math.max(this.acked, msg.seq); this.paintStatus();
-        } else if (msg.type === 'presence') { this.peers = msg.peers; this.paintPeers(); }
+        } else if (msg.type === 'presence') { this.peers = msg.peers; this.paintPeers(); projectPresence.update(this.peers,this.peerId); }
         else if (msg.type === 'error') { this.failed = true; status(msg.error, true); message('Your changes are still in this browser. Export JSON before closing if the error persists.', true); }
       } catch (e) { status('Could not apply a shared update. Export your work before reloading.', true); console.error(e); }
     };
     this.socket.onclose = event => {
-      this.synced = false; this.peers = []; this.paintPeers();
       if (this.closed) return;
+      this.synced = false; this.peers = []; this.paintPeers(); projectPresence.clear();
       if (event.code === 4001) { status('Session expired — export pending changes and sign in again', true); return; }
       this.paintStatus();
       this.retryTimer = setTimeout(() => this.connect(), Math.min(1000 * 2 ** this.retry++, 10000));
@@ -200,13 +202,16 @@ class LiveProject {
       if (!nodes) {
         let hash = 0; for (const c of peer.name) hash = (hash * 31 + c.charCodeAt(0)) | 0;
         const color = `hsl(${Math.abs(hash) % 360} 65% 42%)`;
-        nodes = {badge:element('span', peer.name, 'server-person'), cursor:element('div', '? ' + peer.name, 'server-cursor'), field:element('div', '', 'server-field')};
+        nodes = {badge:element('span', peer.name, 'server-person'), cursor:element('div', '➤ ' + peer.name, 'server-cursor'), field:element('div', '', 'server-field')};
         nodes.badge.style.setProperty('--peer', color); nodes.cursor.style.color = color; nodes.field.style.borderColor = color;
         nodes.cursor.style.left = nodes.cursor.style.top = nodes.field.style.left = nodes.field.style.top = '0px';
         $('server-people').append(nodes.badge); $('server-cursors').append(nodes.cursor, nodes.field);
         this.peerNodes.set(peer.id, nodes);
       }
-      const title = same ? 'Viewing this takeoff' : 'Viewing another takeoff or tab';
+      const location = resolveLocation({lists:bridge.getProjectLists()},peer);
+      const title = location ? `${location.companyName} → ${location.projectName} → ${location.takeoffName} → ${location.tab}` : 'Opening a project';
+      const label = location ? `${peer.name} · ${location.projectName}` : peer.name;
+      if (nodes.badge.textContent !== label) nodes.badge.textContent = label;
       if (nodes.badge.title !== title) nodes.badge.title = title;
       if (nodes.cursor.hidden !== !cursor) nodes.cursor.hidden = !cursor;
       if (nodes.field.hidden !== !field) nodes.field.hidden = !field;
@@ -224,13 +229,19 @@ class LiveProject {
     cancelAnimationFrame(this.peerFrame);
     this.socket?.close(); this.doc.destroy();
     $('server-people').replaceChildren(); $('server-cursors').replaceChildren();
+    projectPresence.clear();
   }
 }
 
 function syncProjectPanel() {
   const browse = browsing || !current;
-  $('server-browser').hidden = !browse;
-  $('server-hierarchy').hidden = browse || !document.body.classList.contains('server-active');
+  $('server-workbooks').hidden = !browse;
+  $('server-hierarchy').hidden = browse || recentMode || !document.body.classList.contains('server-active');
+  $('server-recent').hidden = browse || !recentMode;
+  $('server-tab-projects').disabled = $('server-tab-recent').disabled = !current;
+  $('server-tab-projects').setAttribute('aria-pressed',String(!browse && !recentMode));
+  $('server-tab-recent').setAttribute('aria-pressed',String(!browse && recentMode));
+  $('server-tab-workbooks').setAttribute('aria-pressed',String(browse));
   $('server-back').hidden = !current || !browse;
   $('server-open').textContent = current ? current.name + ' \u25be' : 'Browse saved workbooks';
   $('server-open').title = 'Switch saved workbook';
@@ -242,7 +253,7 @@ function panel(open = true) {
   $('server-drawer').hidden = !open;
   document.body.classList.toggle('workspace-projects-open', open);
   $('server-projects').setAttribute('aria-expanded', String(open));
-  if (open) { syncProjectPanel(); bridge.refreshProjects(); if (user) refresh().catch(e => message(e.message, true)); }
+  if (open) { syncProjectPanel(); bridge.refreshProjects(); if (user) { refresh().catch(e => message(e.message, true)); if (recentMode && !browsing) refreshRecent(); } }
   requestAnimationFrame(() => bridge.relayout());
 }
 
@@ -257,25 +268,53 @@ function renderProjects() {
     item.append(element('strong', project.name));
     item.append(element('span', 'Opened ' + date(project.my_opened_at || project.accessed_at)));
     item.append(element('span', 'Edited ' + date(project.modified_at) + ' · ' + project.modified_by));
-    if (project.online.length) item.append(element('span', '● ' + [...new Set(project.online)].join(', '), 'server-online'));
+    for (const visitor of project.locations || []) item.append(element('span', '● ' + visitor.name +
+      (visitor.projectName ? ' · ' + visitor.companyName + ' → ' + visitor.projectName + ' → ' + visitor.takeoffName + ' · ' + visitor.tab : ''), 'server-online'));
     item.onclick = () => run(() => openProject(project)); host.append(item);
   }
+}
+async function refreshRecent() {
+  if (!current) return;
+  const request = ++recentRequest, workbookId = current.id;
+  const selected = $('server-recent-user').value || ($('server-recent-user').options.length ? '' : user);
+  try {
+    const result = await api('/projects/' + workbookId + '/recent?user=' + encodeURIComponent(selected));
+    if (request !== recentRequest || current?.id !== workbookId) return;
+    const select = $('server-recent-user');
+    select.replaceChildren(new Option('Everyone',''), ...result.users.map(name=>new Option(name===user ? name+' (you)' : name,name)));
+    select.value = selected;
+    const host = $('server-recent-list'); host.replaceChildren();
+    if (!result.items.length) host.append(element('p','No projects viewed by this user yet. New visits appear here automatically.','server-empty'));
+    for (const item of result.items) {
+      const button = element('button','','recent-project'); button.type = 'button';
+      button.append(element('strong',item.projectName),element('span',item.companyName + ' · ' + item.listName),
+        element('span',item.takeoffName + ' · ' + item.tab),element('span',item.name + ' · ' + date(item.viewed_at)));
+      button.onclick = () => {
+        if (!bridge.openLocation(item)) { message('This project is no longer available.',true); refreshRecent(); return; }
+        browsing = recentMode = false; syncProjectPanel(); connection?.sendPresence();
+      };
+      host.append(button);
+    }
+  } catch(error) { if (request === recentRequest) message(error.message,true); }
 }
 async function closeProject() {
   await connection?.close(); connection = null; current = null;
   document.body.classList.remove('server-active');
   $('server-title').textContent = 'Freedom Estimating';
   $('server-close').disabled = $('server-edit').disabled = $('server-export').disabled = true;
-  browsing = true; bridge.closeEditor(); syncProjectPanel(); status('No project open'); panel();
+  localStorage.removeItem('freedom:last-workbook:' + user);
+  browsing = true; recentMode = false; bridge.closeEditor(); syncProjectPanel(); status('No project open'); panel();
 }
 async function openProject(project) {
-  if (current?.id === project.id && connection?.ready) { panel(false); return; }
+  if (current?.id === project.id && connection?.ready) { browsing = recentMode = false; syncProjectPanel(); panel(false); return; }
   await connection?.close(); connection = null;
   document.body.classList.remove('server-active');
   current = await api('/projects/' + project.id + '/open', { method: 'POST' });
   $('server-title').textContent = current.name;
   $('server-close').disabled = $('server-edit').disabled = $('server-export').disabled = false;
-  browsing = false; syncProjectPanel();
+  browsing = recentMode = false; syncProjectPanel();
+  $('server-recent-user').replaceChildren();
+  localStorage.setItem('freedom:last-workbook:' + user,current.id);
   connection = new LiveProject(current); await connection.start(); panel(false);
 }
 async function createProject(name, book) {
@@ -311,6 +350,11 @@ document.body.insertAdjacentHTML('afterbegin', `
   </header>
   <aside id="server-drawer" aria-label="Projects">
     <div class="server-drawer-head"><strong>Projects</strong><button id="server-hide" aria-label="Hide projects">&times;</button></div>
+    <nav class="project-navigation" aria-label="Project views">
+      <button id="server-tab-projects" type="button" aria-pressed="false">Projects</button>
+      <button id="server-tab-recent" type="button" aria-pressed="false">Recently viewed</button>
+    </nav>
+    <section id="server-workbooks" aria-label="Workbooks">
     <div class="workbook-controls">
       <span class="workbook-label">Saved workbook</span>
       <div class="workbook-picker"><button id="server-open" type="button">Browse saved workbooks</button>
@@ -325,7 +369,13 @@ document.body.insertAdjacentHTML('afterbegin', `
       <label class="server-search">Find a workbook<input id="server-search" type="search" placeholder="Search saved workbooks…"></label>
       <div id="server-list"></div>
     </section>
+    </section>
     <div id="server-hierarchy" hidden></div>
+    <section id="server-recent" aria-label="Recently viewed projects" hidden>
+      <label class="recent-filter" for="server-recent-user">Viewed by<select id="server-recent-user"></select></label>
+      <div id="server-recent-list" aria-live="polite"></div>
+    </section>
+    <footer class="project-navigation-footer"><button id="server-tab-workbooks" type="button" aria-pressed="true">Workbooks…</button></footer>
   </aside>
   <div id="server-welcome"><h1>Your projects, together.</h1><p>Create a workbook here, or use File &rarr; Import JSON to bring in existing work.</p><p>Browse companies, projects and takeoffs in one place. Open the same workbook on another browser to collaborate.</p></div>
   <div id="server-message" role="alert"></div><div id="server-cursors" aria-hidden="true"></div>
@@ -339,6 +389,7 @@ document.body.insertAdjacentHTML('afterbegin', `
   </form></dialog>`);
 document.body.classList.add('server-mode');
 workspace = setupWorkspace();
+projectPresence = setupProjectPresence(bridge);
 $('workspace-cursor').onchange = async event => {
   const control = event.target, previous = document.body.dataset.cursor || 'system';
   control.disabled = true; workspace.setCursor(control.value);
@@ -347,10 +398,14 @@ $('workspace-cursor').onchange = async event => {
   finally { control.disabled = false; }
 };
 syncProjectPanel();
-$('server-projects').onclick = () => panel($('server-drawer').hidden);
+$('server-projects').onclick = () => { if (current && ($('server-drawer').hidden || browsing)) { browsing = recentMode = false; panel(); } else panel($('server-drawer').hidden); };
 $('server-hide').onclick = () => panel(false);
 $('server-open').onclick = () => { browsing = true; panel(); $('server-search').focus(); };
-$('server-back').onclick = () => { browsing = false; syncProjectPanel(); bridge.refreshProjects(); };
+$('server-back').onclick = () => { browsing = recentMode = false; syncProjectPanel(); bridge.refreshProjects(); };
+$('server-tab-projects').onclick = () => { browsing = recentMode = false; panel(); };
+$('server-tab-recent').onclick = () => { browsing = false; recentMode = true; panel(); };
+$('server-tab-workbooks').onclick = () => { browsing = true; panel(); };
+$('server-recent-user').onchange = () => refreshRecent();
 $('server-search').oninput = event => { filter = event.target.value.toLowerCase(); renderProjects(); };
 $('server-new').onclick = () => nameDialog('New workbook', '', name => createProject(name, bridge.blank(name)));
 $('server-edit').onclick = () => nameDialog('Rename workbook', current.name, async name => {
@@ -401,6 +456,8 @@ async function signedIn(name) {
   const preferences = await api('/preferences');
   workspace.setCursor(preferences.cursor); $('workspace-cursor').disabled = false;
   $('server-login').close(); await refresh(); syncProjectPanel(); status('No project open');
+  const last = projects.find(p=>p.id===localStorage.getItem('freedom:last-workbook:' + user));
+  if (last) await openProject(last);
 }
 async function boot() {
   await bridge.ready;
@@ -419,6 +476,6 @@ async function boot() {
       } catch (e) { $('server-login-error').textContent = e.message; }
     };
   }
-  setInterval(() => { if (user && !$('server-drawer').hidden) refresh().catch(() => {}); }, 10000);
+  setInterval(() => { if (user && !$('server-drawer').hidden) { refresh().catch(() => {}); if (recentMode && !browsing) refreshRecent(); } }, 10000);
 }
 boot().catch(e => { status('Server unavailable', true); message(e.message + ' Start the Node.js server to use shared projects.', true); });

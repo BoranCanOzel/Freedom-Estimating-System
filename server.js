@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as Y from 'yjs';
 import { writeBook, readBook, validateBook } from './shared/model.js';
+import { resolveLocation } from './shared/navigation.js';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const encode = doc => Buffer.from(Y.encodeStateAsUpdate(doc)).toString('base64');
@@ -30,7 +31,11 @@ export function createApp(options = {}) {
     CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, name TEXT NOT NULL, expires INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS access (project_id TEXT NOT NULL REFERENCES projects(id), name TEXT NOT NULL,
       opened_at TEXT NOT NULL, PRIMARY KEY(project_id,name));
-    CREATE TABLE IF NOT EXISTS user_preferences (name TEXT PRIMARY KEY, cursor TEXT NOT NULL);`);
+    CREATE TABLE IF NOT EXISTS user_preferences (name TEXT PRIMARY KEY, cursor TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS project_visits (
+      workbook_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE, name TEXT NOT NULL,
+      project_id TEXT NOT NULL, list_id TEXT NOT NULL, takeoff_id TEXT NOT NULL, sheet_id TEXT NOT NULL,
+      view TEXT NOT NULL, viewed_at TEXT NOT NULL, PRIMARY KEY(workbook_id,name,project_id));`);
   const rooms = new Map(), loginAttempts = new Map();
   const app = express(), server = createServer(app);
   app.disable('x-powered-by');
@@ -56,7 +61,9 @@ export function createApp(options = {}) {
   }
   const publicProject = row => {
     const { state, ...metadata } = row;
-    return { ...metadata, online: [...(rooms.get(row.id)?.clients || [])].map(ws => ws.name) };
+    const room = rooms.get(row.id), book = room ? readBook(room.doc) : null;
+    return { ...metadata, online: [...(rooms.get(row.id)?.clients || [])].map(ws => ws.name),
+      locations: [...(room?.clients || [])].map(ws => ({name:ws.name,...(book && resolveLocation(book,ws.presence || {}) || {})})) };
   };
   function project(id) {
     return validId(id) && db.prepare('SELECT * FROM projects WHERE id=?').get(id);
@@ -126,6 +133,23 @@ export function createApp(options = {}) {
       LEFT JOIN access a ON p.id=a.project_id AND a.name=? ORDER BY COALESCE(a.opened_at,p.modified_at) DESC`).all(req.user.name);
     res.json(rows.map(publicProject));
   });
+  app.get('/api/projects/:id/recent', (req, res) => {
+    const row = project(req.params.id);
+    if (!row) return res.status(404).json({error:'Workbook not found.'});
+    const visits = db.prepare('SELECT * FROM project_visits WHERE workbook_id=? ORDER BY viewed_at DESC').all(row.id);
+    const doc = new Y.Doc(); Y.applyUpdate(doc, row.state);
+    const book = readBook(doc); doc.destroy();
+    const names = [...new Set([req.user.name,...Object.keys(users),...visits.map(v=>v.name)])].sort();
+    const selected = typeof req.query.user === 'string' ? req.query.user : '';
+    const items = [];
+    for (const visit of visits) {
+      if (selected && visit.name !== selected) continue;
+      const location = resolveLocation(book,{list:visit.list_id,takeoff:visit.takeoff_id,sheet:visit.sheet_id,view:visit.view});
+      if (location && location.project === visit.project_id) items.push({...location,name:visit.name,viewed_at:visit.viewed_at});
+      if (items.length >= 100) break;
+    }
+    res.json({users:names,items});
+  });
   app.post('/api/projects', (req, res) => {
     const name = String(req.body.name || '').trim().slice(0, 160);
     if (!name) return res.status(400).json({ error: 'Enter a project name.' });
@@ -187,7 +211,20 @@ export function createApp(options = {}) {
             if (Date.now() - (ws.lastPresence || 0) < 35) return;
             ws.lastPresence = Date.now();
             const p = msg.presence || {};
+            const locationKey = JSON.stringify([p.list,p.takeoff,p.sheet,p.view]);
+            if (locationKey !== ws.locationKey) {
+              ws.locationKey = locationKey;
+              ws.location = resolveLocation(readBook(room.doc), p);
+              if (ws.location) {
+                const l = ws.location;
+                db.prepare(`INSERT INTO project_visits VALUES (?,?,?,?,?,?,?,?)
+                  ON CONFLICT(workbook_id,name,project_id) DO UPDATE SET list_id=excluded.list_id,
+                  takeoff_id=excluded.takeoff_id,sheet_id=excluded.sheet_id,view=excluded.view,viewed_at=excluded.viewed_at`)
+                  .run(id,ws.name,l.project,l.list,l.takeoff,l.sheet,l.view,now());
+              }
+            }
             ws.presence = {
+              ...(ws.location || {}),
               view: String(p.view || '').slice(0, 100), sheet: String(p.sheet || '').slice(0, 100),
               takeoff: String(p.takeoff || '').slice(0, 100), field: String(p.field || '').slice(0, 500),
               anchor: String(p.anchor || '').slice(0, 500),

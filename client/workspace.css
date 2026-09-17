@@ -54,9 +54,31 @@ body.server-mode #projects>.lib-head{padding:9px 12px;background:var(--calc);bor
 body.server-mode #projects .proj-body{flex:1;min-height:0;overflow:auto}
 body.server-mode #projects .lib-name{font-size:12px;max-width:100%;width:100%}
 body.server-mode #projects .proj-tools{padding:10px 12px}
-body.server-mode #projects .p-btn{padding:2px 4px;border:0;background:transparent;font-size:13px}
+body.server-mode #projects .p-btn{min-width:44px;min-height:44px;padding:8px;border:1px solid var(--rule);border-radius:5px;background:var(--card);font-size:18px;opacity:1}
+body.server-mode #projects .p-btn:hover{background:var(--calc);border-color:var(--amber)}
 body.server-mode #projects .caret{padding:2px;border:0;background:transparent}
-body.server-mode #projects .p-head{min-height:32px}
+body.server-mode #projects .p-head{min-height:52px;padding:8px;flex-wrap:wrap;gap:6px}
+body.server-mode #projects .p-name{min-width:100px;font-size:14px;line-height:1.4;white-space:normal;overflow-wrap:anywhere}
+.project-actions{display:flex;justify-content:flex-end;gap:6px;width:100%}
+body.server-mode #projects .caret{min-width:28px;min-height:36px}
+body.server-mode #projCollapse{white-space:nowrap}
+body.server-mode #server-workbooks{display:flex;flex:1;flex-direction:column;min-height:0}
+body.server-mode #server-drawer .project-navigation{display:flex;gap:4px;padding:8px;border-bottom:1px solid var(--rule);flex:none}
+body.server-mode #server-drawer .project-navigation button{width:auto;flex:1;min-height:40px;font-size:13px}
+body.server-mode #server-drawer .project-navigation button[aria-pressed=true]{background:var(--calc);box-shadow:inset 0 -3px var(--amber)}
+.project-navigation-footer{padding:8px 12px;border-top:1px solid var(--rule);flex:none}
+body.server-mode #server-tab-workbooks{font-size:12px;color:var(--muted);border:0;min-height:36px;width:100%;text-align:left}
+body.server-mode #server-tab-workbooks[aria-pressed=true]{color:var(--ink);background:var(--calc)}
+#server-recent{display:flex;flex-direction:column;flex:1;min-height:0}
+.recent-filter{display:flex;align-items:center;gap:12px;padding:14px;font-size:12px}
+.recent-filter select{flex:1;min-width:0;padding:9px;border:1px solid var(--rule);background:var(--card);color:var(--ink);border-radius:4px;font:inherit}
+#server-recent-list{overflow:auto;flex:1;min-height:0;padding:0 8px 12px}
+body.server-mode #server-drawer .recent-project{display:grid;gap:6px;text-align:left;width:100%;padding:12px;border:0;border-bottom:1px solid var(--rule);border-radius:0}
+.recent-project strong{font-size:14px}.recent-project span{font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.project-presence{display:block;width:100%;font-size:11px;line-height:1.5;color:var(--ink);padding:4px 7px;background:var(--calc);border-left:3px solid #38a99d;overflow-wrap:anywhere}
+#rail .tab.has-presence{outline:2px solid #38a99d;outline-offset:-2px}
+.tab-presence{display:block;font-size:10px;line-height:1.2;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#38a99d;margin-top:4px}
+.server-person{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 body.server-mode #projects .lib-foot{border-top:1px solid var(--rule);padding:10px 12px;background:var(--calc)}
 body.server-mode #projects .lib-foot button{width:100%;text-align:left;font-size:12px}
 body.server-mode .card>.head .workspace-actions{margin:10px -2px 0;padding:0;gap:6px;border:0;background:none;border-radius:0;box-shadow:none;min-height:0}

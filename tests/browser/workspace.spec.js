@@ -8,9 +8,16 @@ function workbook() {
     {id:'south',name:'South job',status:'Completed',custom:{Region:'South'},takeoffs:[{id:'ts',name:'South takeoff',sheets:[sheet('ss','South scope')]}]}
   ]}]}],customFields:{company:['Account'],project:['Region'],takeoff:['Estimator']},filterFields:['Region']};
 }
+let workspaceCookies;
 async function openWorkbook(page, data = workbook(), name = 'Workspace tester') {
-  await page.goto('/'); await page.locator('#server-login-name').fill(name);
-  await page.locator('#server-login-form button').click(); await expect(page.locator('#server-login')).not.toBeVisible();
+  const reuse = name === 'Workspace tester' && workspaceCookies;
+  if (reuse) await page.context().addCookies(workspaceCookies);
+  await page.goto('/');
+  if (!reuse) {
+    await page.locator('#server-login-name').fill(name);
+    await page.locator('#server-login-form button').click(); await expect(page.locator('#server-login')).not.toBeVisible();
+    if (name === 'Workspace tester') workspaceCookies = await page.context().cookies();
+  }
   await page.locator('#workspace-file > summary').click();
   const chooser = page.waitForEvent('filechooser'); await page.locator('#server-import').click();
   await (await chooser).setFiles({name:'Organized '+Date.now()+'.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(data))});
@@ -99,6 +106,9 @@ test('one project drawer retains hierarchy, custom details and filters', async (
   await expect(page.locator('#projToggle')).not.toBeVisible();
   await expect(page.locator('#server-drawer #projects')).toBeVisible();
   await expect(page.locator('#server-browser')).not.toBeVisible();
+  await expect(page.locator('.workbook-controls')).not.toBeVisible();
+  const editSize=await page.getByTitle('Edit this project',{exact:true}).first().boundingBox();
+  expect(editSize.width).toBeGreaterThanOrEqual(44);expect(editSize.height).toBeGreaterThanOrEqual(44);
   await expect(page.locator('#projBody')).toContainText('Freedom Customer');
   await expect(page.locator('#projBody')).toContainText('North job');
   await page.locator('[data-takeoff="ts"]').click(); await expect(page.locator('#title')).toHaveValue('South scope');
@@ -132,6 +142,47 @@ test('one project drawer retains hierarchy, custom details and filters', async (
   await page.locator('#projOptions').click();
   await page.screenshot({path:'test-results/project-settings.png',fullPage:true});
   expect(errors).toEqual([]);
+});
+
+test('project presence, tab highlights, collapse and recent views work for two users',async({page,browser,baseURL})=>{
+  const data=workbook();
+  data.lists[0].companies[0].projects[0].takeoffs[0].sheets.push(sheet('sn2','Second scope'));
+  const name='Navigator '+Date.now(), other='Viewer '+Date.now();
+  await openWorkbook(page,data,name);
+  const context=await browser.newContext({baseURL}), peer=await context.newPage();
+  try {
+    await peer.goto('/');await peer.locator('#server-login-name').fill(other);await peer.locator('#server-login-form button').click();
+    const workbookName=await page.locator('#server-title').textContent();
+    await peer.locator('#server-list .server-project').filter({hasText:workbookName}).click();
+    await expect(peer.locator('#server-status')).toHaveText('All changes saved');
+    await peer.locator('#rail [data-sheet="sn2"]').click();
+    await expect(page.locator('#rail [data-sheet="sn2"] .tab-presence')).toContainText(other);
+    await expect(page.locator('#server-people .server-person')).toHaveAttribute('title',/Freedom Customer → North job → North takeoff → Tab 2/);
+    await page.locator('#server-projects').click();
+    await expect(page.locator('[data-project="north"] > .p-head.lvl2 .project-presence')).toContainText(other);
+    await page.locator('#projCollapse').click();
+    await expect(page.locator('#projBody [data-project]')).toHaveCount(0);
+    await expect(page.locator('[data-company="co"] > .p-head .project-presence')).toContainText(other);
+    // Collapsing is personal and must not collapse the other user's hierarchy.
+    await peer.locator('#server-projects').click();await expect(peer.locator('[data-takeoff="ts"]')).toBeVisible();
+    await peer.locator('[data-takeoff="ts"]').click();
+    await expect(page.locator('#rail .tab-presence')).toHaveCount(0);
+    await expect(page.locator('#server-people .server-person')).toHaveAttribute('title',/South job/);
+    await page.locator('#server-tab-recent').click();
+    await expect(page.locator('#server-recent-user')).toHaveValue(name);
+    await expect(page.locator('#server-recent-list')).toContainText('North job');
+    await expect(page.locator('#server-recent-user option').filter({hasText:other})).toHaveCount(1);
+    await page.locator('#server-recent-user').selectOption(other);
+    await expect(page.locator('#server-recent-list')).toContainText('South job');
+    await expect(page.locator('#server-recent-list .recent-project').first()).toContainText('South job');
+    await page.locator('#server-recent-list .recent-project').filter({hasText:'North job'}).click();
+    await expect(page.locator('#title')).toHaveValue('Second scope');
+    await expect(page.locator('#server-hierarchy')).toBeVisible();
+    await expect(page.locator('.workbook-controls')).not.toBeVisible();
+    await page.screenshot({path:'test-results/project-navigation.png',fullPage:true});
+    await page.locator('#server-tab-recent').click();
+    await page.screenshot({path:'test-results/recent-projects.png',fullPage:true});
+  } finally {await context.close();}
 });
 
 test('menus preserve rounding, display, downloads, printing and keyboard access', async ({page}) => {
@@ -182,10 +233,11 @@ test('workspace menus fit a small screen and appearance survives reopening',asyn
   const rect=await page.locator('#workspace-view .workspace-menu-content').boundingBox();
   expect(rect.x).toBeGreaterThanOrEqual(0);expect(rect.x+rect.width).toBeLessThanOrEqual(600);
   await page.locator('#workspace-view > summary').press('Escape');
-  await page.locator('#server-projects').click();await page.locator('#server-open').click();
+  await page.locator('#server-projects').click();await page.locator('#server-tab-workbooks').click();await page.locator('#server-open').click();
   await expect(page.locator('#server-list')).toBeVisible();await page.locator('#server-back').click();
   await expect(page.locator('#server-hierarchy')).toBeVisible();
   const name=await page.locator('#server-title').textContent();
+  await page.locator('#server-tab-workbooks').click();
   await page.locator('#server-workbook-actions > summary').click();await page.locator('#server-close').click();
   await page.locator('#server-list .server-project').filter({hasText:name}).click();
   await expect(page.locator('#server-status')).toHaveText('All changes saved');
