@@ -30,6 +30,8 @@ The site now needs a running Node process. Serving `index.html` as a static site
 
 If your process manager starts `server.js` directly instead of `npm start`, load the configured environment and build first, or use `node --env-file-if-exists=.env server.js`.
 
+If `/api/preferences` returns an HTML `Cannot GET` page after a pull, the frontend was rebuilt while the old Node process is still running. Restart the Node project in aaPanel. The client tolerates a missing preferences route so existing workbooks remain accessible during this version mismatch; account settings need the updated server. API errors identify the route and HTTP status instead of exposing a JSON parsing error.
+
 The app intentionally refuses to start in production without valid `APP_USERS`. Every configured account is a member of the same estimating team and can open/edit all projects. Per-project roles and account-management screens are not included.
 
 ## Projects and files
@@ -53,6 +55,7 @@ Workspace controls are grouped by purpose:
 | Estimate | Current option rounding, embedded load calculator, hidden column restoration, reset and delete |
 | Projects → Project settings | Custom fields by company/project/takeoff, project statuses, and available filters |
 | Item column header or calculator heading | Common add-item, add-section, add-option, and add-labor-group actions |
+| Scope of Work header | Larger Detail opener and a copy of Collapse/Expand all detail, synchronized with View |
 
 Project settings save automatically. Renaming a custom field retains existing detail values and its filter configuration. Theme and zoom are personal browser preferences that persist across workbook changes. The Scopes tab replaces the former gear icon for the option overview. Destructive estimate actions retain their two-click confirmation.
 

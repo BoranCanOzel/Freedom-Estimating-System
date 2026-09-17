@@ -194,6 +194,7 @@ export function createApp(options = {}) {
     res.attachment('project-' + row.id + '.json').json({ _app: 'project-breakdown', _v: 3, ...readBook(doc) });
     doc.destroy();
   });
+  app.use('/api', (_req, res) => res.status(404).json({error:'API route not found. Restart the Node project after deployment.'}));
   app.get('/', (_req, res) => res.sendFile(join(root, 'index.html')));
   app.use('/assets', express.static(join(root, 'dist')));
   app.get('/health', (_req, res) => res.json({ ok: true }));

@@ -29,6 +29,18 @@ async function openWorkbook(page, data = workbook(), name = 'Workspace tester') 
   await expect(page.locator('#server-status')).toHaveText('All changes saved', {timeout:20000});
 }
 
+test('an older server missing preferences still opens workbooks without a JSON crash',async({page})=>{
+  await page.route('**/api/preferences',route=>route.fulfill({status:404,contentType:'text/html',body:'<!DOCTYPE html><html>Cannot GET /api/preferences</html>'}));
+  await openWorkbook(page);
+  await page.reload();
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await expect(page.locator('#sheetCard')).toBeVisible();
+  await expect(page.locator('#server-message')).toContainText('restart the Node project');
+  await expect(page.locator('#server-message')).not.toContainText('Unexpected token');
+  await page.locator('#workspace-view > summary').click();
+  await expect(page.locator('#workspace-cursor')).toBeDisabled();
+});
+
 test('last selected workbook survives sign-out and opens in a fresh browser',async({page,browser,baseURL})=>{
   const name='Remember workbook '+Date.now();
   await openWorkbook(page,workbook(),name);
@@ -242,6 +254,20 @@ test('project presence, tab highlights, collapse and recent views work for two u
 test('menus preserve rounding, display, downloads, printing and keyboard access', async ({page}) => {
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await openWorkbook(page);
+  const detailButton=await page.locator('#titleNote').boundingBox();
+  expect(detailButton.height).toBeGreaterThanOrEqual(32);expect(detailButton.width).toBeGreaterThanOrEqual(80);
+  await page.locator('#titleNote').click();
+  await page.locator('#sheetCard > .head .item-note').fill('Scope detail');
+  await page.locator('#workspace-toggle-notes').click();
+  await expect(page.locator('#sheetCard > .head .item-note')).not.toBeVisible();
+  await expect(page.locator('#body .item-note').first()).not.toBeVisible();
+  await expect(page.locator('#workspace-toggle-notes')).toHaveText('Expand all detail');
+  await page.locator('#workspace-view > summary').click();
+  await expect(page.locator('#toggleNotes')).toHaveText('Expand all detail');
+  await page.locator('#toggleNotes').click();
+  await expect(page.locator('#sheetCard > .head .item-note')).toBeVisible();
+  await expect(page.locator('#workspace-toggle-notes')).toHaveText('Collapse all detail');
+  await page.locator('#workspace-view > summary').press('Escape');
   await expect(page.locator('#sheetCard > .bar')).toHaveCount(0);
   await expect(page.locator('#sheetTable th.c-item #add')).toBeVisible();
   await expect(page.locator('#roundTotal')).not.toBeVisible();

@@ -3343,6 +3343,8 @@
       noteBtn.classList.toggle('has-note', !!noteEl);
       noteBtn.classList.toggle('note-hidden', !!noteEl && !open);
       noteBtn.title = !noteEl ? 'Add detail' : (open ? 'Hide this detail' : 'Show this detail');
+      noteBtn.setAttribute('aria-label',noteBtn.title);
+      noteBtn.setAttribute('aria-expanded',String(!!noteEl && open));
       if (!noteEl) return;
       noteEl.classList.toggle('hidden', !open);
       if (open) grow(noteEl);
@@ -4384,6 +4386,7 @@
     const fresh = noteButton();
     fresh.id = 'titleNote';
     fresh.classList.add('head-note');
+    fresh.insertAdjacentHTML('beforeend','<span>Detail</span>');
     document.getElementById('titleNote').replaceWith(fresh);
     headNoteSync = attachNote(state, head, fresh, 'Detail — one per line');
   }
@@ -6523,9 +6526,13 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   }
 
   function syncNotesButton(){
-    const btn = document.getElementById('toggleNotes');
-    btn.hidden = !anyNotes();
-    btn.textContent = anyNotesOpen() ? 'Collapse all detail' : 'Expand all detail';
+    for (const id of ['toggleNotes','workspace-toggle-notes']) {
+      const btn = document.getElementById(id);
+      if (!btn) continue;
+      btn.hidden = !anyNotes();
+      btn.textContent = anyNotesOpen() ? 'Collapse all detail' : 'Expand all detail';
+      btn.setAttribute('aria-expanded',String(anyNotesOpen()));
+    }
   }
 
   document.getElementById('toggleNotes').addEventListener('click', () => {

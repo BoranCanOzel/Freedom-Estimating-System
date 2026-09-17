@@ -66,6 +66,11 @@ export function setupWorkspace() {
   $('workspace-pictures').append($('showPics').closest('.pic-pair'));
   $('workspace-pictures').querySelector('.pic-lab').textContent = 'Pictures';
   move('toggleNotes', 'workspace-detail');
+  const detailCopy = document.createElement('button');
+  detailCopy.id = 'workspace-toggle-notes'; detailCopy.type = 'button';
+  detailCopy.textContent = $('toggleNotes').textContent; detailCopy.hidden = $('toggleNotes').hidden;
+  detailCopy.onclick = () => $('toggleNotes').click();
+  document.querySelector('#sheetCard .eyebrow-row').append(detailCopy);
   move('sumSections', 'workspace-summary'); move('sumDetail', 'workspace-summary');
   move('loadFoldAll', 'workspace-load'); move('sheetLoadBtn', 'workspace-load-toggle');
   move('hiddenCols', 'workspace-columns');

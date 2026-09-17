@@ -35,6 +35,9 @@ test('authenticated projects, real-time changes, access dates, snapshots, and re
     assert.equal((await fetch(base+'/api/preferences')).status,401);
     assert.equal((await fetch(base+'/.env')).status,404);
     const alice=await login('Alice'), bob=await login('Bob');
+    const missing=await request('/api/unknown-route',alice);
+    assert.equal(missing.status,404);assert.match(missing.headers.get('content-type'),/application\/json/);
+    assert.match((await missing.json()).error,/API route not found/);
     assert.deepEqual(await (await request('/api/preferences',alice)).json(), {cursor:'system',lastWorkbook:null});
     assert.equal((await request('/api/preferences',alice,'PUT',{cursor:'large-dark'})).status,200);
     assert.equal((await request('/api/preferences',alice,'PUT',{cursor:'invalid'})).status,400);

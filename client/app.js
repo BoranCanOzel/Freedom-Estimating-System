@@ -10,7 +10,7 @@ const clone = value => structuredClone(value);
 const encode = data => { let s = ''; for (let i = 0; i < data.length; i += 8192) s += String.fromCharCode(...data.subarray(i, i + 8192)); return btoa(s); };
 const decode = data => Uint8Array.from(atob(data), c => c.charCodeAt(0));
 let user, current, connection, projects = [], filter = '', busy = false, browsing = true;
-let workspace, projectPresence, recentMode = false, recentRequest = 0;
+let workspace, projectPresence, recentMode = false, recentRequest = 0, preferencesAvailable = true;
 const bridge = window.estimator;
 const cacheDB = new Promise((resolve, reject) => {
   const request = indexedDB.open('freedom-collaboration', 1);
@@ -28,8 +28,14 @@ async function cache(key, value) {
 }
 async function api(path, options = {}) {
   const response = await fetch('/api' + path, { ...options, headers: { 'Content-Type': 'application/json', ...options.headers } });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Request failed.');
+  const fail = text => Object.assign(new Error(text), {status:response.status,path});
+  if (!(response.headers.get('content-type') || '').includes('application/json')) {
+    throw fail(`The server returned a web page instead of API data for /api${path} (HTTP ${response.status}). Restart the Node project in aaPanel after deployment; if it continues, check the Nginx proxy.`);
+  }
+  let data;
+  try { data = await response.json(); }
+  catch { throw fail(`The server returned invalid JSON for /api${path} (HTTP ${response.status}).`); }
+  if (!response.ok) throw fail(data.error || 'Request failed.');
   return data;
 }
 function message(text, bad = false) { $('server-message').textContent = text; $('server-message').classList.toggle('error', bad); }
@@ -461,12 +467,19 @@ window.addEventListener('resize', () => connection?.paintPeers());
 document.addEventListener('visibilitychange', () => { if (document.hidden) connection?.sendPresence({ visible: false }); });
 async function signedIn(name) {
   user = name; $('server-signout').textContent = name + ' · Sign out';
-  const preferences = await api('/preferences');
-  workspace.setCursor(preferences.cursor); $('workspace-cursor').disabled = false;
+  let preferences = {cursor:'system',lastWorkbook:null};
+  try { preferences = await api('/preferences'); }
+  catch (error) {
+    if (error.status !== 404) throw error;
+    preferencesAvailable = false;
+    message('Server update pending: restart the Node project in aaPanel to enable account settings. Your workbooks are still available.',true);
+  }
+  workspace.setCursor(preferences.cursor); $('workspace-cursor').disabled = !preferencesAvailable;
   await refresh(); syncProjectPanel();
   let remembered;
   try { remembered = localStorage.getItem('freedom:last-workbook:' + user); } catch {}
-  const last = projects.find(p=>p.id===preferences.lastWorkbook) || projects.find(p=>p.id===remembered);
+  const last = projects.find(p=>p.id===preferences.lastWorkbook) || projects.find(p=>p.id===remembered)
+    || projects.find(p=>p.my_opened_at);
   if (last) { status('Opening project…'); await openProject(last); }
   else status('No project open');
   $('server-login').close();
@@ -490,4 +503,4 @@ async function boot() {
   }
   setInterval(() => { if (user && !$('server-drawer').hidden) { refresh().catch(() => {}); if (recentMode && !browsing) refreshRecent(); } }, 10000);
 }
-boot().catch(e => { status('Server unavailable', true); message(e.message + ' Start the Node.js server to use shared projects.', true); });
+boot().catch(e => { status('Could not open the workspace', true); message(e.message, true); });

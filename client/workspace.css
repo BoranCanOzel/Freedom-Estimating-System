@@ -94,6 +94,12 @@ body.server-mode #sheetTable .h-adds .btn{min-height:44px;padding:10px 14px;font
 body.server-mode #sheetTable .h-adds .btn:hover{background:#ffb347;color:#241b10;border-color:#e99525}
 body.server-mode #sheetTable .sec-add{opacity:1;min-height:44px;min-width:88px;padding:10px 14px;font-size:13px;white-space:nowrap;border-radius:5px}
 body.server-mode .sheet>.card{padding-bottom:8px}
+body.server-mode #sheetCard>.head{padding-top:7px;padding-bottom:5px}
+body.server-mode #sheetCard .eyebrow-row{min-height:32px}
+body.server-mode #titleNote{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:32px;min-width:80px;padding:6px 10px;opacity:1;border:1px solid var(--rule);border-radius:5px;font:500 12px var(--f-sans);line-height:1;color:var(--ink)}
+body.server-mode #titleNote svg{width:14px;height:12px}
+body.server-mode #workspace-toggle-notes{margin-left:auto;min-height:32px;padding:6px 10px;border:1px solid var(--rule);border-radius:5px;background:transparent;color:var(--ink);font:500 12px var(--f-sans);cursor:pointer}
+body.server-mode #titleNote:hover,body.server-mode #workspace-toggle-notes:hover{background:var(--calc);border-color:var(--amber)}
 body.server-mode .ed{top:65px;bottom:24px;z-index:560;max-height:calc(100vh - 89px)}
 body.server-mode.workspace-projects-open .ed.ed-left{left:calc(42px + var(--workspace-project-width));right:auto;max-width:calc(100vw - var(--workspace-project-width) - 62px)}
 body.server-mode:not(.workspace-projects-open) .ed.ed-left{left:30px;right:auto;max-width:calc(100vw - 60px)}
@@ -117,4 +123,4 @@ body.server-mode .workspace-menu summary:focus-visible,body.server-mode button:f
 body.server-mode #server-welcome{padding-left:calc(var(--workspace-project-width) + 40px)}
 @media(max-width:900px){body.server-mode.workspace-projects-open.server-active>.sheet{margin-left:0}body.server-mode #server-people{display:none}body.server-mode #server-title{max-width:28vw}body.server-mode #server-status{font-size:10px}body.server-mode.workspace-projects-open .ed.ed-left,body.server-mode:not(.workspace-projects-open) .ed.ed-left{left:20px;right:20px;max-width:calc(100vw - 40px);width:410px}}
 @media(max-width:650px){body.server-mode #server-bar{gap:4px}body.server-mode #workspace-menus{order:2}body.server-mode #server-status{order:3;flex:1;text-align:right}body.server-mode #server-title{max-width:none}body.server-mode #server-signout{max-width:100px;font-size:11px}body.server-mode #server-drawer{top:101px;left:10px;width:calc(100vw - 20px);bottom:12px}body.server-mode .ed{top:101px}body.server-mode #server-welcome{padding:30px}body.server-mode .workspace-menu-content{max-height:calc(100vh - 160px)}}
-@media print{body.server-mode .workspace-actions,body.server-mode #workspace-menus{display:none!important}body.server-mode.workspace-projects-open.server-active>.sheet{margin-left:0}}
+@media print{body.server-mode .workspace-actions,body.server-mode #workspace-menus,body.server-mode #workspace-toggle-notes{display:none!important}body.server-mode.workspace-projects-open.server-active>.sheet{margin-left:0}}
