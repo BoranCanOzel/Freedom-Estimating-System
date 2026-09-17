@@ -62,7 +62,7 @@ test('menus preserve rounding, display, downloads, printing and keyboard access'
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await openWorkbook(page);
   await expect(page.locator('#sheetCard > .bar')).toHaveCount(0);
-  await expect(page.locator('#sheetCard > .head #add')).toBeVisible();
+  await expect(page.locator('#sheetTable th.c-item #add')).toBeVisible();
   await expect(page.locator('#roundTotal')).not.toBeVisible();
   await page.locator('#workspace-estimate > summary').click(); await page.locator('#roundTotal').selectOption('100');
   await expect(page.locator('#tGrandLipMoney .v')).toHaveText('100.00');

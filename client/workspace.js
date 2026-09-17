@@ -70,6 +70,9 @@ export function setupWorkspace() {
   const parking = document.createElement('div'); parking.id = 'workspace-legacy'; parking.hidden = true;
   document.body.append(parking);
   for (const control of document.querySelectorAll('.card > .bar .js-export, .card > .bar .js-print, #saveFile, #saveFile2, #loadFile, #loadFile2')) parking.append(control);
+  const itemActions = document.querySelector('#sheetTable .h-adds');
+  parking.append($('hAddItem'), $('hAddSec'));
+  itemActions.append($('add'), $('addSection'));
   for (const bar of document.querySelectorAll('.card > .bar')) {
     bar.querySelectorAll('.legend').forEach(legend => { bar.title = legend.textContent; legend.remove(); });
     if (!bar.children.length) { bar.remove(); continue; }
