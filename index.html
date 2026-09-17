@@ -7535,13 +7535,23 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     x.type = 'button';
     x.className = 'tpl-btn rm folder-x';
     x.innerHTML = '&times;';
-    x.title = 'Delete this folder and its subfolders — templates move to Unfiled';
+    x.title = 'Delete this folder';
     x.addEventListener('click', ev => {
       ev.stopPropagation();
       const lib = activeLib();
-      lib.folders = lib.folders.filter(fd => !underFolder(fd, path));
+      const hasSubfolders = (lib.folders || []).some(fd => fd !== path && underFolder(fd, path));
+      const hasItems = inside.length > 0;
+      if (hasItems || hasSubfolders) {
+        flash(
+          hasItems
+            ? 'Move or delete the items inside this folder first.'
+            : 'Move or delete the subfolders inside this folder first.',
+          true
+        );
+        return;
+      }
+      lib.folders = lib.folders.filter(fd => fd !== path);
       book.folders = lib.folders;
-      entries.forEach(e => { if (underFolder(e.t.folder || '', path)) e.t.folder = ''; });
       if (underFolder(libPath, path)) libPath = parentFolder(path);
       renderLibrary();
       save();
