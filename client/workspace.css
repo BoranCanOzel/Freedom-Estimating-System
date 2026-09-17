@@ -60,6 +60,7 @@ body.server-mode #sheetTable .h-item-row{flex-wrap:wrap}
 body.server-mode #sheetTable .h-adds{display:flex;flex-wrap:wrap;flex:0 1 auto;justify-content:flex-end;gap:6px;margin-left:auto}
 body.server-mode #sheetTable .h-adds .btn{min-height:44px;padding:10px 14px;font-size:13px;white-space:nowrap;background:#e99525;color:#241b10;border:1px solid #c97b17;border-radius:5px;text-shadow:none;box-shadow:none}
 body.server-mode #sheetTable .h-adds .btn:hover{background:#ffb347;color:#241b10;border-color:#e99525}
+body.server-mode #sheetTable .sec-add{opacity:1;min-height:44px;min-width:88px;padding:10px 14px;font-size:13px;white-space:nowrap;border-radius:5px}
 body.server-mode .sheet>.card{padding-bottom:8px}
 body.server-mode .ed{top:65px;bottom:24px;z-index:560;max-height:calc(100vh - 89px)}
 body.server-mode.workspace-projects-open .ed.ed-left{left:calc(42px + var(--workspace-project-width));right:auto;max-width:calc(100vw - var(--workspace-project-width) - 62px)}
