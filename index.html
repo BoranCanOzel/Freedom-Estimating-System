@@ -6820,7 +6820,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
   armConfirm(document.getElementById('deleteSheet'), () => {
     if (book.sheets.length < 2){ flash('only one option', true); return; }
-    book.sheets = book.sheets.filter(s => s.id !== state.id);
+    book.sheets.splice(book.sheets.findIndex(s => s.id === state.id), 1);
     book.sheets.forEach((s, i) => { s.num = i + 1; });   // close the gap in the tab numbers
     state = book.sheets[0];
     book.active = state.id;
@@ -9522,7 +9522,9 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     else renderScopeEd(box);
   }
 
+  let editorSession = 0;
   function openEditor(mode, t){
+    editorSession++;
     if (t) t = structuredClone(t); // drafts must not mutate the shared record before Save
     edMode = mode;
     markListOpts();
@@ -10906,7 +10908,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         edBtn('&times;', 'Delete this company', e => {
           e.stopPropagation();
           confirmPop(ch, 'Delete "' + (co.name || 'company') + '" and everything under it?', () => {
-            book.companies = book.companies.filter(x => x.id !== co.id);
+            activeList().companies.splice(book.companies.findIndex(x => x.id === co.id), 1);
             activeTakeoff();
             renderProjects();
             save();
@@ -11516,6 +11518,26 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     getShared(){ projectTree(); templates(); return separate(book); },
     getLocation(){ return {list:book.activeList,view:book.view, sheet:book.active, takeoff:book.activeTakeoff}; },
     getProjectLists(){ return book.lists || []; },
+    getEditorHistory(){
+      if (document.getElementById('editor').hidden) return null;
+      const draft = ({item:itemDraft, section:secDraft, scope:scopeDraft, part:partDraft,
+        construct:conDraft, service:svcDraft, company:coDraft, project:prDraft,
+        takeoff:tkDraft, subtype:subDraft})[edMode];
+      return draft ? {session:editorSession, value:structuredClone(draft)} : null;
+    },
+    restoreEditorHistory(snapshot){
+      if (snapshot.session !== editorSession) return;
+      const draft = ({item:itemDraft, section:secDraft, scope:scopeDraft, part:partDraft,
+        construct:conDraft, service:svcDraft, company:coDraft, project:prDraft,
+        takeoff:tkDraft, subtype:subDraft})[edMode];
+      if (!draft) return;
+      Object.keys(draft).forEach(key => delete draft[key]);
+      Object.assign(draft, structuredClone(snapshot.value));
+      renderEditor();
+    },
+    rebaseEditorHistory(snapshot, before, after){
+      return {...snapshot, value:rebaseDraft(snapshot.value, before.value, after.value)};
+    },
     openLocation(location){
       const list = (book.lists || []).find(l => l.id === location.list);
       if (!list) return false;

@@ -4,6 +4,7 @@ import './style.css';
 import { setupWorkspace } from './workspace.js';
 import { setupProjectPresence } from './project-presence.js';
 import { resolveLocation } from '../shared/navigation.js';
+import { setupHistory } from './history.js';
 
 const $ = id => document.getElementById(id);
 const clone = value => structuredClone(value);
@@ -69,8 +70,11 @@ function focused() {
     scrolls: [...document.querySelectorAll('.scroll,.proj-body,.lib-body')].map(e => [e, e.scrollTop, e.scrollLeft]) };
 }
 function renderRemote(data, fresh = false, location) {
+  document.dispatchEvent(new Event('estimator:before-receive'));
   const focus = focused();
+  const beforeDraft = bridge.getEditorHistory();
   bridge.receive(data, fresh, location);
+  document.dispatchEvent(new CustomEvent('estimator:editor-rebase', {detail:{before:beforeDraft,after:bridge.getEditorHistory()}}));
   if (!fresh && focus.selector) {
     const el = document.querySelector(focus.selector);
     if (el && ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) {
@@ -90,6 +94,11 @@ class LiveProject {
     this.ready = false; this.closed = false; this.peers = []; this.persisting = Promise.resolve();
     this.cacheKey = user + ':' + project.id; this.baseline = {}; this.retry = 0;
     this.locationKey = 'freedom:location:' + this.cacheKey;
+    this.history = new Y.UndoManager(this.doc, {trackedOrigins:new Set(['local']), captureTimeout:500});
+    this.history.on('stack-item-added', ({stackItem}) => {
+      if (!this.history.undoing && !this.history.redoing) stackItem.meta.set('before', this.historyLocation || bridge.getLocation());
+      document.dispatchEvent(new Event('estimator:history'));
+    });
     this.resumeLocation = project.lastLocation;
     try { this.resumeLocation = JSON.parse(localStorage.getItem(this.locationKey)) || this.resumeLocation; } catch {}
   }
@@ -100,7 +109,7 @@ class LiveProject {
       const state = Y.encodeStateAsUpdate(this.doc);
       this.persisting = this.persisting.catch(() => {}).then(() => cache(this.cacheKey, state));
       this.persisting.catch(() => { this.cacheFailed = true; status('Device backup failed — keep this tab open', true); });
-      if (origin === 'local') {
+      if (origin === 'local' || origin === this.history) {
         this.seq++;
         if (this.socket?.readyState === WebSocket.OPEN && this.synced) this.sendUpdate(_update);
         this.paintStatus();
@@ -123,10 +132,12 @@ class LiveProject {
           this.applying = true;
           try { renderRemote(readBook(this.doc), !this.ready, this.resumeLocation); this.baseline = clone(bridge.getShared()); }
           finally { this.applying = false; }
+          this.historyLocation = clone(bridge.getLocation());
           if (msg.type === 'sync') {
             this.peerId = msg.peerId; this.synced = true; this.ready = true; this.retry = 0;
             document.body.classList.add('server-active');
             workspace.sync(); syncProjectPanel();
+            document.dispatchEvent(new Event('estimator:history'));
             // The merged state includes edits recovered from this browser after a disconnect.
             this.seq++; this.sendUpdate(Y.encodeStateAsUpdate(this.doc));
           }
@@ -150,8 +161,35 @@ class LiveProject {
   changed() {
     if (!this.ready || this.closed || this.applying) return;
     const next = bridge.getShared();
-    writeBook(this.doc, this.baseline, next);
+    const sequence = this.seq;
+    if (JSON.stringify(this.baseline) !== JSON.stringify(next)) writeBook(this.doc, this.baseline, next);
     this.baseline = clone(next);
+    this.historyLocation = clone(bridge.getLocation());
+    const latest = this.history.undoStack.at(-1);
+    if (latest && this.seq !== sequence) latest.meta.set('after', this.historyLocation);
+    document.dispatchEvent(new Event('estimator:history'));
+    this.sendPresence();
+  }
+  travelHistory(redo = false) {
+    if (!this.ready || this.closed) return;
+    this.changed();
+    this.history.stopCapturing();
+    const stack = redo ? this.history.redoStack : this.history.undoStack;
+    const entry = stack.at(-1);
+    if (!entry) return;
+    const before = entry.meta.get('before'), after = entry.meta.get('after');
+    this.applying = true;
+    try {
+      const popped = redo ? this.history.redo() : this.history.undo();
+      if (!popped) return;
+      renderRemote(readBook(this.doc));
+      const location = redo ? after : before;
+      if (location && JSON.stringify(location) !== JSON.stringify(bridge.getLocation())) bridge.openLocation(location);
+      this.baseline = clone(bridge.getShared());
+      this.historyLocation = clone(bridge.getLocation());
+      const inverse = (redo ? this.history.undoStack : this.history.redoStack).at(-1);
+      if (inverse) { inverse.meta.set('before',before); inverse.meta.set('after',after); }
+    } finally { this.applying = false; document.dispatchEvent(new Event('estimator:history')); }
     this.sendPresence();
   }
   paintStatus() {
@@ -243,6 +281,7 @@ class LiveProject {
     this.closed = true; clearTimeout(this.retryTimer); clearTimeout(this.presenceTimer);
     cancelAnimationFrame(this.peerFrame);
     this.socket?.close(); this.doc.destroy();
+    document.dispatchEvent(new Event('estimator:history'));
     $('server-people').replaceChildren(); $('server-cursors').replaceChildren();
     projectPresence.clear();
   }
@@ -359,6 +398,10 @@ document.body.insertAdjacentHTML('afterbegin', `
   <header id="server-bar">
     <button id="server-projects" type="button" aria-expanded="true" aria-controls="server-drawer">☰ Projects</button>
     <nav id="workspace-menus" aria-label="Workspace menus"></nav>
+    <div id="workspace-history" role="group" aria-label="Edit history">
+      <button id="workspace-undo" type="button" title="Undo (Ctrl+Z)" disabled>Undo</button>
+      <button id="workspace-redo" type="button" title="Redo (Ctrl+Y or Ctrl+Shift+Z)" disabled>Redo</button>
+    </div>
     <strong id="server-title">Freedom Estimating</strong><div id="server-people" aria-label="Collaborators"></div>
     <span id="server-status" role="status">Connecting…</span><button id="server-signout" type="button">Sign out</button>
   </header>
@@ -449,6 +492,7 @@ for (const id of ['saveFile', 'saveFile2']) {
 }
 $('server-signout').onclick = () => run(async () => { await closeProject(); await api('/logout', { method: 'POST' }); location.reload(); });
 window.freedomSession = { changed: () => connection?.changed(), notify: text => message(text) };
+setupHistory(bridge, () => connection);
 window.addEventListener('beforeunload', event => { if (connection && connection.seq > connection.acked) { event.preventDefault(); event.returnValue = ''; } });
 let lastPointer = 0;
 document.addEventListener('pointermove', event => {
