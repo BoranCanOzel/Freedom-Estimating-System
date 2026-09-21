@@ -7,7 +7,6 @@
   "scripts": {
     "build": "esbuild client/app.js --bundle --format=iife --loader:.png=file --outfile=dist/app.js",
     "start": "node --env-file-if-exists=.env server.js",
-    "prestart": "npm run build",
     "test": "node --test tests/*.test.js",
     "test:browser": "playwright test",
     "password": "node scripts/password.js"

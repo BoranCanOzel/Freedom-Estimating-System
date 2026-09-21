@@ -10,6 +10,23 @@ export function setupProjectPresence(bridge) {
     if (!dirty && signature === next) return;
     signature = next; dirty = false;
     clear();
+    const byId = (name,id) => document.querySelector(`#projBody [data-${name}="${CSS.escape(id)}"]`);
+    if (here) {
+      const current = [
+        [byId('company',here.company)?.querySelector(':scope > .p-head'), `${here.projectName} / ${here.takeoffName} · ${here.tab}`],
+        [byId('project',here.project)?.querySelector(':scope > .p-head'), `${here.takeoffName} · ${here.tab}`],
+        [byId('takeoff',here.takeoff), here.tab]
+      ];
+      for (const [host,detail] of current) {
+        if (!host) continue;
+        host.classList.add('is-current-location');
+        if (host.dataset.takeoff) host.setAttribute('aria-current','location');
+        const badge = document.createElement('span');
+        badge.className = 'project-current-location';
+        badge.textContent = `You are here · ${detail}`;
+        host.append(badge);
+      }
+    }
     const groups = new Map();
     function mark(host,peer,location,tab=false) {
       if (!host) return;
@@ -19,7 +36,6 @@ export function setupProjectPresence(bridge) {
       if (!group.people.includes(text)) group.people.push(text);
     }
     for (const {peer,location:l} of visitors) {
-      const byId = (name,id) => document.querySelector(`#projBody [data-${name}="${CSS.escape(id)}"]`);
       if (l.list === bridge.getLocation().list) {
         mark(byId('company',l.company)?.querySelector(':scope > .p-head'),peer,l);
         mark(byId('project',l.project)?.querySelector(':scope > .p-head'),peer,l);
@@ -41,6 +57,10 @@ export function setupProjectPresence(bridge) {
     }
   }
   function clear() {
+    document.querySelectorAll('.project-current-location').forEach(el=>el.remove());
+    document.querySelectorAll('.is-current-location').forEach(el=>{
+      el.classList.remove('is-current-location'); el.removeAttribute('aria-current');
+    });
     document.querySelectorAll('.project-presence,.tab-presence').forEach(el=>el.remove());
     document.querySelectorAll('.has-presence').forEach(el=>el.classList.remove('has-presence'));
   }

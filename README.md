@@ -82,6 +82,12 @@ Edits are acknowledged only after SQLite writes succeed. JSON snapshots are gene
 
 For a full backup, stop the process and copy all of `DATA_DIR`, or use SQLite's supported online backup facilities. Do not copy only `projects.sqlite` while the database is running in WAL mode. The JSON snapshot history is a convenience, not a substitute for an independent backup. Never edit a snapshot to change an open project; import it as a new workbook instead.
 
+## Nested takeoff sections
+
+Use **+ Subsection** on a section header to add a child. Indentation and branch lines show the hierarchy; each section collapses independently and its subtotal includes all descendants. Moving or duplicating a section carries its entire subtree. Removing a section header keeps its contents at the parent level.
+
+Drag library sections onto the lower half of a section header to place them inside it, or between rows to choose another position. Saving a section to the library preserves its nested sections, and dropping that template restores the tree. Nested templates can also be expanded and dragged individually from the library. While dragging, translucent rows show the actual placement, nesting, and totals before release, including after a section subtotal. Press Escape to cancel.
+
 ## Collaboration behavior
 
 - Fields update live; colored pointers and outlines identify another person's location and active field.

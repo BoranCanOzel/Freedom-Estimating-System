@@ -30,6 +30,10 @@ body.server-mode #workspace-pictures button{width:auto;min-width:50px;text-align
 body.server-mode #workspace-pictures button.on{border-color:var(--amber);background:var(--calc)}
 body.server-mode #workspace-option-actions button{color:#c65a4f}
 body.server-mode #workspace-option-actions button.danger{background:#a2372d;color:white}
+#workspace-page-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+body.server-mode #server-bar #workspace-page-actions button{min-height:36px;white-space:nowrap;font:500 12px var(--f-sans);text-transform:none;letter-spacing:normal;box-shadow:none;text-shadow:none}
+body.server-mode #server-bar #deleteSheet{color:#c65a4f}
+body.server-mode #server-bar #deleteSheet.danger{background:#a2372d;color:white}
 #workspace-columns #hiddenCols{display:flex;flex-direction:column;width:100%;gap:3px}
 #workspace-columns #hiddenCols:empty::after{content:'All columns are visible';padding:7px 10px;font-size:12px;color:var(--muted)}
 body.server-mode #status,body.server-mode #projToggle,body.server-mode #projClose,body.server-mode #projects .panel-grab{display:none!important}
@@ -64,6 +68,9 @@ body.server-mode #projects .p-head.lvl2 .p-name{font-size:12px;font-weight:500}
 body.server-mode #projects .p-head.lvl3{margin-left:15px}
 body.server-mode #projects .p-head.lvl3 .p-name{font-size:11.5px;font-weight:400;color:var(--muted)}
 body.server-mode #projects .p-head.current .p-name{color:var(--ink);font-weight:500}
+body.server-mode #projects .p-head.is-current-location{background:var(--calc);box-shadow:inset 3px 0 var(--amber);border-radius:4px}
+body.server-mode #projects .p-head.is-current-location .p-name{color:var(--ink);font-weight:700}
+.project-current-location{display:block;width:100%;padding:4px 7px;font-size:11px;font-weight:600;line-height:1.5;color:var(--ink);border-left:3px solid var(--amber);overflow-wrap:anywhere}
 .project-actions{display:flex;flex:none;align-items:center;gap:0;margin-left:auto}
 body.server-mode #projects .caret{min-width:18px;min-height:40px}
 body.server-mode #projCollapse{white-space:nowrap}

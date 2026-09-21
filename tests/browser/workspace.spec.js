@@ -29,6 +29,43 @@ async function openWorkbook(page, data = workbook(), name = 'Workspace tester') 
   await expect(page.locator('#server-status')).toHaveText('All changes saved', {timeout:20000});
 }
 
+test('visible page actions duplicate a complete option and confirm deletion', async ({page}) => {
+  const data = workbook();
+  const source = data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0];
+  source.units = [{id:'unit-original',label:'SF',qty:100}];
+  source.rows = [{id:'section-original',type:'section',name:'Section',units:{'unit-original':{qty:25}}},
+    ...source.rows, {id:'end-original',type:'sectionEnd',sid:'section-original'}];
+  source.notes = 'Keep these notes';
+  await openWorkbook(page, data);
+  const actions = page.locator('#workspace-page-actions');
+  await expect(actions.locator('#deleteSheet')).toBeVisible();
+  await expect(page.locator('#workspace-estimate #deleteSheet')).toHaveCount(0);
+  const original = await page.evaluate(() => window.estimator.exportBook().sheets[0]);
+  await actions.locator('#duplicateSheet').click();
+  await expect(page.locator('#title')).toHaveValue('North scope (copy)');
+  const copied = await page.evaluate(() => window.estimator.exportBook().sheets[1]);
+  expect(copied.id).not.toBe(original.id);
+  expect(copied.rows[0].id).not.toBe(original.rows[0].id);
+  expect(copied.rows[2].sid).toBe(copied.rows[0].id);
+  expect(copied.rows[0].units[copied.units[0].id]).toEqual({qty:25});
+  expect(copied.rows[1].name).toBe(original.rows[1].name);
+  expect(copied.fees[0].pct).toBe(original.fees[0].pct);
+  expect(copied.notes).toBe(original.notes);
+  await page.locator('#title').fill('Independent copy');
+  expect(await page.evaluate(() => window.estimator.exportBook().sheets[0].title)).toBe('North scope');
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();
+  await expect(page.locator('#title')).toHaveValue('Independent copy');
+  await actions.locator('#deleteSheet').click();
+  await expect(page.locator('#rail .tab[data-sheet]')).toHaveCount(2);
+  await actions.locator('#deleteSheet').click();
+  await expect(page.locator('#title')).toHaveValue('North scope');
+  await expect(page.locator('#rail .tab[data-sheet]')).toHaveCount(1);
+  await actions.locator('#deleteSheet').click();
+  await actions.locator('#deleteSheet').click();
+  await expect(page.locator('#rail .tab[data-sheet]')).toHaveCount(1);
+});
+
 test('an older server missing preferences still opens workbooks without a JSON crash',async({page})=>{
   await page.route('**/api/preferences',route=>route.fulfill({status:404,contentType:'text/html',body:'<!DOCTYPE html><html>Cannot GET /api/preferences</html>'}));
   await openWorkbook(page);
@@ -123,6 +160,74 @@ test('large estimate scrolls without changing rows or totals', async ({page}) =>
   await expect(page.locator('#tGrand')).toHaveText(total);
 });
 
+test('library folders can be renamed with contents preserved and conflicting names rejected', async ({page}) => {
+  const data = workbook();
+  data.folders = ['Tools','Tools/Empty','Other'];
+  data.templates = {items:[{id:'saw',name:'Saw',folder:'Tools',kind:'equipment',cost:125}],
+    sections:[{id:'crew',name:'Crew',folder:'Tools/Nested',items:[]}]};
+  await openWorkbook(page, data);
+  await page.locator('#libToggle').click();
+  const folder = page.locator('#libAll .folder-head[data-folder="Tools"]');
+  await folder.getByRole('button', {name:'Rename',exact:true}).click();
+  const name = page.getByRole('textbox', {name:'Folder name',exact:true});
+  await name.fill('Cancelled');
+  await name.press('Escape');
+  await expect(folder).toBeVisible();
+  await folder.getByRole('button', {name:'Rename',exact:true}).click();
+  await name.fill('Other');
+  await name.press('Enter');
+  await expect(name).toBeVisible();
+  expect(await name.evaluate(el => el.validationMessage)).toContain('already exists');
+  await name.fill('Equipment');
+  await name.press('Enter');
+  await expect(page.locator('#libAll .folder-head[data-folder="Equipment"]')).toBeVisible();
+  const renamed = await page.evaluate(() => window.estimator.exportBook());
+  expect(renamed.folders).toEqual(['Equipment','Equipment/Empty','Other']);
+  expect(renamed.templates.items[0].folder).toBe('Equipment');
+  expect(renamed.templates.sections[0].folder).toBe('Equipment/Nested');
+  await page.locator('#libAll .folder-head[data-folder="Equipment"]').click();
+  await expect(page.locator('#libAll .tpl-name').getByText('Saw',{exact:true})).toBeVisible();
+  await page.locator('#libAll .folder-head[data-folder="Equipment/Empty"]').getByRole('button',{name:'Rename',exact:true}).click();
+  await name.fill('Spare');
+  await name.press('Enter');
+  await expect(page.locator('#libAll .folder-head[data-folder="Equipment/Spare"]')).toBeVisible();
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  const saved = await page.evaluate(() => window.estimator.exportBook());
+  expect(saved.folders).toContain('Equipment/Spare');
+  expect(saved.templates.sections[0].folder).toBe('Equipment/Nested');
+});
+
+test('library Duplicate creates independent copies in the same folder and saves them', async ({page}) => {
+  const data = workbook();
+  data.templates = {items:[{id:'original-template',name:'Saw',folder:'Tools',kind:'equipment',cost:125,
+    note:'Keep this detail',pics:[{id:'original-picture',name:'Saw photo',url:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'}]}]};
+  await openWorkbook(page, data);
+  await page.locator('#libToggle').click();
+  await page.locator('#libAll .folder-head[data-folder="Tools"]').click();
+  const original = page.locator('#libAll .tpl').filter({has:page.getByText('Saw', {exact:true})});
+  await original.getByRole('button', {name:'Duplicate',exact:true}).click();
+  await expect(page.locator('#libAll .tpl-name').getByText('Saw (copy)', {exact:true})).toBeVisible();
+  await expect(page.locator('#editor')).not.toBeVisible();
+  const items = await page.evaluate(() => window.estimator.exportBook().templates.items);
+  expect(items).toHaveLength(2);
+  expect(items[1].id).not.toBe(items[0].id);
+  expect(items[1].pics[0].id).not.toBe(items[0].pics[0].id);
+  expect(items[1]).toMatchObject({folder:'Tools',kind:'equipment',cost:125,note:'Keep this detail'});
+  expect(items[1].pics[0].url).toBe(items[0].pics[0].url);
+  await original.getByRole('button', {name:'Duplicate',exact:true}).click();
+  await expect(page.locator('#libAll .tpl-name').getByText('Saw (copy 2)', {exact:true})).toBeVisible();
+  const copy = page.locator('#libAll .tpl').filter({has:page.getByText('Saw (copy)', {exact:true})});
+  await copy.getByTitle('Delete this template').click();
+  await expect(original).toBeVisible();
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  const saved = await page.evaluate(() => window.estimator.exportBook().templates.items);
+  expect(saved.map(t => t.name)).toEqual(['Saw','Saw (copy 2)']);
+});
+
 test('new pictured items follow Hide and Show without forcing existing rows open', async ({page}) => {
   const data = workbook();
   data.templates = {items:[{id:'pictured',name:'Pictured item',kind:'labor',cost:25,
@@ -132,8 +237,26 @@ test('new pictured items follow Hide and Show without forcing existing rows open
   await page.locator('#hidePics').click();
   await page.locator('#workspace-view > summary').press('Escape');
   await page.locator('#libToggle').click();
-  const add = page.locator('.tpl').filter({hasText:'Pictured item'}).getByTitle('Add to the end of this option');
-  await add.click();
+  const template = page.locator('#libAll .tpl').filter({hasText:'Pictured item'});
+  await template.locator('.tpl-name').click();
+  await expect(page.locator('#editor')).not.toBeVisible();
+  await expect(template.getByTitle('Add to the end of this option')).toHaveCount(0);
+  await template.getByRole('button', {name:'Edit', exact:true}).click();
+  await expect(page.locator('#editor')).toBeVisible();
+  await page.locator('#edSave').click();
+  const add = async () => {
+    await template.locator('.tpl-name').click();
+    const source = await template.locator('.tpl-name').boundingBox();
+    const targetRow = page.locator('#body tr[data-type="item"]').first();
+    const target = await targetRow.boundingBox();
+    await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(target.x + 80, target.y + target.height * 0.8, {steps:15});
+    const displayedTarget = await targetRow.boundingBox();
+    await page.mouse.move(displayedTarget.x + 80, displayedTarget.y + displayedTarget.height * 0.8);
+    await page.mouse.up();
+  };
+  await add();
   const rows = page.locator('#body tr[data-type="item"]').filter({has:page.locator('.pic-strip img')});
   await expect(rows).toHaveCount(1);
   await expect(rows.first().locator('.pic-strip')).not.toHaveClass(/open/);
@@ -145,7 +268,7 @@ test('new pictured items follow Hide and Show without forcing existing rows open
   await page.locator('#showPics').click();
   await page.locator('#workspace-view > summary').press('Escape');
   await page.locator('#libToggle').click();
-  await add.click();
+  await add();
   await expect(rows).toHaveCount(2);
   await expect(rows.last().locator('.pic-strip')).toHaveClass(/open/);
 });
@@ -196,6 +319,33 @@ test('one project drawer retains hierarchy, custom details and filters', async (
   await page.locator('#projOptions').click();
   await page.screenshot({path:'test-results/project-settings.png',fullPage:true});
   expect(errors).toEqual([]);
+});
+
+test('projects show my current takeoff and page even when the hierarchy is collapsed', async ({page}) => {
+  const data = workbook();
+  data.lists[0].companies[0].projects[0].takeoffs[0].sheets.push(sheet('sn2','Second scope'));
+  await openWorkbook(page,data);
+  await page.locator('#server-projects').click();
+  const company = page.locator('[data-company="co"] > .p-head');
+  await expect(company.locator('.project-current-location')).toContainText('North job / North takeoff · Tab 1');
+  await company.locator('.p-name').click();
+  const north = page.locator('[data-project="north"] > .p-head');
+  await expect(north).toHaveClass(/is-current-location/);
+  await north.locator('.p-name').click();
+  const takeoff = page.locator('[data-takeoff="tn"]');
+  await expect(takeoff).toHaveAttribute('aria-current','location');
+  await page.locator('#rail [data-sheet="sn2"]').click();
+  await expect(takeoff.locator('.project-current-location')).toHaveText('You are here · Tab 2');
+  await page.locator('#rail .tab-summary').click();
+  await expect(company.locator('.project-current-location')).toContainText('Summary');
+  await page.locator('[data-project="south"] > .p-head > .p-name').click();
+  await page.locator('[data-takeoff="ts"]').click();
+  await expect(page.locator('[data-takeoff="ts"]')).toHaveAttribute('aria-current','location');
+  await expect(takeoff).not.toHaveClass(/is-current-location/);
+  await expect(north.locator('.project-current-location')).toHaveCount(0);
+  await expect(company.locator('.project-current-location')).toContainText('South job / South takeoff');
+  await page.locator('#projCollapse').click();
+  await expect(company.locator('.project-current-location')).toBeVisible();
 });
 
 test('project presence, tab highlights, collapse and recent views work for two users',async({page,browser,baseURL})=>{
@@ -323,4 +473,220 @@ test('workspace menus fit a small screen and appearance survives reopening',asyn
   await expect(page.locator('#server-status')).toHaveText('All changes saved');
   await expect(page.locator('body')).toHaveClass(/dark/);await expect(page.locator('body')).not.toHaveClass(/medieval/);
   await page.screenshot({path:'test-results/workspace-small-screen.png',fullPage:true});
+});
+
+test('nested sections retain totals, collapse state, duplication and library drops', async ({page}) => {
+  const errors=[]; page.on('pageerror',e=>errors.push(e.message));
+  const data=workbook();
+  const rows=[
+    {id:'parent',type:'section',name:'Parent'},
+    {id:'outer-item',kind:'labor',name:'Outer work',count:1,time:1,days:1,cost:100},
+    {id:'child',type:'section',name:'Child'},
+    {id:'grandchild',type:'section',name:'Grandchild'},
+    {id:'inner-item',kind:'labor',name:'Inner work',count:1,time:1,days:1,cost:50},
+    {id:'grandchild-end',type:'sectionEnd',sid:'grandchild'},
+    {id:'child-end',type:'sectionEnd',sid:'child'},
+    {id:'parent-end',type:'sectionEnd',sid:'parent'}
+  ];
+  data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0].rows=rows;
+  await openWorkbook(page,data);
+  const row=id=>page.locator('#sheetTable tr[data-id="'+id+'"]');
+  await expect(row('child')).toHaveAttribute('data-depth','1');
+  await expect(row('grandchild')).toHaveAttribute('data-depth','2');
+  await expect(row('parent-end').locator('.sub .v')).toHaveText('150.00');
+  await expect(row('child-end').locator('.sub .v')).toHaveText('50.00');
+  await expect(page.locator('#tSub .v')).toHaveText('150.00');
+  await row('child').locator('.caret').click();
+  await row('parent').locator('.caret').click();
+  await expect(row('child')).not.toBeVisible();
+  await row('parent').locator('.caret').click();
+  await expect(row('child')).toBeVisible();
+  await expect(row('grandchild')).not.toBeVisible();
+  await row('child').locator('.caret').click();
+  await row('parent').getByRole('button',{name:'+ Subsection',exact:true}).click();
+  await expect(page.locator('#sheetTable tr.section-head')).toHaveCount(4);
+  const newSection=page.locator('#sheetTable tr.section-head').last();
+  await expect(newSection).toHaveAttribute('data-depth','1');
+  await newSection.locator('.name-in').fill('New child');
+  await row('parent').getByRole('button',{name:'Duplicate this section and everything in it',exact:true}).click();
+  await expect(page.locator('#sheetTable tr.section-head')).toHaveCount(8);
+  await expect(page.locator('#tSub .v')).toHaveText('300.00');
+  const snapshot=await page.evaluate(()=>window.estimator.exportBook());
+  const sh=snapshot.sheets.find(s=>s.rows.some(r=>r.id==='parent'));
+  const stack=[];
+  for(const r of sh.rows){if(r.type==='section')stack.push(r.id);if(r.type==='sectionEnd')expect(r.sid).toBe(stack.pop());}
+  expect(stack).toEqual([]);
+  await page.locator('#libToggle').click();
+  await page.locator('#libCapture .tpl').filter({hasText:'Parent'}).first().locator('button').click();
+  const template=page.locator('#libAll .tpl').filter({hasText:'Parent'}).first();
+  await expect(template).toBeVisible();
+  const source=await template.boundingBox();
+  const target=await row('child').boundingBox();
+  await page.mouse.move(source.x+source.width/2,source.y+source.height/2);
+  await page.mouse.down();
+  await page.mouse.move(target.x+target.width/2,target.y+target.height*0.8,{steps:15});
+  // A full-height preview moves following rows; aim at the header's displayed position.
+  const displayedTarget=await row('child').boundingBox();
+  await page.mouse.move(displayedTarget.x+displayedTarget.width/2,displayedTarget.y+displayedTarget.height*0.8);
+  await page.mouse.up();
+  await expect(page.locator('#sheetTable tr.section-head')).toHaveCount(12);
+  await expect(page.locator('#tSub .v')).toHaveText('450.00');
+  await expect(row('child-end').locator('.sub .v')).toHaveText('200.00');
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();
+  await expect(page.locator('#sheetTable tr.section-head')).toHaveCount(12);
+  await expect(page.locator('#tSub .v')).toHaveText('450.00');
+  expect(errors).toEqual([]);
+});
+
+test('items and nested sections move between option tabs and Escape cancels', async ({page}) => {
+  const errors=[]; page.on('pageerror',e=>errors.push(e.message));
+  const data=workbook();
+  const sheets=data.lists[0].companies[0].projects[0].takeoffs[0].sheets;
+  sheets[0].units=[{id:'source-unit',label:'SF',qty:100}];
+  sheets[0].rows=[
+    {id:'loose',kind:'labor',name:'Loose item',count:1,time:1,days:1,cost:25,note:'Keep me'},
+    {id:'parent',type:'section',name:'Parent',collapsed:true,units:{'source-unit':{qty:20}}},
+    {id:'child',type:'section',name:'Child'},
+    {id:'nested',kind:'labor',name:'Nested item',count:1,time:1,days:1,cost:50},
+    {id:'child-end',type:'sectionEnd',sid:'child'},
+    {id:'parent-end',type:'sectionEnd',sid:'parent'}
+  ];
+  sheets.push(sheet('destination','Destination'));
+  await openWorkbook(page,data);
+  const beginMove = async (rowId,tabId) => {
+    const grip=page.locator('#body tr[data-id="'+rowId+'"] .grip').first();
+    await grip.scrollIntoViewIfNeeded();
+    const source=await grip.boundingBox();
+    const tab=page.locator('#rail [data-sheet="'+tabId+'"]');
+    const target=await tab.boundingBox();
+    await page.mouse.move(source.x+source.width/2,source.y+source.height/2);
+    await page.mouse.down();
+    await page.mouse.move(target.x+target.width/2,target.y+target.height/2,{steps:15});
+    await expect(tab).toHaveClass(/row-drop-target/);
+  };
+  await beginMove('loose','destination');
+  await page.mouse.up();
+  await expect(page.locator('#title')).toHaveValue('Destination');
+  await expect(page.locator('#body tr[data-id="loose"]')).toBeVisible();
+  await page.locator('#rail [data-sheet="sn"]').click();
+  await expect(page.locator('#body tr[data-id="loose"]')).toHaveCount(0);
+  await beginMove('parent','destination');
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await expect(page.locator('#title')).toHaveValue('North scope');
+  await expect(page.locator('#body tr[data-id="parent"]')).toBeVisible();
+  await expect(page.locator('#rail .row-drop-target')).toHaveCount(0);
+  await beginMove('parent','destination');
+  await page.mouse.up();
+  await expect(page.locator('#title')).toHaveValue('Destination');
+  const moved=await page.evaluate(()=>window.estimator.exportBook().sheets);
+  expect(moved[0].rows).toEqual([]);
+  expect(moved[1].rows.map(r=>r.id)).toEqual(['row-destination','loose','parent','child','nested','child-end','parent-end']);
+  expect(moved[1].rows.find(r=>r.id==='child-end').sid).toBe('child');
+  expect(moved[1].rows.find(r=>r.id==='parent-end').sid).toBe('parent');
+  expect(moved[1].rows.find(r=>r.id==='parent').units[moved[1].units[0].id]).toEqual({qty:20});
+  expect(moved[1].rows.find(r=>r.id==='loose').note).toBe('Keep me');
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();
+  await expect(page.locator('#title')).toHaveValue('Destination');
+  const saved=await page.evaluate(()=>window.estimator.exportBook().sheets);
+  expect(saved[0].rows).toEqual([]);
+  expect(saved[1].rows.map(r=>r.id)).toEqual(moved[1].rows.map(r=>r.id));
+  expect(errors).toEqual([]);
+});
+
+test('moving a section nests its whole subtree and removing the parent keeps children', async ({page}) => {
+  const data=workbook();
+  data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0].rows=[
+    {id:'a',type:'section',name:'Destination',collapsed:true},
+    {id:'ae',type:'sectionEnd',sid:'a'},
+    {id:'b',type:'section',name:'Moving parent'},
+    {id:'c',type:'section',name:'Moving child'},
+    {id:'work',kind:'labor',name:'Work',count:1,time:1,days:1,cost:25},
+    {id:'ce',type:'sectionEnd',sid:'c'},
+    {id:'be',type:'sectionEnd',sid:'b'}
+  ];
+  await openWorkbook(page,data);
+  const row=id=>page.locator('#sheetTable tr[data-id="'+id+'"]');
+  const source=await row('b').locator('.grip').boundingBox();
+  const dest=await row('a').boundingBox();
+  await page.mouse.move(source.x+source.width/2,source.y+source.height/2);
+  await page.mouse.down();
+  await page.mouse.move(dest.x+80,dest.y+dest.height*0.8,{steps:10});
+  await expect(page.locator('#sheetTable .drop-preview.section-head').first()).toHaveAttribute('data-depth','1');
+  const unchanged=await page.evaluate(()=>window.estimator.exportBook().sheets[0].rows.map(r=>r.id));
+  expect(unchanged).toEqual(['a','ae','b','c','work','ce','be']);
+  await page.keyboard.press('Escape');await page.mouse.up();
+  await expect(page.locator('#sheetTable .drop-preview')).toHaveCount(0);
+  await expect(row('b')).toHaveAttribute('data-depth','0');
+  await page.mouse.move(source.x+source.width/2,source.y+source.height/2);
+  await page.mouse.down();
+  await page.mouse.move(dest.x+80,dest.y+dest.height*0.8);
+  await page.mouse.up();
+  await expect(row('b')).toHaveAttribute('data-depth','1');
+  await expect(row('c')).toHaveAttribute('data-depth','2');
+  await expect(row('work')).toBeVisible();
+  await expect(row('ae').locator('.sub .v')).toHaveText('25.00');
+  await row('a').locator('.del').click();
+  await expect(row('a')).toHaveCount(0);
+  await expect(row('ae')).toHaveCount(0);
+  await expect(row('b')).toBeVisible();
+  await expect(row('b')).toHaveAttribute('data-depth','0');
+  await expect(row('c')).toHaveAttribute('data-depth','1');
+  await expect(row('work')).toBeVisible();
+  await expect(page.locator('#tSub .v')).toHaveText('25.00');
+  await page.screenshot({path:'test-results/nested-sections.png',fullPage:true});
+});
+
+test('section drop ghost matches committed rows after subtotals and cancels without changes', async ({page}) => {
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  const data=workbook();
+  data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0].rows=[
+    {id:'outer',type:'section',name:'Outer'},
+    {id:'inner',type:'section',name:'Inner'},
+    {id:'line',kind:'labor',name:'Work',count:1,time:1,days:1,cost:50},
+    {id:'inner-end',type:'sectionEnd',sid:'inner'},
+    {id:'outer-end',type:'sectionEnd',sid:'outer'}
+  ];
+  await openWorkbook(page,data);
+  await page.locator('#libToggle').click();
+  await page.locator('#libCapture .tpl').filter({hasText:'Inner'}).locator('button').click();
+  const template=page.locator('#libAll .tpl').filter({hasText:'Inner'}).first();
+  const original=await page.evaluate(()=>JSON.stringify(window.estimator.exportBook().sheets));
+  const begin=async(id)=>{
+    const source=await template.boundingBox();
+    const target=await page.locator('#sheetTable tr[data-id="'+id+'"]').boundingBox();
+    await page.mouse.move(source.x+source.width/2,source.y+source.height/2);
+    await page.mouse.down();
+    await page.mouse.move(target.x+target.width/2,target.y+target.height*0.8);
+    await expect(page.locator('#sheetTable .drop-preview')).toHaveCount(3);
+  };
+  const geometry=el=>({id:el.dataset.id,depth:el.dataset.depth,top:el.getBoundingClientRect().top,height:el.getBoundingClientRect().height,
+    cells:[...el.cells].map(c=>({width:c.getBoundingClientRect().width,text:c.textContent,values:[...c.querySelectorAll('input')].map(i=>i.value)}))});
+  await begin('inner-end');
+  await expect(page.locator('#sheetTable .drop-preview.section-head')).toHaveAttribute('data-depth','1');
+  expect(await page.evaluate(()=>JSON.stringify(window.estimator.exportBook().sheets))).toBe(original);
+  await page.keyboard.press('Escape');await page.mouse.up();
+  await expect(page.locator('#sheetTable .drop-preview')).toHaveCount(0);
+  expect(await page.evaluate(()=>JSON.stringify(window.estimator.exportBook().sheets))).toBe(original);
+  await expect(page.locator('#tSub .v')).toHaveText('50.00');
+
+  await begin('outer-end');
+  const preview=page.locator('#sheetTable .drop-preview');
+  await expect(preview.first()).toHaveAttribute('data-depth','0');
+  const before=await Promise.all((await preview.all()).map(row=>row.evaluate(geometry)));
+  expect(await page.evaluate(()=>JSON.stringify(window.estimator.exportBook().sheets))).toBe(original);
+  await page.screenshot({path:'test-results/section-drop-ghost.png',fullPage:true});
+  await page.mouse.up();
+  await expect(page.locator('#sheetTable .drop-preview')).toHaveCount(0);
+  for(const expected of before){
+    const actual=await page.locator('#sheetTable tr[data-id="'+expected.id+'"]').evaluate(geometry);
+    expect(actual.depth).toBe(expected.depth);
+    expect(actual.height).toBeCloseTo(expected.height,0);
+    expect(actual.top).toBeCloseTo(expected.top,0);
+    expect(actual.cells).toEqual(expected.cells);
+  }
+  await expect(page.locator('#tSub .v')).toHaveText('100.00');
+  expect(errors).toEqual([]);
 });

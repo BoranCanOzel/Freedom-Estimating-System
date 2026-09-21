@@ -587,6 +587,7 @@
   tr.dragging td{background:var(--s23);border-bottom-color:var(--amber)}
   tr.dragging td.c-item{box-shadow:inset 3px 0 0 var(--amber)}
   tr.dragging .grip{opacity:1;cursor:grabbing}
+  #rail .tab.row-drop-target{outline:3px solid var(--amber);outline-offset:-3px;background:var(--calc)}
   tbody.sorting .cell-in,tbody.sorting .name-in,tbody.sorting .kind-btn,tbody.sorting .del{pointer-events:none}
   tbody.sorting{cursor:grabbing}
   @keyframes settle{
@@ -657,8 +658,10 @@
     font-family:var(--f-sans);font-size:12px;color:var(--ink);
   }
   .kind-opt i{display:flex;flex:none}
-  .kind-opt:hover{background:var(--s24)}
-  .kind-opt.on{background:var(--s25);font-weight:600}
+  .kind-opt.on{background:color-mix(in srgb,var(--card) 86%,var(--ink));font-weight:600}
+  .kind-opt:hover,.kind-opt:focus-visible{
+    background:color-mix(in srgb,var(--card) 90%,var(--ink));color:var(--ink);
+  }
   td.menu-open{z-index:60}
 
   .tip-legend{display:flex;align-items:center;gap:14px}
@@ -776,6 +779,8 @@
   }
   .tpl-btn:hover{background:var(--s27);color:var(--slate)}
   .tpl-btn.rm:hover{background:var(--s28);color:#B23A2E}
+  .folder-rename-form{display:flex;align-items:center;gap:4px;flex:1;min-width:0;flex-wrap:wrap}
+  .folder-rename-form input{flex:1;min-width:70px;width:90px;padding:5px;border:1px solid var(--rule);border-radius:3px;background:var(--card);color:var(--ink);font:inherit}
 
   .lib-form{
     border:1px solid var(--rule);border-radius:5px;padding:10px;background:var(--s15);margin-top:8px;
@@ -804,6 +809,9 @@
     font-family:var(--f-sans);font-size:12px;font-weight:600;
     box-shadow:0 12px 26px -12px rgba(0,0,0,.7);
   }
+  #sheetTable tr.drop-preview{opacity:.65;pointer-events:none}
+  #sheetTable tr.drop-preview td{box-shadow:inset 0 1px 0 var(--amber),inset 0 -1px 0 var(--amber)}
+  #sheetTable tr.drag-source{display:none!important}
   tr.drop-before td{box-shadow:inset 0 3px 0 var(--amber)}
   tr.drop-after td{box-shadow:inset 0 -3px 0 var(--amber)}
 
@@ -999,8 +1007,6 @@
   }
   .ed-affix input:focus{outline:none}
 
-  .folder-add{opacity:0;flex:none}
-  .folder-head:hover .folder-add{opacity:.7}
 
   .ed-folder{
     border:1.5px solid var(--slate);border-radius:6px;
@@ -1199,6 +1205,13 @@
   }
   .ro-line b{color:var(--ink);font-weight:500;font-family:var(--f-sans);font-size:12px}
 
+  #sheetTable tr.tree-child .c-item{padding-left:calc(var(--section-depth) * 22px)!important;position:relative}
+  #sheetTable tr.tree-child .c-item::before{
+    content:"";position:absolute;left:calc(var(--section-depth) * 22px - 13px);top:0;
+    width:10px;height:22px;border-left:1px solid var(--rule-strong);border-bottom:1px solid var(--rule-strong);
+    pointer-events:none;
+  }
+  .ed-subsection{margin:8px 0 8px 16px;padding-left:12px;border-left:2px solid var(--rule-strong)}
   .pic-strip{display:none;align-items:center;gap:6px;flex-wrap:wrap;padding:4px 8px 6px 43px}
   .pic-strip.open{display:flex}
   .pic{position:relative;display:inline-flex;border:1px solid var(--rule);border-radius:3px;overflow:hidden}
@@ -2828,7 +2841,8 @@
         <button type="button" id="hidePics" title="Close every picture strip">Hide</button>
       </span>
       <button class="btn ghost" id="toggleNotes">Collapse all detail</button>
-      <button class="btn ghost" id="deleteSheet">Delete option</button>
+      <button class="btn ghost" id="duplicateSheet" type="button">Duplicate page</button>
+      <button class="btn ghost" id="deleteSheet" type="button">Delete page</button>
       <button class="btn ghost" id="reset">Reset sheet</button>
     </div>
   </div>
@@ -3458,12 +3472,17 @@
     secAdd.addEventListener('click', e => {
       e.stopPropagation();
       const start = state.rows.indexOf(row);
-      let at = start + 1;
-      while (at < state.rows.length && state.rows[at].type !== 'sectionEnd' &&
-             state.rows[at].type !== 'section') at++;
+      const at = sectionEndIndex(state.rows, start);
       row.collapsed = false;
       addItemRow(at);
     });
+
+    const subAdd = document.createElement('button');
+    subAdd.type = 'button';
+    subAdd.className = 'sec-add';
+    subAdd.textContent = '+ Subsection';
+    subAdd.title = 'Add a section inside this section';
+    subAdd.addEventListener('click', e => { e.stopPropagation(); addSectionRows(row); });
 
     const secDup = document.createElement('button');
     secDup.type = 'button';
@@ -3476,8 +3495,8 @@
     secDup.addEventListener('click', e => { e.stopPropagation(); duplicateSection(row); });
 
     const noteBtn = noteButton();
-    wrap.append(secDup, makeGrip(tr, row, 'Drag to move this whole section'),
-                caret, name, secAdd, noteBtn);
+    wrap.append(secDup, makeGrip(tr, row, 'Drag to move this whole section, or drop on another option tab'),
+                caret, name, secAdd, subAdd, noteBtn);
     const stackCell = document.createElement('div');
     stackCell.className = 'item-wrap';
     stackCell.appendChild(wrap);
@@ -3486,7 +3505,7 @@
     const secStrip = picStrip(row, stackCell);
     const syncPics = () => {
       secStrip.classList.toggle('open',
-        row.picsOpen === true || (book.picsOn && row.picsOpen !== false));
+        row.picsOpen === true || (!!book.picsOn && row.picsOpen !== false));
     };
     syncPics();
 
@@ -3545,6 +3564,7 @@
       gone.forEach(g => refs.delete(g));
       tr.remove();
       renumber();
+      applyCollapse();
       recalc();
     });
     tdDel.appendChild(del);
@@ -3616,7 +3636,7 @@
     const wrap = document.createElement('div');
     wrap.className = 'item-cell';
 
-    const grip = makeGrip(tr, row, 'Drag to reorder');
+    const grip = makeGrip(tr, row, 'Drag to reorder, or drop on another option tab');
 
     const rownum = document.createElement('span');
     rownum.className = 'rownum';
@@ -3833,41 +3853,50 @@
 
   const rowById = rid => state.rows.find(r => r.id === rid);
 
-  // collapsed sections keep their label row and their subtotal row, and hide the lines between
-  function applyCollapse(){
-    Array.from(body.children).forEach(tr => {
-      if (tr.dataset.type !== 'section') return;
-      const row = rowById(tr.dataset.id);
-      const on = !!(row && row.collapsed);
-      const block = blockOf(tr);
-      const tail = block[block.length - 1];
-      const foot = tail !== tr && tail.dataset.type === 'sectionEnd' ? tail : null;
-      const members = block.slice(1).filter(el => el.dataset.type !== 'sectionEnd');
-      members.forEach(el => el.classList.toggle('row-hidden', on));
-      if (foot) foot.classList.toggle('row-hidden', on);
-      tr.classList.toggle('collapsed', on);
+  // Match complete section subtrees, including nested headers and footers.
+  function sectionEndIndex(rows, start){
+    let depth = 0;
+    for (let i = start; i < rows.length; i++){
+      if (rows[i].type === 'section') depth++;
+      if (rows[i].type === 'sectionEnd' && --depth === 0) return i;
+    }
+    return rows.length;
+  }
 
+  function applyCollapse(){
+    const stack = [];
+    Array.from(body.children).forEach(tr => {
+      if (tr.classList.contains('drag-source')) return;
+      const row = rowById(tr.dataset.id);
+      const ending = tr.dataset.type === 'sectionEnd';
+      const depth = Math.max(0, stack.length - (ending ? 1 : 0));
+      tr.style.setProperty('--section-depth', depth);
+      tr.dataset.depth = depth;
+      tr.classList.toggle('tree-child', depth > 0);
+      tr.classList.toggle('row-hidden', stack.some(r => r.collapsed));
+      if (ending){ stack.pop(); return; }
+      if (tr.dataset.type !== 'section') return;
+      const on = !!row.collapsed;
+      tr.classList.toggle('collapsed', on);
       const caret = tr.querySelector('.caret');
       if (caret){
         caret.setAttribute('aria-expanded', String(!on));
         caret.title = on ? 'Expand section' : 'Collapse section';
       }
+      stack.push(row);
     });
     growAll();
   }
 
-  // a row dropped into a collapsed section would vanish, so open it back up
   function revealAround(tr){
-    let n = tr.previousElementSibling;
-    while (n){
-      if (n.dataset.type === 'sectionEnd') return;
-      if (n.dataset.type === 'section'){
-        const row = rowById(n.dataset.id);
-        if (row && row.collapsed){ row.collapsed = false; applyCollapse(); }
-        return;
-      }
-      n = n.previousElementSibling;
+    const stack = [];
+    for (const el of body.children){
+      if (el === tr) break;
+      if (el.dataset.type === 'section') stack.push(rowById(el.dataset.id));
+      if (el.dataset.type === 'sectionEnd') stack.pop();
     }
+    stack.forEach(row => { row.collapsed = false; });
+    applyCollapse();
   }
 
   /* ---------- dynamic columns: fees and unit prices ---------- */
@@ -4111,6 +4140,7 @@
   function renumber(){
     let n = 0;
     Array.from(body.children).forEach(tr => {
+      if (tr.classList.contains('drag-source')) return;
       const el = tr.querySelector('.rownum');
       if (!el) return;
       n += 1;
@@ -5566,7 +5596,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       ['dot round', 'The Round column is a display only, it never feeds the maths']
     ]],
     ['Lines', [
-      ['ico grip', 'Drag the grip to reorder a line, or a whole section'],
+      ['ico grip', 'Drag the grip to reorder a line or whole section, or drop it on another option tab to move it there'],
       ['ico dup', 'The copy icon duplicates a line, or a section and everything in it'],
       ['ico card', 'The card icon opens the line as a full card'],
       ['ico type', 'The type icon on the right sets labor, equipment, material and the rest']
@@ -5799,22 +5829,20 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
   // per-section rollup for any sheet
   function sheetSections(sh){
-    const out = [];
-    let open = null;
+    const out = [], stack = [];
     sh.rows.forEach(r => {
       if (r.type === 'section'){
-        open = {row:r, name:r.name, note:r.note, mk:0, sub:0, grand:0, fees:sh.fees.map(() => 0)};
-        return;
+        const section = {row:r, name:r.name, note:r.note, depth:stack.length, mk:0, sub:0, grand:0, fees:sh.fees.map(() => 0)};
+        out.push(section); stack.push(section); return;
       }
-      if (r.type === 'sectionEnd'){ if (open) out.push(open); open = null; return; }
-      if (r.kind === 'none' || !open) return;
+      if (r.type === 'sectionEnd'){ stack.pop(); return; }
+      if (r.kind === 'none') return;
       const c = calc(r, sh);
-      open.mk += c.sub - c.base;
-      open.sub += c.sub;
-      open.grand += c.grand;
-      c.fees.forEach((v, i) => { open.fees[i] += v; });
+      stack.forEach(open => {
+        open.mk += c.sub - c.base; open.sub += c.sub; open.grand += c.grand;
+        c.fees.forEach((v, i) => { open.fees[i] += v; });
+      });
     });
-    if (open) out.push(open);
     return out;
   }
 
@@ -5921,7 +5949,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
           return '<tr class="s-sec">' +
             '<td class="s-num"><div class="num-wrap"><span class="s-subn">' +
               sh.num + '.' + (si + 1) + '</span></div></td>' +
-            '<td class="s-scope"><span class="s-secname">' +
+            '<td class="s-scope"><span class="s-secname" style="padding-left:' + (22 + sec.depth * 18) + 'px">' +
               (sec.name ? esc(sec.name) : '<span class="s-none">unnamed section</span>') + '</span>' +
               (detail && sec.note && sec.note.trim()
                 ? '<span class="s-detail">' + esc(sec.note.trim()) + '</span>' : '') +
@@ -6003,6 +6031,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   }
 
   function renderAll(){
+    clearSheetDropPreview(false);
     applyHiddenCols();
     renderColumnHeaders();
     renderColumnTotals();
@@ -6025,16 +6054,16 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     growAll();
   }
 
-  function recalc(){
+  function recalc(persist = true){
     let tM = 0, tS = 0, tG = 0, tR = 0;
     const tF = state.fees.map(() => 0);
-    let open = null;   // the section currently being filled, if any
+    const sections = [];
 
     state.rows.forEach(r => {
       const ref = refs.get(r.id);
 
       if (r.type === 'section'){
-        open = {mk:0, sub:0, grand:0, round:0, head:ref, row:r, fees: state.fees.map(() => 0)};
+        sections.push({mk:0, sub:0, grand:0, round:0, head:ref, row:r, fees: state.fees.map(() => 0)});
         // sections track the column above them until they set their own value
         if (ref && ref.upInputs){
           ref.upInputs.forEach((ui, i) => {
@@ -6051,7 +6080,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       }
 
       if (r.type === 'sectionEnd'){
-        const s = open || {mk:0, sub:0, grand:0, round:0, head:null, row:null, fees:state.fees.map(() => 0)};
+        const s = sections.pop() || {mk:0, sub:0, grand:0, round:0, head:null, row:null, fees:state.fees.map(() => 0)};
         [ref, s.head].forEach(t => {
           if (!t || !t.sub) return;
           money(t.mk, s.mk);       money(t.sub, s.sub);
@@ -6075,11 +6104,10 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
                                   : (cur.label ? '/' + cur.label : '');
           });
         }
-        open = null;
         return;
       }
 
-      if (ref && ref.tr) ref.tr.classList.toggle('in-section', !!open);
+      if (ref && ref.tr) ref.tr.classList.toggle('in-section', sections.length > 0);
       if (ref && ref.paintKind) ref.paintKind();   // card edits can change the derived type
       if (r.kind === 'none') return;
 
@@ -6110,11 +6138,11 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       tR += roundTo(c.grand, rstep);
       tM += mkAmt; tS += c.sub; tG += c.grand;
       c.fees.forEach((v, i) => { tF[i] += v; });
-      if (open){
+      sections.forEach(open => {
         open.mk += mkAmt; open.sub += c.sub; open.grand += c.grand;
         open.round += roundTo(c.grand, rstep);
         c.fees.forEach((v, i) => { open.fees[i] += v; });
-      }
+      });
     });
 
     money(document.getElementById('tMk'), tM);
@@ -6131,7 +6159,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       const q = col ? num(col.qty) : 0;
       money(el, q ? tG / q : 0);
     });
-    save();
+    if (persist) save();
   }
 
   /* ---------- reordering ---------- */
@@ -6141,43 +6169,96 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     if (!grandFrame && num(state.roundTotal)) grandFrame = requestAnimationFrame(() => { grandFrame = 0; placeGrandTab(); });
   }, {passive:true});
   let drag = null;
+  let sheetDropPreview = null;
+
+  function clearSheetDropPreview(restore = true){
+    if (!sheetDropPreview) return;
+    const preview = sheetDropPreview;
+    sheetDropPreview = null;
+    preview.nodes.forEach(el => el.remove());
+    preview.rows.forEach(row => refs.delete(row.id));
+    preview.sources.forEach(el => el.classList.remove('drag-source'));
+    if (restore){ renumber(); applyCollapse(); recalc(false); }
+  }
+
+  function sheetDropTarget(x, y, sourceIds = new Set()){
+    const bounds = scroller.getBoundingClientRect();
+    if (book.view !== 'sheet' || x < bounds.left || x > bounds.right || y < bounds.top || y > bounds.bottom) return null;
+    const candidates = state.rows.filter(row => !sourceIds.has(row.id));
+    const target = before => ({beforeId:before?.id || null});
+    if (sheetDropPreview){
+      const visible = sheetDropPreview.nodes.filter(el => el.offsetParent !== null);
+      if (visible.length && y >= visible[0].getBoundingClientRect().top && y <= visible.at(-1).getBoundingClientRect().bottom)
+        return {beforeId:sheetDropPreview.beforeId};
+    }
+    for (let i = 0; i < candidates.length; i++){
+      const tr = refs.get(candidates[i].id)?.tr;
+      if (!tr || tr.offsetParent === null) continue;
+      const rect = tr.getBoundingClientRect();
+      if (y < rect.top + rect.height / 2) return target(candidates[i]);
+      // The bottom half means AFTER this exact row, including a subtotal.
+      if (y <= rect.bottom) return target(candidates[i + 1]);
+    }
+    return target(null);
+  }
+
+  function showSheetDropPreview(rows, beforeId, sources = []){
+    if (sheetDropPreview?.beforeId === beforeId && sheetDropPreview.rows === rows) return;
+    clearSheetDropPreview();
+    const sourceIds = new Set(sources.map(el => el.dataset.id));
+    const projected = state.rows.filter(row => !sourceIds.has(row.id)).map(row => ({...row}));
+    const at = beforeId == null ? projected.length : projected.findIndex(row => row.id === beforeId);
+    if (at < 0) return;
+    const ancestors = [];
+    projected.slice(0, at).forEach(row => {
+      if (row.type === 'section') ancestors.push(row);
+      if (row.type === 'sectionEnd') ancestors.pop();
+    });
+    ancestors.forEach(row => { row.collapsed = false; });
+    projected.splice(at, 0, ...rows);
+    const previous = state;
+    const nodes = [];
+    sheetDropPreview = {rows, nodes, sources, beforeId};
+    try {
+      state = {...state, rows:projected};
+      const before = beforeId == null ? null : refs.get(beforeId)?.tr;
+      sources.forEach(el => el.classList.add('drag-source'));
+      rows.forEach(row => {
+        const tr = makeRow(row);
+        tr.classList.add('drop-preview');
+        tr.setAttribute('aria-hidden', 'true');
+        tr.inert = true;
+        nodes.push(tr);
+        body.insertBefore(tr, before);
+      });
+      renumber(); applyCollapse(); recalc(false);
+    } finally { state = previous; }
+  }
+
+  function previewCopies(rows){
+    const copies = rows.map(row => ({...structuredClone(row), id:id()}));
+    const ids = new Map(rows.map((row, i) => [row.id, copies[i].id]));
+    copies.forEach(row => { if (row.type === 'sectionEnd') row.sid = ids.get(row.sid); });
+    return copies;
+  }
 
   // a section header drags as one unit: header, everything inside, and its end row
   function blockOf(tr){
-    const block = [tr];
-    if (tr.dataset.type !== 'section') return block;
-    let n = tr.nextElementSibling;
-    while (n){
-      if (n.dataset.type === 'section') break;   // never swallow another section
-      block.push(n);
-      if (n.dataset.type === 'sectionEnd') break;
-      n = n.nextElementSibling;
-    }
-    return block;
+    if (tr.dataset.type !== 'section') return [tr];
+    const rows = Array.from(body.children);
+    const start = rows.indexOf(tr);
+    const end = sectionEndIndex(rows.map(el => ({type:el.dataset.type})), start);
+    return rows.slice(start, end + 1);
   }
 
-  // top-level units: loose rows stand alone, sections count as one
-  function topUnits(){
-    const units = [];
-    let cur = null;
-    Array.from(body.children).forEach(tr => {
-      if (cur){
-        cur.push(tr);
-        if (tr.dataset.type === 'sectionEnd'){ units.push(cur); cur = null; }
-        return;
-      }
-      if (tr.dataset.type === 'section'){ cur = [tr]; return; }
-      units.push([tr]);
-    });
-    if (cur) units.push(cur);
-    return units;
-  }
 
   function startDrag(e, tr, grip){
     if (e.button > 0) return;
     e.preventDefault();
     grip.focus({preventScroll:true});
-    drag = {tr, block: blockOf(tr), y:e.clientY};
+    const block = blockOf(tr);
+    drag = {tr, block, sourceId:state.id, y:e.clientY, x:e.clientX, target:null,
+      previewRows:previewCopies(block.map(el => rowById(el.dataset.id)))};
     drag.block.forEach(el => el.classList.add('dragging'));
     body.classList.add('sorting');
     document.body.style.userSelect = 'none';
@@ -6185,6 +6266,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     window.addEventListener('pointermove', onDragMove);
     window.addEventListener('pointerup', endDrag);
     window.addEventListener('pointercancel', endDrag);
+    window.addEventListener('keydown', cancelRowDrag);
     requestAnimationFrame(edgeScroll);
   }
 
@@ -6199,11 +6281,29 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     drag.y = e.clientY;
     drag.x = e.clientX;
     clearFolderMarks();
+    document.querySelectorAll('#rail .row-drop-target').forEach(el => el.classList.remove('row-drop-target'));
     const ghost = document.getElementById('libGhost');
+    const option = rowDropOptionAt(e.clientX, e.clientY);
+    drag.toOption = option?.id || null;
+    if (option){
+      clearSheetDropPreview();
+      drag.target = null;
+      drag.toLib = null;
+      document.getElementById('library').classList.remove('lib-target');
+      drag.block.forEach(el => el.classList.remove('to-library'));
+      document.querySelector('#rail [data-sheet="' + CSS.escape(option.id) + '"]').classList.add('row-drop-target');
+      ghost.textContent = 'Move to option ' + option.num + (option.title ? ' · ' + option.title : '');
+      ghost.hidden = false;
+      ghost.style.left = (e.clientX + 14) + 'px';
+      ghost.style.top = (e.clientY + 14) + 'px';
+      return;
+    }
     const lib = libDropAt(e.clientX, e.clientY);
     drag.toLib = lib;
 
     if (lib !== null){
+      clearSheetDropPreview();
+      drag.target = null;
       const fh = folderHeadAt(e.clientX, e.clientY);
       if (fh) fh.classList.add('folder-drop');
       document.getElementById('library').classList.add('lib-target');
@@ -6220,46 +6320,22 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     placeRow(e.clientY);
   }
 
-  function insertBlock(block, before){
-    const last = block[block.length - 1];
-    if (before ? last.nextElementSibling === before : body.lastElementChild === last) return;
-    block.forEach(el => body.insertBefore(el, before));
-    renumber();
+  function placeRow(y){
+    if (!drag || drag.toOption || libDropAt(drag.x, y) !== null) return;
+    const target = sheetDropTarget(drag.x, y, new Set(drag.block.map(el => el.dataset.id)));
+    drag.target = target;
+    if (!target){ clearSheetDropPreview(); return; }
+    showSheetDropPreview(drag.previewRows, target.beforeId, drag.block);
   }
 
-  // slot the dragged row or block wherever the pointer sits
-  function placeRow(y){
-    const block = drag.block;
-
-    if (block.length === 1 && block[0].dataset.type !== 'section'){
-      const tr = block[0];
-      for (const r of Array.from(body.children)){
-        if (r === tr) continue;
-        const box = r.getBoundingClientRect();
-        if (y < box.top + box.height / 2){
-          if (r.previousElementSibling !== tr){ body.insertBefore(tr, r); renumber(); }
-          return;
-        }
-      }
-      if (body.lastElementChild !== tr){ body.appendChild(tr); renumber(); }
-      return;
-    }
-
-    // whole section: compare against other top-level units so it can't nest
-    for (const u of topUnits()){
-      if (block.includes(u[0])) continue;
-      const vis = u.filter(el => el.offsetParent !== null);
-      if (!vis.length) continue;
-      const top = vis[0].getBoundingClientRect().top;
-      const bot = vis[vis.length - 1].getBoundingClientRect().bottom;
-      if (y < (top + bot) / 2){ insertBlock(block, u[0]); return; }
-    }
-    insertBlock(block, null);
+  function cancelRowDrag(e){
+    if (e.key === 'Escape') endDrag({type:'pointercancel'});
   }
 
   // creep the table when dragging against the top or bottom edge
   function edgeScroll(){
     if (!drag) return;
+    if (drag.toOption){ requestAnimationFrame(edgeScroll); return; }
     const box = scroller.getBoundingClientRect();
     const zone = 56;
     let dy = 0;
@@ -6272,29 +6348,73 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   function endDrag(e){
     if (!drag) return;
     const block = drag.block;
+    const target = drag.target;
+    const sourceId = drag.sourceId;
+    const cancelled = e?.type === 'pointercancel';
     // read the release point, not the last move, so a quick flick still lands
     const px = (e && e.clientX != null) ? e.clientX : drag.x;
     const py = (e && e.clientY != null) ? e.clientY : drag.y;
-    const toLib = libDropAt(px, py);
+    const toLib = cancelled ? null : libDropAt(px, py);
+    const toOption = cancelled ? null : rowDropOptionAt(px, py);
+    clearSheetDropPreview();
     drag = null;
     document.getElementById('libGhost').hidden = true;
     document.getElementById('library').classList.remove('lib-target');
     window.removeEventListener('pointermove', onDragMove);
     window.removeEventListener('pointerup', endDrag);
     window.removeEventListener('pointercancel', endDrag);
+    window.removeEventListener('keydown', cancelRowDrag);
     document.body.style.userSelect = '';
     block.forEach(el => { el.classList.remove('dragging','to-library'); settle(el); });
     body.classList.remove('sorting');
     clearFolderMarks();
+    document.querySelectorAll('#rail .row-drop-target').forEach(el => el.classList.remove('row-drop-target'));
 
+    if (cancelled) return;
+    if (toOption){
+      const source = book.sheets.find(sh => sh.id === sourceId);
+      if (!source || source.id !== state.id) return;
+      const ids = new Set(block.map(el => el.dataset.id));
+      const rows = source.rows.filter(row => ids.has(row.id));
+      if (rows.length !== ids.size) return;
+      // Keep section unit overrides attached to equivalent destination columns.
+      const unitIds = new Map();
+      for (const col of source.units || []){
+        if (!rows.some(row => row.units && Object.hasOwn(row.units, col.id))) continue;
+        toOption.units ||= [];
+        let destination = toOption.units.find(unit => unit.id === col.id || (unit.label === col.label && unit.qty === col.qty));
+        if (!destination){ destination = {...structuredClone(col), id:id()}; toOption.units.push(destination); }
+        unitIds.set(col.id, destination.id);
+      }
+      for (const row of rows){
+        if (row.units) row.units = Object.fromEntries(Object.entries(row.units).map(([key,value]) => [unitIds.get(key) || key,value]));
+      }
+      source.rows = source.rows.filter(row => !ids.has(row.id));
+      toOption.rows.push(...rows);
+      book.active = toOption.id;
+      state = toOption;
+      showView();
+      save();
+      flash('moved to option ' + toOption.num);
+      return;
+    }
     if (toLib !== null){
       const rowObj = rowById(block[0].dataset.id);
       if (rowObj) saveRowAsTemplate(rowObj, toLib);
       return;
     }
 
-    if (block[0].dataset.type !== 'section') revealAround(block[0]);
+    if (!target || !block.every(el => el.isConnected)) return;
+    const before = target.beforeId == null ? null : refs.get(target.beforeId)?.tr;
+    if (target.beforeId != null && !before) return;
+    block.forEach(el => body.insertBefore(el, before));
+    revealAround(block[0]);
     syncOrder();
+  }
+
+  function rowDropOptionAt(x, y){
+    const tab = document.elementFromPoint(x, y)?.closest('#rail .tab[data-sheet]');
+    return tab && book.sheets.find(sh => sh.id === tab.dataset.sheet && sh.id !== (drag?.sourceId || state.id));
   }
 
   // edit a live sheet line in the same card the library uses
@@ -6330,15 +6450,8 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     const tpl = templates();
     if (row.type === 'section'){
       const start = state.rows.indexOf(row);
-      const items = [];
-      for (let i = start + 1; i < state.rows.length; i++){
-        const r = state.rows[i];
-        if (r.type === 'sectionEnd' || r.type === 'section') break;
-        items.push({kind:r.kind, name:r.name, note:r.note, count:r.count,
-                    time:r.time, days:r.days, cost:r.cost, markup:r.markup});
-      }
-      tpl.sections.push({id:id(), name:row.name, note:row.note, folder:folder,
-                         img:(row.pics && row.pics[0] ? row.pics[0].url : undefined), items:items});
+      const section = partsFromRows(state.rows.slice(start, sectionEndIndex(state.rows, start) + 1))[0];
+      tpl.sections.push({...section, id:id(), folder});
       flash('section saved to library');
     } else {
       tpl.items.push({id:id(), kind:row.kind || 'labor', name:row.name, note:row.note, folder:folder,
@@ -6353,6 +6466,8 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   function nudge(tr, dir){
     const block = blockOf(tr);
     const first = block[0], last = block[block.length - 1];
+    if (dir < 0 && first.previousElementSibling?.dataset.type === 'section') return;
+    if (dir > 0 && last.nextElementSibling?.dataset.type === 'sectionEnd') return;
     if (dir < 0){
       const prev = first.previousElementSibling;
       if (!prev) return;
@@ -6362,18 +6477,17 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       const next = last.nextElementSibling;
       if (!next) return;
       const after = next.dataset.type === 'section' ? blockOf(next).slice(-1)[0] : next;
-      block.forEach(el => body.insertBefore(el, after.nextElementSibling));
+      const before = after.nextElementSibling;
+      block.forEach(el => body.insertBefore(el, before));
     }
     tr.scrollIntoView({block:'nearest'});
     block.forEach(settle);
-    if (tr.dataset.type !== 'section') revealAround(tr);
+    revealAround(tr);
     syncOrder();
   }
 
   function sectionHeadFor(endTr){
-    let n = endTr;
-    while (n && n.dataset.type !== 'section') n = n.previousElementSibling;
-    return n || endTr;
+    return Array.from(body.children).find(tr => tr.dataset.id === rowById(endTr.dataset.id)?.sid) || endTr;
   }
 
   function settle(tr){
@@ -6670,6 +6784,40 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     });
   }
 
+  document.getElementById('duplicateSheet').addEventListener('click', () => {
+    const copy = structuredClone(state);
+    const ids = new Map();
+    const renewIds = value => {
+      if (!value || typeof value !== 'object') return;
+      if (value.id) {
+        const old = value.id;
+        if (!ids.has(old)) ids.set(old, id());
+        value.id = ids.get(old);
+      }
+      Object.values(value).forEach(renewIds);
+    };
+    renewIds(copy);
+    // Sections and unit allocations must point to the copied records.
+    const remapReferences = value => {
+      if (!value || typeof value !== 'object') return;
+      if (value.sid && ids.has(value.sid)) value.sid = ids.get(value.sid);
+      Object.keys(value).forEach(key => {
+        remapReferences(value[key]);
+        if (ids.has(key)) { value[ids.get(key)] = value[key]; delete value[key]; }
+      });
+    };
+    remapReferences(copy);
+    copy.num = nextNum();
+    copy.title = (state.title || 'Option ' + state.num) + ' (copy)';
+    book.sheets.push(copy);
+    book.view = 'sheet';
+    book.active = copy.id;
+    state = copy;
+    showView();
+    save();
+    flash('page duplicated');
+  });
+
   armConfirm(document.getElementById('deleteSheet'), () => {
     if (book.sheets.length < 2){ flash('only one option', true); return; }
     book.sheets = book.sheets.filter(s => s.id !== state.id);
@@ -6807,7 +6955,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     return TPL_TAG[kind] || 'Template';
   }
 
-  function card(t, kind, onAdd, onEdit, onRemove){
+  function card(t, kind, onEdit, onRemove){
     const wrap = document.createElement('div');
     wrap.className = 'tpl-wrap';
     const el = document.createElement('div');
@@ -6862,20 +7010,25 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         : (count + (count === 1 ? ' line' : ' lines'))) + '</span>';
     el.appendChild(main);
 
-    const add = document.createElement('button');
-    add.type = 'button'; add.className = 'tpl-btn'; add.innerHTML = '+';
-    add.title = kind === 'scope' ? 'Create a new option from this scope' : 'Add to the end of this option';
-    add.addEventListener('click', e => { e.stopPropagation(); onAdd(); });
+    const edit = document.createElement('button');
+    edit.type = 'button'; edit.className = 'tpl-btn'; edit.textContent = 'Edit';
+    edit.title = 'Edit this template';
+    edit.addEventListener('click', e => { e.stopPropagation(); onEdit(); });
+
+    const duplicate = document.createElement('button');
+    duplicate.type = 'button'; duplicate.className = 'tpl-btn'; duplicate.textContent = 'Duplicate';
+    duplicate.title = 'Duplicate this template';
+    duplicate.addEventListener('click', e => { e.stopPropagation(); duplicateTemplate(t, kind); });
 
     const rm = document.createElement('button');
     rm.type = 'button'; rm.className = 'tpl-btn rm'; rm.innerHTML = '&times;';
     rm.title = 'Delete this template';
     rm.addEventListener('click', e => { e.stopPropagation(); onRemove(); });
 
-    el.append(add, rm);
+    el.append(edit, duplicate, rm);
     el.addEventListener('pointerdown', e => {
       if (e.target.closest('.tpl-btn, .tpl-caret')) return;
-      armTemplateDrag(e, el, t, kind, onEdit);
+      armTemplateDrag(e, el, t, kind);
     });
     wrap.appendChild(el);
 
@@ -6887,61 +7040,45 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       if (!list.length){
         kids.innerHTML = '<div class="lib-hint">Nothing inside yet.</div>';
       } else {
-        list.forEach((i, n) => {
-          const isSec = i.type === 'section';
-          const k = document.createElement('div');
-          k.className = 'tpl-kid' + (isSec ? ' is-sec' : '');
-
-          if (isSec){
-            const subKey = t.id + '::' + n;
-            const subOpen = secOpen.has(subKey);
+        const renderKids = (items, parent, path) => items.forEach((item, n) => {
+          const section = item.type === 'section';
+          const key = path + '::' + n;
+          const entry = document.createElement('div');
+          entry.className = 'tpl-kid' + (section ? ' is-sec' : '');
+          if (section){
             const car = document.createElement('button');
-            car.type = 'button';
-            car.className = 'caret tpl-caret' + (subOpen ? '' : ' shut');
+            car.className = 'caret tpl-caret' + (secOpen.has(key) ? '' : ' shut');
             car.innerHTML = caretSvg();
-            car.title = subOpen ? 'Hide these lines' : 'Show these lines';
             car.addEventListener('click', e => {
               e.stopPropagation();
-              if (subOpen) secOpen.delete(subKey); else secOpen.add(subKey);
+              if (secOpen.has(key)) secOpen.delete(key); else secOpen.add(key);
               renderLibrary();
             });
-            k.appendChild(car);
-
-            const main = document.createElement('span');
-            main.className = 'tpl-main';
-            main.innerHTML = '<span class="tpl-name sec-name">' + esc(i.name || 'Unnamed section') + '</span>' +
-              '<span class="tpl-meta">section · ' + (i.items || []).length +
-              ((i.items || []).length === 1 ? ' line' : ' lines') + '</span>';
-            k.appendChild(main);
-            kids.appendChild(k);
-
-            if (subOpen){
-              const sub = document.createElement('div');
-              sub.className = 'tpl-kids nested';
-              if (!(i.items || []).length){
-                sub.innerHTML = '<div class="lib-hint">No lines.</div>';
-              } else {
-                i.items.forEach(li => {
-                  const e2 = document.createElement('div');
-                  e2.className = 'tpl-kid';
-                  e2.innerHTML = '<span class="tpl-ico" style="color:var(--' + (li.kind || 'labor') + ')">' +
-                    iconSvg(li.kind, 'kind-ico') + '</span>' +
-                    '<span class="tpl-main"><span class="tpl-name">' + esc(li.name || 'Untitled') + '</span>' +
-                    '<span class="tpl-meta">' + esc(tplMeta(li)) + '</span></span>';
-                  sub.appendChild(e2);
-                });
-              }
-              kids.appendChild(sub);
-            }
-            return;
+            entry.appendChild(car);
           }
-
-          k.innerHTML = '<span class="tpl-ico" style="color:var(--' + (i.kind || 'labor') + ')">' +
-            iconSvg(i.kind, 'kind-ico') + '</span>' +
-            '<span class="tpl-main"><span class="tpl-name">' + esc(i.name || 'Untitled') + '</span>' +
-            '<span class="tpl-meta">' + esc(tplMeta(i)) + '</span></span>';
-          kids.appendChild(k);
+          const label = document.createElement('span');
+          label.className = 'tpl-main';
+          label.innerHTML = '<span class="tpl-name' + (section ? ' sec-name' : '') + '">' +
+            esc(item.name || (section ? 'Unnamed section' : 'Untitled')) + '</span>' +
+            '<span class="tpl-meta">' + (section ? 'section · ' + (item.items || []).length + ' entries' : esc(tplMeta(item))) + '</span>';
+          if (!section){
+            const icon = document.createElement('span');
+            icon.className = 'tpl-ico';
+            icon.style.color = 'var(--' + (item.kind || 'labor') + ')';
+            icon.innerHTML = iconSvg(item.kind, 'kind-ico');
+            entry.appendChild(icon);
+          }
+          label.addEventListener('pointerdown', e => armTemplateDrag(e, entry, item, section ? 'section' : 'item'));
+          entry.appendChild(label);
+          parent.appendChild(entry);
+          if (section && secOpen.has(key)){
+            const children = document.createElement('div');
+            children.className = 'tpl-kids nested';
+            parent.appendChild(children);
+            renderKids(item.items || [], children, key);
+          }
         });
+        renderKids(list, kids, t.id);
       }
       wrap.appendChild(kids);
     }
@@ -6966,21 +7103,18 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         r.cost  = t.cost;
       }
       else r.cost = t.cost;
-      if (t.img){ r.pics = [{id:id(), name:'picture', url:t.img}]; }
+      if (t.img && !r.pics?.length){ r.pics = [{id:id(), name:'picture', url:t.img}]; }
       return [r];
     }
     if (kind === 'item'){
-      const r = {id:id(), type:'item', kind:t.kind || 'labor', name:t.name || '', note:t.note || '',
+      const r = {...freshIds(t), id:id(), type:'item', kind:t.kind || 'labor', name:t.name || '', note:t.note || '',
                  count:t.count, time:t.time, days:t.days, cost:t.cost, markup:t.markup};
-      if (t.img){ r.pics = [{id:id(), name:'picture', url:t.img}]; }
+      if (t.img && !r.pics?.length){ r.pics = [{id:id(), name:'picture', url:t.img}]; }
       return [r];
     }
-    const head = {id:id(), type:'section', name:t.name || '', note:t.note || '', units:{}};
-    if (t.img){ head.pics = [{id:id(), name:'picture', url:t.img}]; }
-    const mid = (t.items || []).map(i => ({
-      id:id(), type:'item', kind:i.kind || 'labor', name:i.name || '', note:i.note || '',
-      count:i.count, time:i.time, days:i.days, cost:i.cost, markup:i.markup
-    }));
+    const head = {id:id(), type:'section', name:t.name || '', note:t.note || '', units:freshIds(t.units || {}), pics:freshIds(t.pics || [])};
+    if (t.img && !head.pics.length){ head.pics = [{id:id(), name:'picture', url:t.img}]; }
+    const mid = (t.items || []).flatMap(i => rowsFromTemplate(i, i.type === 'section' ? 'section' : 'item'));
     return [head].concat(mid, [{id:id(), type:'sectionEnd', sid:head.id}]);
   }
 
@@ -6997,25 +7131,19 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     return rows;
   }
 
-  // anything carrying a section may not be dropped inside another section
-  function safeIndex(idx, kind){
-    if (kind !== 'section' && kind !== 'scope') return idx;
-    let depth = 0;
-    for (let i = 0; i < idx; i++){
-      const r = state.rows[i];
-      if (r.type === 'section') depth = 1;
-      if (r.type === 'sectionEnd') depth = 0;
-    }
-    if (!depth) return idx;
-    let j = idx;
-    while (j < state.rows.length && state.rows[j].type !== 'sectionEnd') j++;
-    return Math.min(j + 1, state.rows.length);
-  }
+  // Section templates can be inserted at any row boundary, including inside a section.
+  function safeIndex(idx){ return idx; }
 
-  function insertTemplate(t, kind, idx){
-    const rows = kind === 'scope' ? rowsFromScope(t) : rowsFromTemplate(t, kind);
+  function insertTemplate(t, kind, idx, previewRows){
+    const rows = previewRows || (kind === 'scope' ? rowsFromScope(t) : rowsFromTemplate(t, kind));
     if (!rows.length){ flash('that scope is empty', true); return; }
     const at = Math.max(0, Math.min(safeIndex(idx == null ? state.rows.length : idx, kind), state.rows.length));
+    const ancestors = [];
+    state.rows.slice(0, at).forEach(r => {
+      if (r.type === 'section') ancestors.push(r);
+      if (r.type === 'sectionEnd') ancestors.pop();
+    });
+    ancestors.forEach(r => { r.collapsed = false; });
     state.rows.splice(at, 0, ...rows);
     renderAll();
     flash(kind === 'scope' ? 'scope stacked in' : kind === 'section' ? 'section added' : 'item added');
@@ -7027,7 +7155,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       .forEach(el => el.classList.remove('drop-before','drop-after'));
   }
 
-  function armTemplateDrag(e, el, t, kind, onClick){
+  function armTemplateDrag(e, el, t, kind){
     if (e.button > 0) return;
     const startX = e.clientX, startY = e.clientY;
     let started = false, cancelled = false;
@@ -7044,7 +7172,8 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         if (Math.abs(ev.clientX - startX) < 5 && Math.abs(ev.clientY - startY) < 5) return;
         if (book.view !== 'sheet' && document.getElementById('editor').hidden) return;
         started = true;
-        tplDrag = {t, kind, index:null, valid:false};
+        tplDrag = {t, kind, x:ev.clientX, y:ev.clientY, index:null, valid:false, rows:kind === 'scope' ? rowsFromScope(t) : rowsFromTemplate(t, kind)};
+        requestAnimationFrame(templateEdgeScroll);
         el.classList.add('dragging');
         document.body.style.userSelect = 'none';
         ghost.textContent = (t.name || 'Untitled') + (kind === 'section' ? ' (section)' : '');
@@ -7053,13 +7182,15 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       ev.preventDefault();
       ghost.style.left = (ev.clientX + 14) + 'px';
       ghost.style.top  = (ev.clientY + 14) + 'px';
+      tplDrag.x = ev.clientX; tplDrag.y = ev.clientY;
       markDrop(ev.clientX, ev.clientY);
       ghost.classList.toggle('no', !tplDrag.valid);
       ghost.textContent = tplDrag.label
         || (t.name || 'Untitled') + (kind === 'section' ? ' (section)' : '');
     };
 
-    const up = () => {
+    const up = ev => {
+      if (ev?.type === 'pointercancel') cancelled = true;
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', up);
@@ -7068,9 +7199,10 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       ghost.hidden = true;
       ghost.classList.remove('no');
       el.classList.remove('dragging');
+      clearSheetDropPreview();
       clearDropMarks();
       clearFolderMarks();
-      if (!started){ if (onClick) onClick(); return; }
+      if (!started) return;
       const drop = tplDrag;
       tplDrag = null;
       if (cancelled || !drop || !drop.valid) return;
@@ -7090,13 +7222,28 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         applyEditorDrop({kind, zone:drop.zone, pi:drop.pi}, t);
         return;
       }
-      insertTemplate(t, kind, drop.index);
+      const at = drop.beforeId == null ? state.rows.length : state.rows.findIndex(row => row.id === drop.beforeId);
+      if (at >= 0) insertTemplate(t, kind, at, drop.rows);
     };
 
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', up);
     window.addEventListener('keydown', onEsc);
+  }
+
+  function templateEdgeScroll(){
+    if (!tplDrag) return;
+    if (tplDrag.mode === 'rows' && tplDrag.valid){
+      const box = scroller.getBoundingClientRect();
+      const dy = tplDrag.y < box.top + 45 ? -8 : tplDrag.y > box.bottom - 45 ? 8 : 0;
+      if (dy){
+        const previous = scroller.scrollTop;
+        scroller.scrollTop += dy;
+        if (scroller.scrollTop !== previous) markDrop(tplDrag.x, tplDrag.y);
+      }
+    }
+    requestAnimationFrame(templateEdgeScroll);
   }
 
   function folderHeadAt(x, y){
@@ -7136,6 +7283,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
     const fh = folderHeadAt(x, y);
     if (fh){
+      clearSheetDropPreview();
       fh.classList.add('folder-drop');
       tplDrag.mode = 'folder';
       tplDrag.folder = fh.dataset.folder || '';
@@ -7146,13 +7294,14 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
     // anywhere over the editor is an editor drop — never let it reach the sheet behind
     if (overPanel('editor', x, y)){
+      clearSheetDropPreview();
       const zone = editorZoneAt(x, y);
       const z = zone ? zone.dataset.drop : (edMode === 'section' ? 'pack' : 'end');
       const pi = zone && zone.dataset.pi != null ? parseInt(zone.dataset.pi, 10) : null;
       const isSec = tplDrag.kind === 'section';
       const isScope = tplDrag.kind === 'scope';
-      const ok = (edMode === 'section' || edMode === 'construct' || edMode === 'service')
-                 ? (!isSec && !isScope) : true;
+      const ok = edMode === 'section' ? !isScope
+        : (edMode === 'construct' || edMode === 'service') ? (!isSec && !isScope) : true;
 
       tplDrag.mode = 'editor';
       tplDrag.zone = z;
@@ -7179,6 +7328,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
     // over the library, but not on a folder — nothing to do, and nothing behind it
     if (overPanel('library', x, y)){
+      clearSheetDropPreview();
       tplDrag.mode = 'none';
       tplDrag.valid = false;
       tplDrag.label = 'Drop on a folder, the sheet, or the editor';
@@ -7186,28 +7336,16 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     }
 
     tplDrag.mode = 'rows';
-    const box = scroller.getBoundingClientRect();
-    const over = book.view === 'sheet' &&
-                 x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
-    tplDrag.valid = over;
-    tplDrag.label = !over ? 'Release over the sheet to place it'
-                  : tplDrag.kind === 'scope' ? 'Stack into option ' + state.num
-                  : null;
-    if (!over){ tplDrag.index = null; return; }
-
-    const trs = Array.from(body.children).filter(tr => tr.offsetParent !== null);
-    if (!trs.length){ tplDrag.index = 0; return; }
-    for (const tr of trs){
-      const r = tr.getBoundingClientRect();
-      if (y < r.top + r.height / 2){
-        tr.classList.add('drop-before');
-        tplDrag.index = state.rows.findIndex(row => row.id === tr.dataset.id);
-        return;
-      }
+    const target = sheetDropTarget(x, y);
+    tplDrag.valid = !!target && tplDrag.rows.length > 0;
+    if (!tplDrag.valid){
+      clearSheetDropPreview();
+      tplDrag.label = 'Release over the sheet to place it';
+      return;
     }
-    const last = trs[trs.length - 1];
-    last.classList.add('drop-after');
-    tplDrag.index = state.rows.findIndex(row => row.id === last.dataset.id) + 1;
+    tplDrag.beforeId = target.beforeId;
+    tplDrag.label = 'Release to place here';
+    showSheetDropPreview(tplDrag.rows, target.beforeId);
   }
 
   function lineFromTemplate(t){
@@ -7240,7 +7378,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       return;
     }
     if (edMode === 'section'){
-      secDraft.items.push(lineFromTemplate(t));
+      secDraft.items.push(drop.kind === 'section' ? {...freshIds(t), type:'section'} : lineFromTemplate(t));
       renderEditor();
       flash('line added');
       return;
@@ -7257,7 +7395,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     }
     if (drop.kind === 'section'){
       const sec = {type:'section', name:t.name, note:t.note,
-                   items:(t.items || []).map(i => Object.assign({}, i))};
+                   items:freshIds(t.items || [])};
       if (drop.zone === 'end' || drop.pi == null) parts.push(sec);
       else parts.splice(drop.pi + 1, 0, sec);
     } else if (drop.zone === 'sec' && drop.pi != null && parts[drop.pi]){
@@ -7298,18 +7436,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         b.type = 'button'; b.className = 'tpl-btn'; b.innerHTML = '+';
         b.title = 'Save this section as a template';
         b.addEventListener('click', () => {
-          const start = state.rows.indexOf(sec.row);
-          const kids = [];
-          for (let i = start + 1; i < state.rows.length; i++){
-            const r = state.rows[i];
-            if (r.type === 'sectionEnd') break;
-            if (r.type === 'section') break;
-            kids.push({kind:r.kind, name:r.name, note:r.note, count:r.count,
-                       time:r.time, days:r.days, cost:r.cost, markup:r.markup});
-          }
-          templates().sections.push({id:id(), name:sec.name, note:sec.note, items:kids});
-          renderLibrary();
-          save();
+          saveRowAsTemplate(sec.row, '');
           flash('section saved');
         });
         el.appendChild(b);
@@ -7377,6 +7504,22 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
   const TPL_KEY = {item:'items', section:'sections', scope:'scopes', part:'parts', construct:'constructs', service:'services'};
 
+  function duplicateTemplate(template, kind){
+    const list = templates()[TPL_KEY[kind]];
+    const copy = freshIds(template);
+    copy.id = id();
+    const name = template.name || 'Untitled';
+    copy.name = name + ' (copy)';
+    let number = 2;
+    while (list.some(t => t.name === copy.name && (t.folder || '') === (copy.folder || ''))){
+      copy.name = name + ' (copy ' + number++ + ')';
+    }
+    list.splice(list.indexOf(template) + 1, 0, copy);
+    renderLibrary();
+    save();
+    flash('library item duplicated');
+  }
+
   function dropTemplate(kind, tid){
     const lib = activeLib();
     const key = TPL_KEY[kind];
@@ -7389,16 +7532,16 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   function cardFor(entry){
     const t = entry.t, kind = entry.kind;
     if (kind === 'item')
-      return card(t, 'item', () => insertTemplate(t, 'item', null), () => openForm(t), () => dropTemplate('item', t.id));
+      return card(t, 'item', () => openForm(t), () => dropTemplate('item', t.id));
     if (kind === 'section')
-      return card(t, 'section', () => insertTemplate(t, 'section', null), () => openSecForm(t), () => dropTemplate('section', t.id));
+      return card(t, 'section', () => openSecForm(t), () => dropTemplate('section', t.id));
     if (kind === 'part')
-      return card(t, 'part', () => insertTemplate(t, 'part', null), () => openEditor('part', t), () => dropTemplate('part', t.id));
+      return card(t, 'part', () => openEditor('part', t), () => dropTemplate('part', t.id));
     if (kind === 'construct')
-      return card(t, 'construct', () => insertTemplate(t, 'construct', null), () => openEditor('construct', t), () => dropTemplate('construct', t.id));
+      return card(t, 'construct', () => openEditor('construct', t), () => dropTemplate('construct', t.id));
     if (kind === 'service')
-      return card(t, 'service', () => insertTemplate(t, 'service', null), () => openEditor('service', t), () => dropTemplate('service', t.id));
-    return card(t, 'scope', () => optionFromScope(t), () => openScopeForm(t), () => dropTemplate('scope', t.id));
+      return card(t, 'service', () => openEditor('service', t), () => dropTemplate('service', t.id));
+    return card(t, 'scope', () => openScopeForm(t), () => dropTemplate('scope', t.id));
   }
 
   let newFolderParent = '';
@@ -7436,6 +7579,11 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       flash(name + ' is already in there', true);
       return;
     }
+    remapLibraryFolder(from, dest);
+    flash('moved to ' + (to || 'the top'));
+  }
+
+  function remapLibraryFolder(from, dest){
     const remap = p => p === from ? dest
       : String(p).indexOf(from + '/') === 0 ? dest + p.slice(from.length) : p;
     const lib = activeLib();
@@ -7446,13 +7594,12 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     if (libPath) libPath = remap(libPath);
     renderLibrary();
     save();
-    flash('moved to ' + (to || 'the top'));
   }
 
   // a folder drags onto another folder, or onto the trail to move back up a level
   function startFolderDrag(e, path, el){
     if (e.button > 0) return;
-    if (e.target.closest('.folder-x, .folder-add')) return;
+    if (e.target.closest('button, input, form')) return;
     const sx = e.clientX, sy = e.clientY;
     const ghost = document.getElementById('libGhost');
     let started = false, dest = null, ok = false;
@@ -7513,22 +7660,51 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     head.addEventListener('pointerdown', ev => startFolderDrag(ev, path, head));
     head.addEventListener('click', e => {
       if (folderDragged) return;
-      if (e.target.closest('.folder-x, .folder-add')) return;
+      if (e.target.closest('button, input, form')) return;
       libPath = path;
       renderLibrary();
     });
 
-    const plus = document.createElement('button');
-    plus.type = 'button';
-    plus.className = 'tpl-btn folder-add';
-    plus.innerHTML = '+';
-    plus.title = 'Add a folder inside ' + name;
-    plus.addEventListener('click', ev => {
+    const rename = document.createElement('button');
+    rename.type = 'button';
+    rename.className = 'tpl-btn';
+    rename.textContent = 'Rename';
+    rename.title = 'Rename this folder';
+    rename.addEventListener('click', ev => {
       ev.stopPropagation();
-      newFolderParent = path;
-      const inp = document.getElementById('folderNew');
-      inp.placeholder = 'New folder inside ' + name;
-      inp.focus();
+      if (head.querySelector('form')) return;
+      const label = head.querySelector('.folder-name');
+      const form = document.createElement('form');
+      form.className = 'folder-rename-form';
+      const input = document.createElement('input');
+      input.type = 'text'; input.value = name; input.required = true;
+      input.setAttribute('aria-label', 'Folder name');
+      const submit = document.createElement('button');
+      submit.type = 'submit'; submit.className = 'tpl-btn'; submit.textContent = 'Save';
+      const cancel = document.createElement('button');
+      cancel.type = 'button'; cancel.className = 'tpl-btn'; cancel.textContent = 'Cancel';
+      const close = () => { form.replaceWith(label); rename.hidden = false; x.hidden = false; rename.focus(); };
+      cancel.addEventListener('click', close);
+      input.addEventListener('input', () => input.setCustomValidity(''));
+      input.addEventListener('keydown', event => {
+        if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); }
+      });
+      form.addEventListener('submit', event => {
+        event.preventDefault();
+        const next = input.value.trim();
+        const parent = parentFolder(path);
+        const dest = parent ? parent + '/' + next : next;
+        const error = !next ? 'Enter a folder name.' : next.includes('/') ? 'Folder names cannot contain /.'
+          : dest !== path && folderNames(allTemplates().map(e => e.t)).includes(dest) ? 'A folder with this name already exists here.' : '';
+        input.setCustomValidity(error);
+        if (error) { input.reportValidity(); return; }
+        if (dest === path) { close(); return; }
+        remapLibraryFolder(path, dest);
+        flash('folder renamed');
+      });
+      form.append(input, submit, cancel);
+      label.replaceWith(form); rename.hidden = true; x.hidden = true;
+      input.focus(); input.select();
     });
 
     const x = document.createElement('button');
@@ -7542,12 +7718,11 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       const hasSubfolders = (lib.folders || []).some(fd => fd !== path && underFolder(fd, path));
       const hasItems = inside.length > 0;
       if (hasItems || hasSubfolders) {
-        flash(
-          hasItems
-            ? 'Move or delete the items inside this folder first.'
-            : 'Move or delete the subfolders inside this folder first.',
-          true
-        );
+        const warning = hasItems
+          ? 'Cannot delete this folder. Move or delete the items inside it first.'
+          : 'Cannot delete this folder. Move or delete the subfolders inside it first.';
+        if (window.freedomSession?.notify) window.freedomSession.notify(warning);
+        else flash(warning, true);
         return;
       }
       lib.folders = lib.folders.filter(fd => fd !== path);
@@ -7557,7 +7732,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       save();
     });
 
-    head.append(plus, x);
+    head.append(rename, x);
     return head;
   }
 
@@ -7633,18 +7808,16 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   let scopeDraft = null;
 
   function partsFromRows(rows){
-    const parts = [];
-    let cur = null;
+    const parts = [], stack = [parts];
     rows.forEach(r => {
-      if (r.type === 'section'){
-        cur = {type:'section', name:r.name, note:r.note, items:[]};
-        parts.push(cur);
-        return;
-      }
-      if (r.type === 'sectionEnd'){ cur = null; return; }
-      const item = {type:'item', kind:r.kind, name:r.name, note:r.note,
-                    count:r.count, time:r.time, days:r.days, cost:r.cost, markup:r.markup};
-      if (cur) cur.items.push(item); else parts.push(item);
+      if (r.type === 'sectionEnd'){ if (stack.length > 1) stack.pop(); return; }
+      const part = freshIds(r);
+      delete part.id;
+      delete part.collapsed;
+      if (part.pics?.length) part.img = part.pics[0].url;
+      part.type = r.type === 'section' ? 'section' : 'item';
+      stack[stack.length - 1].push(part);
+      if (part.type === 'section'){ part.items = []; stack.push(part.items); }
     });
     return parts;
   }
@@ -7815,7 +7988,23 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   }
 
   // one card: the item editor, and the unit the section pack is built from
+  function sectionCard(it, list, locked = false){
+    const box = document.createElement('div');
+    box.className = 'ed-subsection';
+    if (locked) box.appendChild(readOnlyLine(it.name || 'Section', 'Subsection'));
+    else {
+      box.appendChild(edField('Subsection', it.name, v => { it.name = v; }));
+      box.appendChild(edBtn('&times;', 'Remove subsection', () => { list.splice(list.indexOf(it), 1); renderEditor(); }, 'rm'));
+    }
+    (it.items || []).forEach((child, index) => {
+      box.appendChild(child.type === 'section' ? sectionCard(child, it.items, locked)
+        : locked ? readOnlyLine(child.name || 'Line', '') : lineCard(child, it.items, index));
+    });
+    return box;
+  }
+
   function lineCard(it, list, i, opts){
+    if (it.type === 'section') return sectionCard(it, list);
     const c = document.createElement('div');
     c.className = 'ed-card' + (it.slim ? ' slim-card' : '');
     c.__line = it;
@@ -8837,7 +9026,9 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       pack.innerHTML = '<div class="lib-hint">No lines yet — add one, or drag an item in from the library.</div>';
     } else {
       secDraft.items.forEach((it, i) => {
-        if (secDraft.linesLocked){
+        if (it.type === 'section'){
+          pack.appendChild(sectionCard(it, secDraft.items, secDraft.linesLocked));
+        } else if (secDraft.linesLocked){
           pack.appendChild(readOnlyLine(it.name || 'Line',
             (num(it.count) || 1) + ' x $' + fmt.format(num(it.cost))));
         } else {
@@ -8847,7 +9038,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     }
     const strip = document.createElement('div');
     strip.className = 'ed-dropstrip';
-    strip.textContent = 'Drop an item template here';
+    strip.textContent = 'Drop an item or section template here';
     pack.appendChild(strip);
     box.appendChild(pack);
 
@@ -8989,6 +9180,13 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       tr.dataset.kind = 'item';
       tr.className = 'in-sec';
       tr.__part = it;
+      if (it.type === 'section'){
+        const cell = document.createElement('td');
+        cell.colSpan = 7;
+        cell.appendChild(sectionCard(it, parent ? parent.items : d.parts));
+        tr.appendChild(cell);
+        return tr;
+      }
 
       const td = document.createElement('td');
       td.className = 'c1';
@@ -9653,23 +9851,22 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   function duplicateSection(row){
     const start = state.rows.indexOf(row);
     if (start < 0) return;
-    let end = start + 1;
-    while (end < state.rows.length && state.rows[end].type !== 'sectionEnd'
-           && state.rows[end].type !== 'section') end++;
-    const hasFoot = end < state.rows.length && state.rows[end].type === 'sectionEnd';
-    const block = state.rows.slice(start, hasFoot ? end + 1 : end);
+    const block = state.rows.slice(start, sectionEndIndex(state.rows, start) + 1);
     const copy = block.map(freshIds);
-    copy.forEach(r => { if (r.type === 'sectionEnd') r.sid = copy[0].id; });
+    const ids = new Map(block.map((r, i) => [r.id, copy[i].id]));
+    copy.forEach(r => { if (r.type === 'sectionEnd') r.sid = ids.get(r.sid); });
     state.rows.splice(start + block.length, 0, ...copy);
     renderAll();
     save();
     flash('section duplicated');
   }
 
-  function addSectionRows(){
+  function addSectionRows(parent){
     const head = {id:id(), type:'section', name:'', units:{}};
     const foot = {id:id(), type:'sectionEnd', sid:head.id};
-    state.rows.push(head, foot);
+    const at = parent?.type === 'section' ? sectionEndIndex(state.rows, state.rows.indexOf(parent)) : state.rows.length;
+    if (parent?.type === 'section') parent.collapsed = false;
+    state.rows.splice(at, 0, head, foot);
     renderAll();
     const ref = refs.get(head.id);
     if (ref && ref.name) ref.name.focus();
@@ -9769,19 +9966,20 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     const GRAND = colRef(7 + nF);
     const rows = [rowXml(heads.map(h => cS(h, 1)), 1)];
     const dataRows = [];
-    let r = 2;
+    let r = 2, depth = 0;
 
     sh.rows.forEach(x => {
-      if (x.type === 'sectionEnd') return;
+      if (x.type === 'sectionEnd'){ depth = Math.max(0, depth - 1); return; }
       if (x.type === 'section' || x.kind === 'none'){
         const st = x.type === 'section' ? 6 : 2;
-        const cells = [cS(x.type === 'section' ? (x.name || 'Section').toUpperCase() : (x.name || ''), st)];
+        const cells = [cS('  '.repeat(depth) + (x.type === 'section' ? (x.name || 'Section').toUpperCase() : (x.name || '')), st)];
+        if (x.type === 'section') depth++;
         for (let i = 1; i < width; i++) cells.push(cS('', st));
         rows.push(rowXml(cells, r++));
         return;
       }
       const c = calc(x, sh);
-      const cells = [cS(x.name || '', 2), cN(num(x.count), 3), cN(num(x.time), 3), cN(num(x.days), 3),
+      const cells = [cS('  '.repeat(depth) + (x.name || ''), 2), cN(num(x.count), 3), cN(num(x.time), 3), cN(num(x.days), 3),
                      cN(num(x.cost), 4), cN(num(x.markup), 5)];
       // Subtotal = count × time × days × cost, plus markup
       cells.push(cF('B' + r + '*C' + r + '*D' + r + '*E' + r + '*(1+F' + r + '/100)', c.sub, 4));
@@ -9953,8 +10151,9 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     html += '<table class="ptab"><thead><tr>' + heads.map(h => '<th>' + esc(h) + '</th>').join('') +
             '</tr></thead><tbody>';
 
-    let open = null;
+    const stack = [];
     const closeSec = () => {
+      const open = stack.pop();
       if (!open) return '';
       const cells = ['<td class="pnum">' + money$(open.sub) + '</td>']
         .concat(open.fees.map(v => '<td class="pnum">' + money$(v) + '</td>'),
@@ -9964,15 +10163,14 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
                   return '<td class="pnum">' + (q ? '$' + fmt.format(open.grand / q) : '—') + '</td>';
                 }));
       const out = '<tr class="psub"><td colspan="6">Section subtotal</td>' + cells.join('') + '</tr>';
-      open = null;
+
       return out;
     };
 
     sh.rows.forEach(x => {
       if (x.type === 'section'){
-        html += closeSec();
-        open = {row:x, sub:0, grand:0, fees:sh.fees.map(() => 0)};
-        html += '<tr class="psec"><td colspan="' + span + '">' + esc(x.name || 'Section') + '</td></tr>';
+        stack.push({row:x, sub:0, grand:0, fees:sh.fees.map(() => 0)});
+        html += '<tr class="psec"><td colspan="' + span + '">' + '&nbsp;'.repeat((stack.length - 1) * 4) + esc(x.name || 'Section') + '</td></tr>';
         return;
       }
       if (x.type === 'sectionEnd'){ html += closeSec(); return; }
@@ -9981,10 +10179,10 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         return;
       }
       const c = calc(x, sh);
-      if (open){
+      stack.forEach(open => {
         open.sub += c.sub; open.grand += c.grand;
         c.fees.forEach((v, i) => { open.fees[i] += v; });
-      }
+      });
       const nm = esc(x.name || '') +
         (x.note && x.note.trim() ? '<span class="pdetail">' + esc(x.note.trim()) + '</span>' : '');
       html += '<tr><td>' + nm + '</td>' +
@@ -10001,7 +10199,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
           return '<td class="pnum">' + (q ? '$' + fmt.format(c.grand / q) : '—') + '</td>';
         }).join('') + '</tr>';
     });
-    html += closeSec();
+    while (stack.length) html += closeSec();
 
     const t = sheetTotals(sh);
     html += '</tbody><tfoot><tr><td colspan="6">Total</td>' +
