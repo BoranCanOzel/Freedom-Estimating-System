@@ -1498,6 +1498,11 @@
   }
   .sum-block .folder-head{cursor:pointer;padding:2px}
   .sum-block-body{padding:4px 2px 2px}
+  .sum-block .ro-line b{min-width:0;overflow-wrap:anywhere;white-space:pre-line}
+  .sum-block-title{margin:0;padding:4px 2px 8px;font:600 14px var(--f-sans);color:var(--ink)}
+  .summary-map-link{display:inline-flex;align-items:center;min-height:32px;margin:4px 0 8px;padding:6px 10px;border:1px solid var(--rule);border-radius:5px;background:var(--card);color:var(--ink);font:500 12px var(--f-sans);text-decoration:none}
+  .summary-map-link:hover{border-color:var(--amber);background:var(--calc)}
+  .summary-map-link:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
 
   .panel-grab{
     position:absolute;top:0;bottom:0;width:6px;cursor:col-resize;z-index:6;
@@ -3503,8 +3508,11 @@
     secDup.addEventListener('click', e => { e.stopPropagation(); duplicateSection(row); });
 
     const noteBtn = noteButton();
+    const levelBadge = document.createElement('span');
+    levelBadge.className = 'subsection-badge';
+    levelBadge.hidden = true;
     wrap.append(secDup, makeGrip(tr, row, 'Drag to move this whole section, or drop on another option tab'),
-                caret, name, secAdd, subAdd, noteBtn);
+                caret, levelBadge, name, secAdd, subAdd, noteBtn);
     const stackCell = document.createElement('div');
     stackCell.className = 'item-wrap';
     stackCell.appendChild(wrap);
@@ -3882,8 +3890,18 @@
       tr.dataset.depth = depth;
       tr.classList.toggle('tree-child', depth > 0);
       tr.classList.toggle('row-hidden', stack.some(r => r.collapsed));
-      if (ending){ stack.pop(); return; }
+      if (ending){
+        const label = tr.querySelector('.sec-label');
+        if (label) label.textContent = depth > 0 ? 'Subsection subtotal' : 'Section subtotal';
+        stack.pop(); return;
+      }
       if (tr.dataset.type !== 'section') return;
+      const levelBadge = tr.querySelector('.subsection-badge');
+      if (levelBadge){
+        levelBadge.hidden = depth === 0;
+        levelBadge.textContent = depth > 1 ? 'Subsection · ' + depth : 'Subsection';
+        levelBadge.title = 'Nested section, level ' + depth;
+      }
       const on = !!row.collapsed;
       tr.classList.toggle('collapsed', on);
       const caret = tr.querySelector('.caret');
@@ -5878,26 +5896,30 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
            '<path d="M1 3.2 L5 7.2 L9 3.2 Z" fill="currentColor"/></svg>';
   }
 
-  function sumBlock(cls, title, key, rows){
+  function sumBlock(cls, title, rows){
     const box = document.createElement('div');
     box.className = 'sum-block ' + cls;
-    const shut = book[key] === false;
-    const head = document.createElement('div');
-    head.className = 'folder-head';
-    head.innerHTML = '<span class="caret tpl-caret' + (shut ? ' shut' : '') + '">' + caretSvg() + '</span>' +
-      '<span class="folder-name">' + esc(title) + '</span>';
-    head.addEventListener('click', () => { book[key] = shut; renderSummary(); save(); });
+    const head = document.createElement('h3');
+    head.className = 'sum-block-title';
+    head.textContent = title;
     box.appendChild(head);
-    if (!shut){
-      const body = document.createElement('div');
-      body.className = 'sum-block-body';
-      rows.forEach(([k, v]) => {
-        if (!v) return;
-        body.appendChild(readOnlyLine(k, v));
-      });
-      if (!body.childNodes.length) body.innerHTML = '<div class="lib-hint">Nothing filled in yet.</div>';
-      box.appendChild(body);
-    }
+    const body = document.createElement('div');
+    body.className = 'sum-block-body';
+    rows.forEach(([k, v, isAddress]) => {
+      if (v == null || !String(v).trim()) return;
+      body.appendChild(readOnlyLine(k, v));
+      if (isAddress){
+        const link = document.createElement('a');
+        link.className = 'summary-map-link';
+        link.textContent = 'Open in Maps';
+        link.href = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(String(v).trim());
+        link.target = '_blank'; link.rel = 'noopener noreferrer';
+        link.setAttribute('aria-label', 'Open ' + String(v).trim() + ' in Google Maps');
+        body.appendChild(link);
+      }
+    });
+    if (!body.childNodes.length) body.innerHTML = '<div class="lib-hint">Nothing filled in yet.</div>';
+    box.appendChild(body);
     return box;
   }
 
@@ -5908,15 +5930,20 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     if (!hit) return;
     const co = hit.co, pr = hit.pr, tk = hit.tk;
 
-    const proj = [['Company', co.name], ['Address', pr.address || co.address],
-                  ['Project', pr.name], ['Status', pr.status],
+    const customer = [['Customer', co.name], ['Address', co.address, true],
+                      ['Phone', co.phone], ['Email', co.email]]
+      .concat(customFields('company').map(f => [f, (co.custom && co.custom[f]) || '']));
+    wrap.appendChild(sumBlock('customer', 'Customer', customer));
+    const projectAddress = String(pr.address || '').trim();
+    const proj = [['Project', pr.name], ['Status', pr.status],
+                  [projectAddress ? 'Job address' : 'Customer address', projectAddress || co.address, true],
                   ['Contacts', pr.contacts], ['Email', pr.email], ['Notes', pr.notes]]
       .concat(customFields('project').map(f => [f, (pr.custom && pr.custom[f]) || '']));
-    wrap.appendChild(sumBlock('proj', 'Project information', 'sumProjOpen', proj));
+    wrap.appendChild(sumBlock('proj', 'Project', proj));
 
     const take = [['Takeoff', tk.name], ['Description', tk.note]]
       .concat(customFields('takeoff').map(f => [f, (tk.custom && tk.custom[f]) || '']));
-    wrap.appendChild(sumBlock('tk', 'Takeoff description', 'sumTkOpen', take));
+    wrap.appendChild(sumBlock('tk', 'Takeoff', take));
   }
 
   function renderSummary(){

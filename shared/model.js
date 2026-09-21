@@ -37,15 +37,34 @@ function changeText(text, previous, next) {
 
 function changeOrder(order, previous, next) {
   // Only remove members this client knew about. Concurrent additions survive.
-  const removed = new Set(previous.filter(id => !next.includes(id)));
+  const nextIds = new Set(next);
+  const removed = new Set(previous.filter(id => !nextIds.has(id)));
   for (let i = order.length - 1; i >= 0; i--) if (removed.has(order.get(i))) order.delete(i, 1);
+  // Keep a longest unchanged subsequence in place. Comparing only each row's
+  // old predecessor misses the rest of a moved block and splits nested sections.
+  // Compute this against the client's baseline, not the merged remote order,
+  // so an unrelated local edit does not undo a collaborator's reorder.
+  const positions = new Map(previous.map((id,i) => [id,i]));
+  const sequence = next.filter(id => positions.has(id));
+  const tails = [], parents = [];
+  sequence.forEach((id,i) => {
+    let low = 0, high = tails.length;
+    while (low < high) {
+      const mid = (low + high) >>> 1;
+      if (positions.get(sequence[tails[mid]]) < positions.get(id)) low = mid + 1;
+      else high = mid;
+    }
+    parents[i] = low ? tails[low - 1] : -1;
+    tails[low] = i;
+  });
+  const stationary = new Set();
+  for (let i = tails.at(-1); i != null && i >= 0; i = parents[i]) stationary.add(sequence[i]);
   next.forEach((id, i) => {
-    const oldIndex = previous.indexOf(id);
-    const moved = oldIndex < 0 || previous.slice(0, oldIndex).filter(x => next.includes(x)).at(-1) !== next.slice(0, i).filter(x => previous.includes(x)).at(-1);
-    if (!moved && order.toArray().includes(id)) return;
+    if (stationary.has(id) && order.toArray().includes(id)) return;
     for (let j = order.length - 1; j >= 0; j--) if (order.get(j) === id) order.delete(j, 1);
     const current = order.toArray();
-    const before = i ? current.lastIndexOf(next[i - 1]) : -1;
+    let before = -1;
+    for (let j = i - 1; j >= 0 && before < 0; j--) before = current.lastIndexOf(next[j]);
     order.insert(before + 1, [id]);
   });
 }

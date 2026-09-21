@@ -568,6 +568,39 @@ test('project presence, tab highlights, collapse and recent views work for two u
   } finally {await context.close();}
 });
 
+test('summary shows customer, job address maps and the active takeoff', async ({page}) => {
+  const data=workbook(), company=data.lists[0].companies[0];
+  company.address='12 Office Road'; company.phone='555-0100'; company.email='office@example.com';
+  company.projects[0].address='100 Main St, Suite #4 & Yard';
+  company.projects[0].contacts='Site supervisor';
+  company.projects[0].takeoffs[0].note='Sawcut and removal';
+  data.sumProjOpen=false; data.sumTkOpen=false;
+  await openWorkbook(page,data);
+  await page.locator('#rail .tab-summary').click();
+  const details=page.locator('#sumBlocks');
+  await expect(details.locator('.customer')).toContainText('Freedom Customer');
+  await expect(details.locator('.customer')).toContainText('555-0100');
+  await expect(details.locator('.customer')).toContainText('office@example.com');
+  await expect(details.locator('.proj')).toContainText('North job');
+  await expect(details.locator('.proj')).toContainText('Site supervisor');
+  await expect(details.locator('.tk')).toContainText('North takeoff');
+  await expect(details.locator('.tk')).toContainText('Sawcut and removal');
+  const map=details.locator('.proj .summary-map-link');
+  await expect(map).toHaveAttribute('href','https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(company.projects[0].address));
+  await expect(map).toHaveAttribute('target','_blank');
+  await expect(map).toHaveAttribute('rel','noopener noreferrer');
+  await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'ts',sheet:'ss',view:'summary'}));
+  await expect(details.locator('.proj')).toContainText('South job');
+  await expect(details.locator('.tk')).toContainText('South takeoff');
+  await expect(details.locator('.proj')).toContainText('Customer address');
+  await expect(map).toHaveAttribute('href','https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(company.address));
+  await expect(details).not.toContainText('100 Main St');
+  await openWorkbook(page,workbook());
+  await page.locator('#rail .tab-summary').click();
+  await expect(details.locator('.summary-map-link')).toHaveCount(0);
+  await expect(details.locator('.customer')).toContainText('Freedom Customer');
+});
+
 test('menus preserve rounding, display, downloads, printing and keyboard access', async ({page}) => {
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await openWorkbook(page);
@@ -767,6 +800,47 @@ test('items and nested sections move between option tabs and Escape cancels', as
   const saved=await page.evaluate(()=>window.estimator.exportBook().sheets);
   expect(saved[0].rows).toEqual([]);
   expect(saved[1].rows.map(r=>r.id)).toEqual(moved[1].rows.map(r=>r.id));
+  expect(errors).toEqual([]);
+});
+
+test('editing names and prices after moving a nested section preserves its saved order', async ({page}) => {
+  const errors=[]; page.on('pageerror',error=>errors.push(error.message));
+  const data=workbook();
+  const item=(id,name,cost)=>({id,kind:'labor',name,cost,count:1,time:1,days:1,markup:0});
+  data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0].rows=[
+    item('loose1','Loose 1',10),item('loose2','Loose 2',20),
+    {id:'parent',type:'section',name:'Parent'},
+    {id:'child',type:'section',name:'Subsection'},
+    item('work','Nested work',30),
+    {id:'child-end',type:'sectionEnd',sid:'child'},
+    {id:'parent-end',type:'sectionEnd',sid:'parent'}
+  ];
+  await openWorkbook(page,data);
+  const row=id=>page.locator('#body tr[data-id="'+id+'"]');
+  await row('parent').locator('.grip').press('Alt+ArrowUp');
+  await row('parent').locator('.grip').press('Alt+ArrowUp');
+  const expected=['parent','child','work','child-end','parent-end','loose1','loose2'];
+  const order=()=>page.locator('#body > tr').evaluateAll(rows=>rows.map(row=>row.dataset.id));
+  expect(await order()).toEqual(expected);
+  await row('work').getByRole('textbox',{name:'Item name',exact:true}).fill('Updated nested item');
+  await row('work').getByRole('textbox',{name:'cost',exact:true}).focus();
+  await row('work').getByRole('textbox',{name:'cost',exact:true}).fill('95');
+  await row('work').locator('.card-btn').click();
+  await page.locator('#editor .ed-name, #editor .gc-name').first().fill('Saved nested item');
+  await page.locator('#edSave').click();
+  expect(await order()).toEqual(expected);
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  expect(await order()).toEqual(expected);
+  await expect(row('work')).toHaveAttribute('data-depth','2');
+  await expect(row('work').getByRole('textbox',{name:'Item name',exact:true})).toHaveValue('Saved nested item');
+  await expect(row('work').getByRole('textbox',{name:'cost',exact:true})).toHaveValue('95.00');
+  await expect(page.locator('#tSub .v')).toHaveText('125.00');
+  await row('work').getByRole('textbox',{name:'Item name',exact:true}).fill('Another edit');
+  await page.keyboard.press('Control+z');
+  expect(await order()).toEqual(expected);
+  await expect(row('work').getByRole('textbox',{name:'Item name',exact:true})).toHaveValue('Saved nested item');
   expect(errors).toEqual([]);
 });
 

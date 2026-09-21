@@ -99,6 +99,16 @@ body.server-mode #sheetTable .h-adds{display:flex;flex-wrap:wrap;flex:0 1 auto;j
 body.server-mode #sheetTable .h-adds .btn{min-height:44px;padding:10px 14px;font-size:13px;white-space:nowrap;background:#e99525;color:#241b10;border:1px solid #c97b17;border-radius:5px;text-shadow:none;box-shadow:none}
 body.server-mode #sheetTable .h-adds .btn:hover{background:#ffb347;color:#241b10;border-color:#e99525}
 body.server-mode #sheetTable .sec-add{opacity:1;min-height:44px;min-width:88px;padding:10px 14px;font-size:13px;white-space:nowrap;border-radius:5px}
+body{--subsection-accent:#277c91}
+body.dark{--subsection-accent:#71c2d3}
+body #sheetTable tbody tr.section-head.tree-child:not(.dragging):not(.drop-preview) td{background:color-mix(in srgb,var(--subsection-accent) 12%,var(--card))!important;border-top:1px dashed var(--subsection-accent);border-bottom:1px solid var(--rule);box-shadow:none}
+body.medieval #sheetTable tbody tr.section-head.tree-child:not(.dragging):not(.drop-preview) td{background:#293e46!important}
+body.medieval .subsection-badge{background:#1d3038;color:#b3e4ed}
+body #sheetTable tbody tr.section-head.tree-child td.c-item,body #sheetTable tbody tr.section-foot.tree-child td.c-item{border-left:3px solid var(--subsection-accent)}
+body #sheetTable tr.section-head.tree-child .name-in{font-family:var(--f-sans);font-size:12.5px;font-weight:600;letter-spacing:normal;text-transform:none;color:var(--ink);text-shadow:none}
+body #sheetTable tr.section-head.tree-child .caret{color:var(--subsection-accent)}
+body #sheetTable tr.section-head.tree-child .name-in::placeholder{color:var(--muted)}
+.subsection-badge{flex:none;padding:3px 6px;border:1px solid var(--subsection-accent);border-radius:4px;color:var(--subsection-accent);background:var(--card);font:600 10px var(--f-sans);letter-spacing:normal;white-space:nowrap;text-shadow:none}
 body.server-mode .sheet>.card{padding-bottom:8px}
 body.server-mode #sheetCard>.head{padding-top:7px;padding-bottom:5px}
 body.server-mode #sheetCard .eyebrow-row{min-height:32px}

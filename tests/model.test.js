@@ -47,3 +47,52 @@ test('rejects unrelated JSON and prototype keys', () => {
   assert.throws(()=>validateBook({hello:'world'}));
   assert.throws(()=>validateBook(JSON.parse('{"sheets":[],"__proto__":{}}')));
 });
+
+test('every five-row reorder round-trips without splitting moved blocks', () => {
+  const permutations = ids => ids.length ? ids.flatMap((id,i) =>
+    permutations(ids.filter((_,j) => j !== i)).map(rest => [id,...rest])) : [[]];
+  const initial = {sheets:[{id:'s',rows:['a','b','c','d','e'].map(id => ({id,name:id}))}]};
+  for (const ids of permutations(['a','b','c','d','e'])) {
+    const doc = new Y.Doc();
+    writeBook(doc,{},initial);
+    const next = structuredClone(initial);
+    next.sheets[0].rows = ids.map(id => initial.sheets[0].rows.find(row => row.id === id));
+    writeBook(doc,initial,next);
+    assert.deepEqual(readBook(doc),next,ids.join(','));
+    const edited = structuredClone(next);
+    edited.sheets[0].rows[2].name = 'Edited name';
+    edited.sheets[0].rows[2].cost = 125;
+    writeBook(doc,next,edited);
+    const reopened = new Y.Doc();
+    Y.applyUpdate(reopened,Y.encodeStateAsUpdate(doc));
+    assert.deepEqual(readBook(reopened),edited);
+    doc.destroy(); reopened.destroy();
+  }
+});
+
+test('nested section moves survive later edits, remote updates, undo and redo', () => {
+  const original = {sheets:[{id:'s',rows:[
+    {id:'p',type:'section',name:'Parent'},
+    {id:'a',name:'First line',cost:10},
+    {id:'c',type:'section',name:'Child'},
+    {id:'w',name:'Nested work',cost:20},
+    {id:'ce',type:'sectionEnd',sid:'c'},
+    {id:'pe',type:'sectionEnd',sid:'p'}
+  ]}]};
+  const a=new Y.Doc(), b=new Y.Doc();
+  writeBook(a,{},original,'seed'); Y.applyUpdate(b,Y.encodeStateAsUpdate(a),'remote');
+  const history = new Y.UndoManager(a,{trackedOrigins:new Set(['local'])});
+  const moved=structuredClone(original);
+  moved.sheets[0].rows=['p','c','w','ce','a','pe'].map(id=>moved.sheets[0].rows.find(row=>row.id===id));
+  writeBook(a,original,moved);
+  const edited=structuredClone(original); edited.sheets[0].rows[3].cost=99;
+  writeBook(b,original,edited); exchange(a,b);
+  assert.deepEqual(readBook(a).sheets[0].rows.map(r=>r.id),['p','c','w','ce','a','pe']);
+  assert.equal(readBook(a).sheets[0].rows.find(r=>r.id==='w').cost,99);
+  history.undo();
+  assert.deepEqual(readBook(a).sheets[0].rows.map(r=>r.id),original.sheets[0].rows.map(r=>r.id));
+  assert.equal(readBook(a).sheets[0].rows.find(r=>r.id==='w').cost,99);
+  history.redo();
+  assert.deepEqual(readBook(a).sheets[0].rows.map(r=>r.id),['p','c','w','ce','a','pe']);
+  a.destroy(); b.destroy();
+});
