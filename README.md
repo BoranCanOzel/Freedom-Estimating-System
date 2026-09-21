@@ -42,7 +42,7 @@ Company and project branches start collapsed when a workbook opens. Your last pr
 
 **Recently viewed** lists projects in the current workbook, newest first, with customer, takeoff, tab, viewer, and timestamp. **Viewed by** defaults to your account and can select another user or Everyone. A visit is recorded when the user changes location, not when they move their cursor. One latest location is kept per user/project; opening it returns to that takeoff and tab. History begins when this version is deployed and survives server restarts. Deleted projects/takeoffs are omitted.
 
-Collaborator names appear on the customer, project, and takeoff they are viewing, including collapsed parent rows. Within the same takeoff, numbered tabs and other views are highlighted with viewer names. Header badges provide the full customer → project → takeoff → tab path on hover. The Workbooks tab also shows each user's location inside their workbook. Presence updates live within the open workbook; the workbook browser refreshes every ten seconds.
+The current customer, project, and takeoff are highlighted without adding location rows. Your path uses amber; collaborators use their cursor colors, with a segmented marker when several people share a row. Hover a highlighted row for names and locations, including collapsed parents. Within the same takeoff, numbered tabs and other views are highlighted with viewer names. Header badges provide the full customer → project → takeoff → tab path on hover. The Workbooks tab also shows each user's location inside their workbook. Presence updates live within the open workbook; the workbook browser refreshes every ten seconds.
 
 Each imported JSON becomes a server workbook, preserving its existing company → project → takeoff hierarchy and template libraries. A legacy single-sheet JSON is also supported. Companies, projects, takeoffs, named lists, and custom filters remain available inside the same drawer. Renaming a server workbook changes its name in the workbook selector; internal project names remain editable in the hierarchy.
 
@@ -54,12 +54,13 @@ Use **Ctrl+Z** to undo and **Ctrl+Y** or **Ctrl+Shift+Z** to redo (Command short
 | --- | --- |
 | File | JSON import/export, estimate Excel export, printing, company and project directory exports |
 | View | Theme, zoom, account cursor style, pictures, sheet details, summary details, and calculator folding, according to the active view |
-| Estimate | Current option rounding, embedded load calculator, hidden column restoration, reset and delete |
+| Estimate | Current option rounding, embedded load calculator, hidden column restoration, and reset |
+| Option tabs | × deletes that option; empty options close immediately, while options with content open a confirmation dialog. The last remaining option is kept. |
 | Projects → Project settings | Custom fields by company/project/takeoff, project statuses, and available filters |
 | Item column header or calculator heading | Common add-item, add-section, add-option, and add-labor-group actions |
 | Scope of Work header | Larger Detail opener and a copy of Collapse/Expand all detail, synchronized with View |
 
-Project settings save automatically. Renaming a custom field retains existing detail values and its filter configuration. Theme and zoom are personal browser preferences that persist across workbook changes. The Scopes tab replaces the former gear icon for the option overview. Destructive estimate actions retain their two-click confirmation.
+Project settings save automatically. Renaming a custom field retains existing detail values and its filter configuration. Theme and zoom are personal browser preferences that persist across workbook changes. The Scopes tab replaces the former gear icon for the option overview. Destructive actions that require confirmation use a modal dialog with Cancel and an action button; Escape cancels.
 
 View → Cursor style offers system default, large dark/light arrows, and crosshair. This setting is stored per signed-in account in SQLite and loaded on sign-in across browsers; it does not change shared workbooks. Text fields and resize handles retain their functional cursors.
 

@@ -31,13 +31,13 @@ export function setupHistory(bridge, connection) {
   function flush() {
     if (!pendingEvent) return;
     const event = pendingEvent; pendingEvent = null; clearTimeout(pendingTimer);
-      const next = bridge.getEditorHistory();
-      if (next && draft?.session === next.session && !equal(next.value,draft.value)) {
-        const typing = event.type === 'input' && event.target === lastInput && Date.now()-lastTime < 500;
-        if (!typing) past.push(draft);
-        future=[]; lastInput=event.type === 'input' ? event.target : null; lastTime=Date.now();
-      } else if (next?.session !== draft?.session) { past=[]; future=[]; lastInput=null; }
-      draft=next; paint();
+    const next = bridge.getEditorHistory();
+    if (next && draft?.session === next.session && !equal(next.value,draft.value)) {
+      const typing = event.type === 'input' && event.target === lastInput && Date.now()-lastTime < 500;
+      if (!typing) past.push(draft);
+      future=[]; lastInput=event.type === 'input' ? event.target : null; lastTime=Date.now();
+    } else if (next?.session !== draft?.session) { past=[]; future=[]; lastInput=null; }
+    draft=next; paint();
   }
   function travel(isRedo) {
     flush();
@@ -76,6 +76,7 @@ export function setupHistory(bridge, connection) {
   for (const type of ['pointerdown','focusin','beforeinput']) document.addEventListener(type,before,true);
   for (const type of ['click','input','change','pointerup','keydown']) document.addEventListener(type,after,true);
   document.addEventListener('estimator:history',paint);
+  document.addEventListener('estimator:editor-render',after);
   document.addEventListener('estimator:before-receive',flush);
   document.addEventListener('estimator:editor-rebase', event => {
     const {before,after}=event.detail;

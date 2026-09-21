@@ -38,7 +38,7 @@ test('visible page actions duplicate a complete option and confirm deletion', as
   source.notes = 'Keep these notes';
   await openWorkbook(page, data);
   const actions = page.locator('#workspace-page-actions');
-  await expect(actions.locator('#deleteSheet')).toBeVisible();
+  await expect(page.locator('#deleteSheet')).toHaveCount(0);
   await expect(page.locator('#workspace-estimate #deleteSheet')).toHaveCount(0);
   const original = await page.evaluate(() => window.estimator.exportBook().sheets[0]);
   await actions.locator('#duplicateSheet').click();
@@ -56,14 +56,73 @@ test('visible page actions duplicate a complete option and confirm deletion', as
   await expect(page.locator('#server-status')).toHaveText('All changes saved');
   await page.reload();
   await expect(page.locator('#title')).toHaveValue('Independent copy');
-  await actions.locator('#deleteSheet').click();
+  await page.getByRole('button',{name:'Delete option 2',exact:true}).click();
   await expect(page.locator('#rail .tab[data-sheet]')).toHaveCount(2);
-  await actions.locator('#deleteSheet').click();
+  await expect(page.getByRole('alertdialog')).toContainText('Are you sure you want to delete this option?');
+  await page.getByRole('alertdialog').getByRole('button',{name:'Delete',exact:true}).click();
   await expect(page.locator('#title')).toHaveValue('North scope');
   await expect(page.locator('#rail .tab[data-sheet]')).toHaveCount(1);
-  await actions.locator('#deleteSheet').click();
-  await actions.locator('#deleteSheet').click();
+  await expect(page.getByRole('button',{name:'Delete option 1',exact:true})).toBeDisabled();
   await expect(page.locator('#rail .tab[data-sheet]')).toHaveCount(1);
+});
+
+test('option close buttons skip empty pages and use cancellable dialogs for content and reset', async ({page}) => {
+  const data=workbook();
+  data.lists[0].companies[0].projects[0].takeoffs[0].sheets.push({id:'blank',title:'',
+    fees:[{id:'blank-fee',label:'Fee',pct:3}],units:[{id:'blank-unit',label:'SF',qty:''}],
+    rows:[{id:'blank-row',kind:'labor',name:'',count:1,time:1,days:1,cost:'',markup:0}]});
+  await openWorkbook(page,data);
+  const dialog=page.getByRole('alertdialog');
+  await page.getByRole('button',{name:'Delete option 2',exact:true}).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('#rail .tab[data-sheet]')).toHaveCount(1);
+  await expect(page.locator('#title')).toHaveValue('North scope');
+  await page.keyboard.press('Control+z');
+  await expect(page.locator('#rail .tab[data-sheet]')).toHaveCount(2);
+  await page.locator('#rail [data-sheet="blank"]').click();
+  await page.locator('#sheetNotes').fill('Notes alone must count as content');
+  await page.getByRole('button',{name:'Delete option 2',exact:true}).click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('button',{name:'Cancel'})).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('#sheetNotes')).toHaveValue('Notes alone must count as content');
+  await page.getByRole('button',{name:'Delete option 1',exact:true}).click();
+  await dialog.getByRole('button',{name:'Cancel'}).click();
+  await expect(page.locator('#title')).toHaveValue('');
+  await page.getByRole('button',{name:'Delete option 1',exact:true}).click();
+  await dialog.getByRole('button',{name:'Delete',exact:true}).click();
+  await expect(page.locator('#title')).toHaveValue('');
+  await expect(page.locator('#rail [data-sheet="blank"]')).toHaveAttribute('aria-selected','true');
+  await page.locator('#workspace-estimate > summary').click();
+  await page.locator('#reset').click();
+  await expect(page.locator('#reset')).toHaveText('Reset sheet');
+  await expect(dialog).toContainText('Are you sure you want to reset this sheet?');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#sheetNotes')).toHaveValue('Notes alone must count as content');
+  await page.locator('#workspace-estimate > summary').click();
+  await page.locator('#reset').click();
+  await dialog.getByRole('button',{name:'Reset',exact:true}).click();
+  await expect(page.locator('#sheetNotes')).toHaveValue('');
+  await page.keyboard.press('Control+z');
+  await expect(page.locator('#sheetNotes')).toHaveValue('Notes alone must count as content');
+  await expect(page.getByRole('button',{name:'Delete option 1',exact:true})).toBeDisabled();
+});
+
+test('option tabs still reorder with separate close buttons', async ({page}) => {
+  const data=workbook();
+  data.lists[0].companies[0].projects[0].takeoffs[0].sheets.push(sheet('second','Second'),sheet('third','Third'));
+  await openWorkbook(page,data);
+  const source=await page.locator('#rail [data-sheet="third"]').boundingBox();
+  const target=await page.locator('#rail [data-sheet="sn"]').boundingBox();
+  await page.mouse.move(source.x+source.width/2,source.y+source.height/2);
+  await page.mouse.down();
+  await page.mouse.move(target.x+2,target.y+target.height/2,{steps:15});
+  await page.mouse.up();
+  expect(await page.locator('#rail .tab[data-sheet]').evaluateAll(tabs=>tabs.map(t=>t.dataset.sheet))).toEqual(['third','sn','second']);
+  await expect(page.locator('#rail .option-close')).toHaveCount(3);
+  await page.keyboard.press('Control+z');
+  expect(await page.locator('#rail .tab[data-sheet]').evaluateAll(tabs=>tabs.map(t=>t.dataset.sheet))).toEqual(['sn','second','third']);
 });
 
 test('Ctrl+Z and Ctrl+Y undo workbook edits, additions, deletions and editor drafts', async ({page}) => {
@@ -83,7 +142,8 @@ test('Ctrl+Z and Ctrl+Y undo workbook edits, additions, deletions and editor dra
   await expect(page.locator('#body tr[data-type="item"]')).toHaveCount(2);
   await page.locator('#duplicateSheet').click();
   await expect(page.locator('#rail [data-sheet]')).toHaveCount(2);
-  await page.locator('#deleteSheet').click(); await page.locator('#deleteSheet').click();
+  await page.getByRole('button',{name:'Delete option 2',exact:true}).click();
+  await page.getByRole('alertdialog').getByRole('button',{name:'Delete',exact:true}).click();
   await expect(page.locator('#rail [data-sheet]')).toHaveCount(1);
   await page.keyboard.press('Control+z');
   await expect(page.locator('#rail [data-sheet]')).toHaveCount(2);
@@ -430,7 +490,8 @@ test('projects show my current takeoff and page even when the hierarchy is colla
   await openWorkbook(page,data);
   await page.locator('#server-projects').click();
   const company = page.locator('[data-company="co"] > .p-head');
-  await expect(company.locator('.project-current-location')).toContainText('North job / North takeoff · Tab 1');
+  await expect(company).toHaveAttribute('title', /North job \/ North takeoff · Tab 1/);
+  await expect(page.locator('.project-current-location,.project-presence')).toHaveCount(0);
   await company.locator('.p-name').click();
   const north = page.locator('[data-project="north"] > .p-head');
   await expect(north).toHaveClass(/is-current-location/);
@@ -438,17 +499,17 @@ test('projects show my current takeoff and page even when the hierarchy is colla
   const takeoff = page.locator('[data-takeoff="tn"]');
   await expect(takeoff).toHaveAttribute('aria-current','location');
   await page.locator('#rail [data-sheet="sn2"]').click();
-  await expect(takeoff.locator('.project-current-location')).toHaveText('You are here · Tab 2');
+  await expect(takeoff).toHaveAttribute('title','You are here · Tab 2');
   await page.locator('#rail .tab-summary').click();
-  await expect(company.locator('.project-current-location')).toContainText('Summary');
+  await expect(company).toHaveAttribute('title', /Summary/);
   await page.locator('[data-project="south"] > .p-head > .p-name').click();
   await page.locator('[data-takeoff="ts"]').click();
   await expect(page.locator('[data-takeoff="ts"]')).toHaveAttribute('aria-current','location');
   await expect(takeoff).not.toHaveClass(/is-current-location/);
   await expect(north.locator('.project-current-location')).toHaveCount(0);
-  await expect(company.locator('.project-current-location')).toContainText('South job / South takeoff');
+  await expect(company).toHaveAttribute('title', /South job \/ South takeoff/);
   await page.locator('#projCollapse').click();
-  await expect(company.locator('.project-current-location')).toBeVisible();
+  await expect(company).toHaveClass(/has-location/);
 });
 
 test('project presence, tab highlights, collapse and recent views work for two users',async({page,browser,baseURL})=>{
@@ -467,10 +528,13 @@ test('project presence, tab highlights, collapse and recent views work for two u
     await expect(page.locator('#server-people .server-person')).toHaveAttribute('title',/Freedom Customer → North job → North takeoff → Tab 2/);
     await page.locator('#server-projects').click();
     await page.locator('[data-company="co"] > .p-head > .p-name').click();
-    await expect(page.locator('[data-project="north"] > .p-head.lvl2 .project-presence')).toContainText(other);
+    await expect(page.locator('[data-project="north"] > .p-head.lvl2')).toHaveAttribute('title',new RegExp(other));
+    await expect(page.locator('.project-presence,.project-current-location')).toHaveCount(0);
+    const peerColor=await page.locator('#server-people .server-person').evaluate(el=>el.style.getPropertyValue('--peer'));
+    expect(await page.locator('[data-project="north"] > .p-head.lvl2').evaluate(el=>el.style.getPropertyValue('--location-stripe'))).toContain(peerColor);
     await page.locator('#projCollapse').click();
     await expect(page.locator('#projBody [data-project]')).toHaveCount(0);
-    await expect(page.locator('[data-company="co"] > .p-head .project-presence')).toContainText(other);
+    await expect(page.locator('[data-company="co"] > .p-head')).toHaveAttribute('title',new RegExp(other));
     // Collapsing is personal and must not collapse the other user's hierarchy.
     await peer.locator('#server-projects').click();
     await peer.locator('[data-company="co"] > .p-head > .p-name').click();

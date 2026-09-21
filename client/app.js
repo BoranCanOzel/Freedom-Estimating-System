@@ -2,7 +2,7 @@ import * as Y from 'yjs';
 import { readBook, writeBook, validateBook } from '../shared/model.js';
 import './style.css';
 import { setupWorkspace } from './workspace.js';
-import { setupProjectPresence } from './project-presence.js';
+import { setupProjectPresence, peerColor } from './project-presence.js';
 import { resolveLocation } from '../shared/navigation.js';
 import { setupHistory } from './history.js';
 
@@ -253,8 +253,7 @@ class LiveProject {
     for (const {peer, same, cursor, field} of positions) {
       let nodes = this.peerNodes.get(peer.id);
       if (!nodes) {
-        let hash = 0; for (const c of peer.name) hash = (hash * 31 + c.charCodeAt(0)) | 0;
-        const color = `hsl(${Math.abs(hash) % 360} 65% 42%)`;
+        const color = peerColor(peer.name);
         nodes = {badge:element('span', peer.name, 'server-person'), cursor:element('div', '➤ ' + peer.name, 'server-cursor'), field:element('div', '', 'server-field')};
         nodes.badge.style.setProperty('--peer', color); nodes.cursor.style.color = color; nodes.field.style.borderColor = color;
         nodes.cursor.style.left = nodes.cursor.style.top = nodes.field.style.left = nodes.field.style.top = '0px';

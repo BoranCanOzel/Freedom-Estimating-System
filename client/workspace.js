@@ -81,7 +81,6 @@ export function setupWorkspace() {
   pageActions.setAttribute('aria-label', 'Current page actions');
   $('workspace-menus').after(pageActions);
   move('duplicateSheet', 'workspace-page-actions');
-  move('deleteSheet', 'workspace-page-actions');
   move('reset', 'workspace-option-actions');
   const excel = document.querySelector('.js-export');
   excel.textContent = 'Export estimate to Excel'; excel.dataset.ready = ''; $('workspace-excel').append(excel);
