@@ -1,7 +1,7 @@
 import express from 'express';
 import { createServer } from 'node:http';
 import { DatabaseSync } from 'node:sqlite';
-import { randomUUID, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { randomUUID, randomBytes, scryptSync, timingSafeEqual, createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync, renameSync, readdirSync, unlinkSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,7 +18,9 @@ const validId = id => /^[a-f0-9-]{36}$/.test(id);
 export function createApp(options = {}) {
   const production = options.production ?? process.env.NODE_ENV === 'production';
   const users = options.users ?? JSON.parse(process.env.APP_USERS || '{}');
-  if (production && !Object.keys(users).length) throw new Error('Production requires APP_USERS. See .env.example.');
+  const sitePasswordHash = options.sitePasswordHash ?? process.env.SITE_PASSWORD_HASH ?? '';
+  if (production && !sitePasswordHash && !Object.keys(users).length) throw new Error('Production requires SITE_PASSWORD_HASH or APP_USERS. See .env.example.');
+  if (sitePasswordHash && !/^scrypt:[a-f0-9]{32}:[a-f0-9]{64}$/.test(sitePasswordHash)) throw new Error('Invalid SITE_PASSWORD_HASH.');
   for (const hash of Object.values(users)) if (!/^scrypt:[a-f0-9]{32}:[a-f0-9]{64}$/.test(hash)) throw new Error('Invalid APP_USERS password hash. Use npm run password.');
   const dataDir = resolve(options.dataDir || process.env.DATA_DIR || join(root, 'data'));
   mkdirSync(join(dataDir, 'projects'), { recursive: true });
@@ -36,6 +38,12 @@ export function createApp(options = {}) {
       workbook_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE, name TEXT NOT NULL,
       project_id TEXT NOT NULL, list_id TEXT NOT NULL, takeoff_id TEXT NOT NULL, sheet_id TEXT NOT NULL,
       view TEXT NOT NULL, viewed_at TEXT NOT NULL, PRIMARY KEY(workbook_id,name,project_id));`);
+  db.exec('CREATE TABLE IF NOT EXISTS auth_configuration (id INTEGER PRIMARY KEY, fingerprint TEXT NOT NULL)');
+  const fingerprint = createHash('sha256').update(JSON.stringify([sitePasswordHash,users])).digest('hex');
+  if (db.prepare('SELECT fingerprint FROM auth_configuration WHERE id=1').get()?.fingerprint !== fingerprint) {
+    db.exec('DELETE FROM sessions');
+    db.prepare('INSERT OR REPLACE INTO auth_configuration VALUES (1,?)').run(fingerprint);
+  }
   const rooms = new Map(), loginAttempts = new Map();
   const app = express(), server = createServer(app);
   app.disable('x-powered-by');
@@ -57,7 +65,7 @@ export function createApp(options = {}) {
   function session(req) {
     const token = /(?:^|;\s*)freedom_session=([a-f0-9]+)/.exec(req.headers.cookie || '')?.[1];
     const found = token && db.prepare('SELECT name, token FROM sessions WHERE token=? AND expires>?').get(token, Date.now());
-    return found && (!Object.keys(users).length || Object.hasOwn(users, found.name)) ? found : null;
+    return found && (sitePasswordHash || !Object.keys(users).length || Object.hasOwn(users, found.name)) ? found : null;
   }
   const publicProject = row => {
     const { state, ...metadata } = row;
@@ -92,16 +100,17 @@ export function createApp(options = {}) {
     }
     return rooms.get(id);
   }
-  app.get('/api/session', (req, res) => res.json({ user: session(req)?.name || null, passwordRequired: Object.keys(users).length > 0 }));
+  app.get('/api/session', (req, res) => res.json({ user: session(req)?.name || null, passwordRequired: !!sitePasswordHash || Object.keys(users).length > 0 }));
   app.post('/api/login', (req, res) => {
     const ip = req.ip, recent = (loginAttempts.get(ip) || []).filter(t => Date.now() - t < 60000);
     if (recent.length >= 10) return res.status(429).json({ error: 'Too many attempts. Try again in a minute.' });
     recent.push(Date.now()); loginAttempts.set(ip, recent);
     const name = String(req.body.name || '').trim().slice(0, 80), password = String(req.body.password || '');
-    let allowed = name.length > 0 && !Object.keys(users).length;
-    if (Object.hasOwn(users, name)) {
-      const [, salt, hash] = users[name].split(':');
-      allowed = timingSafeEqual(scryptSync(password.slice(0, 1024), salt, 32), Buffer.from(hash, 'hex'));
+    let allowed = name.length > 0 && !sitePasswordHash && !Object.keys(users).length;
+    const credential = sitePasswordHash || (Object.hasOwn(users,name) ? users[name] : '');
+    if (credential) {
+      const [, salt, hash] = credential.split(':');
+      allowed = name.length > 0 && timingSafeEqual(scryptSync(password.slice(0, 1024), salt, 32), Buffer.from(hash, 'hex'));
     }
     if (!allowed) return res.status(401).json({ error: 'Incorrect name or password.' });
     const token = randomBytes(32).toString('hex');
@@ -195,8 +204,15 @@ export function createApp(options = {}) {
     doc.destroy();
   });
   app.use('/api', (_req, res) => res.status(404).json({error:'API route not found. Restart the Node project after deployment.'}));
-  app.get('/', (_req, res) => res.sendFile(join(root, 'index.html')));
-  app.use('/assets', express.static(join(root, 'dist')));
+  app.get('/', (req, res) => {
+    res.set('Cache-Control','no-store');
+    res.sendFile(join(root, session(req) ? 'index.html' : 'signin.html'));
+  });
+  app.use('/assets', (req,res,next) => {
+    res.set('Cache-Control','no-store');
+    if (!session(req)) return res.status(401).send('Please sign in.');
+    next();
+  }, express.static(join(root, 'dist')));
   app.get('/health', (_req, res) => res.json({ ok: true }));
   app.use((err, _req, res, _next) => {
     console.error(err.message);

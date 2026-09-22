@@ -29,6 +29,46 @@ async function openWorkbook(page, data = workbook(), name = 'Workspace tester') 
   await expect(page.locator('#server-status')).toHaveText('All changes saved', {timeout:20000});
 }
 
+test('new jobs detect addresses across customers and offer existing or new projects', async ({page}) => {
+  const data=workbook();
+  data.lists[0].companies.push({id:'other-customer',name:'Other Customer',projects:[
+    {id:'existing-job',name:'Existing job',address:'123 Main Street, Suite 4',takeoffs:[{id:'existing-takeoff',name:'Existing takeoff',sheets:[sheet('existing-sheet','Existing scope')]}]}
+  ]});
+  await openWorkbook(page,data);
+  const add=page.locator('[data-company="co"] > .p-head button[title="Add a project"]');
+  const editor=page.locator('#editor');
+  const dialog=page.getByRole('dialog',{name:'This address has already been added'});
+  await page.locator('#server-projects').click();
+  await add.click();
+  await editor.getByLabel('Project name',{exact:true}).fill('New job');
+  await editor.getByLabel('Address',{exact:true}).fill(' 123 MAIN ST. #4 ');
+  await page.locator('#edSave').click();
+  await expect(dialog).toContainText('Other Customer');
+  await expect(dialog).toContainText('Existing job');
+  await dialog.getByRole('button',{name:'Back',exact:true}).click();
+  await expect(editor.getByLabel('Project name',{exact:true})).toHaveValue('New job');
+  await page.locator('#edSave').click();
+  await dialog.getByRole('button',{name:'View existing project'}).click();
+  await expect(editor.getByLabel('Project name',{exact:true})).toHaveValue('Existing job');
+  await expect(page.locator('#title')).toHaveValue('Existing scope');
+  expect(await page.evaluate(()=>window.estimator.exportBook().lists[0].companies[0].projects.length)).toBe(2);
+  await page.locator('#edCancel').click();
+  await add.click();
+  await editor.getByLabel('Project name',{exact:true}).fill('Intentional duplicate');
+  await editor.getByLabel('Address',{exact:true}).fill('123 Main St Ste 4');
+  await page.locator('#edSave').click();
+  await dialog.getByRole('button',{name:'Create new project anyway'}).click();
+  await expect(editor).not.toBeVisible();
+  expect(await page.evaluate(()=>window.estimator.exportBook().lists[0].companies[0].projects.length)).toBe(3);
+  await add.click();
+  await editor.getByLabel('Project name',{exact:true}).fill('Different suite');
+  await editor.getByLabel('Address',{exact:true}).fill('123 Main St Suite 5');
+  await page.locator('#edSave').click();
+  await expect(editor).not.toBeVisible();
+  await expect(dialog).toHaveCount(0);
+  expect(await page.evaluate(()=>window.estimator.exportBook().lists[0].companies[0].projects.length)).toBe(4);
+});
+
 test('visible page actions duplicate a complete option and confirm deletion', async ({page}) => {
   const data = workbook();
   const source = data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0];
@@ -113,6 +153,8 @@ test('option tabs still reorder with separate close buttons', async ({page}) => 
   const data=workbook();
   data.lists[0].companies[0].projects[0].takeoffs[0].sheets.push(sheet('second','Second'),sheet('third','Third'));
   await openWorkbook(page,data);
+  const labels=page.locator('#rail .option-tab-label');
+  await expect(labels).toHaveText(['1 - North scope','2 - Second','3 - Third']);
   const source=await page.locator('#rail [data-sheet="third"]').boundingBox();
   const target=await page.locator('#rail [data-sheet="sn"]').boundingBox();
   await page.mouse.move(source.x+source.width/2,source.y+source.height/2);
@@ -121,8 +163,23 @@ test('option tabs still reorder with separate close buttons', async ({page}) => 
   await page.mouse.up();
   expect(await page.locator('#rail .tab[data-sheet]').evaluateAll(tabs=>tabs.map(t=>t.dataset.sheet))).toEqual(['third','sn','second']);
   await expect(page.locator('#rail .option-close')).toHaveCount(3);
+  await expect(labels).toHaveText(['1 - Third','2 - North scope','3 - Second']);
+  expect(await page.evaluate(() => window.estimator.exportBook().sheets.map(s=>s.num))).toEqual([1,2,3]);
   await page.keyboard.press('Control+z');
   expect(await page.locator('#rail .tab[data-sheet]').evaluateAll(tabs=>tabs.map(t=>t.dataset.sheet))).toEqual(['sn','second','third']);
+  await expect(labels).toHaveText(['1 - North scope','2 - Second','3 - Third']);
+  await page.keyboard.press('Control+y');
+  await expect(labels).toHaveText(['1 - Third','2 - North scope','3 - Second']);
+  await page.locator('#title').fill('Concrete cutting and removal throughout the entire building');
+  await expect(labels.nth(1)).toHaveText('2 - Concrete cutting and r…');
+  await expect(page.locator('#rail [data-sheet="sn"] .tab-tip')).toHaveText('Concrete cutting and removal throughout the entire building');
+  expect((await page.locator('#rail [data-sheet="sn"]').boundingBox()).width).toBeLessThanOrEqual(210);
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();
+  await expect(labels).toHaveText(['1 - Third','2 - Concrete cutting and r…','3 - Second']);
+  await page.getByRole('button',{name:'Delete option 1',exact:true}).click();
+  await page.getByRole('alertdialog').getByRole('button',{name:'Delete',exact:true}).click();
+  await expect(labels).toHaveText(['1 - Concrete cutting and r…','2 - Second']);
 });
 
 test('Ctrl+Z and Ctrl+Y undo workbook edits, additions, deletions and editor drafts', async ({page}) => {

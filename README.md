@@ -15,6 +15,8 @@ Open `http://localhost:3000`. In development, enter a display name. Open a secon
 
 This workspace also has an ignored portable Node runtime under `.tools` for local testing; it is not part of the deployment.
 
+To require a shared website password, set `SITE_PASSWORD_HASH` in the private `.env` file or hosting environment. It accepts the same scrypt hash format as account passwords and takes precedence over `APP_USERS`; people enter their own display name and the shared password. Restart the Node server after changing authentication settings. Existing sessions are invalidated when the password configuration changes. Signed-out visitors receive only the sign-in page; the estimator, its assets, data APIs, and WebSocket connections require authentication. Production requires either a shared password hash or configured password accounts. Keep `.env` private and configure the same hash separately on the deployed server.
+
 ## aaPanel deployment
 
 The site now needs a running Node process. Serving `index.html` as a static site does not provide shared storage or collaboration.

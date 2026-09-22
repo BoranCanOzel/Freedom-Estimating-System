@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sign in · Freedom Estimating</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#20282d;color:#edf0f2;font:15px system-ui,sans-serif;padding:24px}
+    main{width:100%;max-width:380px;padding:32px;background:#2b353c;border:1px solid #46535c;border-radius:12px;box-shadow:0 16px 48px #0004}h1{font-size:23px;margin:0 0 10px}p{color:#c2cbd1;line-height:1.5}label{display:block;margin:18px 0 6px}input,button{width:100%;padding:12px;border-radius:6px;font:inherit}input{border:1px solid #6f7f8a;background:#182127;color:white}button{margin-top:24px;border:0;background:#efa33d;color:#21180d;font-weight:600;cursor:pointer}button:disabled{opacity:.5}#server-login-error{color:#ffb4ae;min-height:1.5em;margin-bottom:0}[hidden]{display:none!important}:focus-visible{outline:2px solid #efa33d;outline-offset:3px}
+  </style>
+</head>
+<body>
+  <main id="server-login">
+    <h1>Freedom Estimating</h1>
+    <p id="server-login-hint">Sign in to view and edit estimates.</p>
+    <form id="server-login-form">
+      <label for="server-login-name">Your name</label>
+      <input id="server-login-name" name="username" autocomplete="username" required maxlength="80">
+      <div id="server-password-label">
+        <label for="server-login-password">Password</label>
+        <input id="server-login-password" name="password" type="password" autocomplete="current-password" required>
+      </div>
+      <button type="submit" disabled>Sign in</button>
+      <p id="server-login-error" role="alert"></p>
+    </form>
+  </main>
+  <script>
+    const form=document.getElementById('server-login-form'), button=form.querySelector('button');
+    const error=document.getElementById('server-login-error');
+    fetch('/api/session',{cache:'no-store'}).then(async response=>{
+      if (!response.ok) throw new Error('Unable to check sign-in. Reload to try again.');
+      const session=await response.json();
+      if (session.user) { location.reload(); return; }
+      document.getElementById('server-password-label').hidden=!session.passwordRequired;
+      document.getElementById('server-login-password').required=session.passwordRequired;
+      button.disabled=false;
+    }).catch(reason=>{error.textContent=reason.message;});
+    form.addEventListener('submit',async event=>{
+      event.preventDefault(); button.disabled=true; error.textContent='';
+      try {
+        const response=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:form.elements.username.value,password:form.elements.password.value})});
+        const result=await response.json();
+        if (!response.ok) throw new Error(result.error || 'Unable to sign in.');
+        location.reload();
+      } catch(reason) { error.textContent=reason.message; button.disabled=false; }
+    });
+  </script>
+</body>
+</html>

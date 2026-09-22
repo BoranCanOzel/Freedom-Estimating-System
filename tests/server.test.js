@@ -116,6 +116,43 @@ test('production refuses to start without accounts',()=>{
   assert.throws(()=>createApp({production:true,users:{}}),/APP_USERS/);
 });
 
+test('shared password gates the page, assets, reads, writes and old sessions',async()=>{
+  const dataDir=await mkdtemp(join(tmpdir(),'freedom-site-lock-'));
+  const salt='0123456789abcdef0123456789abcdef';
+  const password='shared-test-password';
+  const hash='scrypt:'+salt+':'+scryptSync(password,salt,32).toString('hex');
+  let app=createApp({dataDir,users:{},sitePasswordHash:'',production:false});
+  async function listen(){app.server.listen(0,'127.0.0.1');await once(app.server,'listening');return 'http://127.0.0.1:'+app.server.address().port;}
+  let base=await listen();
+  const login=async(name,password)=>fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,password})});
+  try {
+    const old=(await login('Previous visitor','')).headers.get('set-cookie').split(';')[0];
+    await app.close();
+    app=createApp({dataDir,users:{},sitePasswordHash:hash,production:false});base=await listen();
+    assert.equal((await fetch(base+'/api/session').then(r=>r.json())).passwordRequired,true);
+    assert.equal((await fetch(base+'/api/projects',{headers:{cookie:old}})).status,401);
+    const locked=await fetch(base+'/').then(r=>r.text());
+    assert.match(locked,/server-login-password/);assert.doesNotMatch(locked,/sheetCard|window.estimator/);
+    assert.equal((await fetch(base+'/assets/app.js')).status,401);
+    assert.equal((await fetch(base+'/api/projects')).status,401);
+    assert.equal((await fetch(base+'/api/projects',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).status,401);
+    assert.equal((await fetch(base+'/.env')).status,404);
+    for (const wrong of ['', 'wrong']) assert.equal((await login('Estimator',wrong)).status,401);
+    assert.equal((await login('',password)).status,401);
+    const signedIn=await login('Estimator',password);
+    assert.equal(signedIn.status,200);
+    const cookie=signedIn.headers.get('set-cookie').split(';')[0];
+    assert.equal((await fetch(base+'/api/projects',{headers:{cookie}})).status,200);
+    assert.match(await fetch(base+'/',{headers:{cookie}}).then(r=>r.text()),/sheetCard/);
+    const protectedPage=await fetch(base+'/',{headers:{cookie}});
+    await protectedPage.text();
+    assert.equal(protectedPage.headers.get('cache-control'),'no-store');
+    await fetch(base+'/api/logout',{method:'POST',headers:{cookie}});
+    assert.equal((await fetch(base+'/assets/app.js',{headers:{cookie}})).status,401);
+    assert.doesNotMatch(await fetch(base+'/',{headers:{cookie}}).then(r=>r.text()),/sheetCard/);
+  } finally {await app.close();await rm(dataDir,{recursive:true,force:true});}
+});
+
 test('password accounts reject bad credentials and cross-origin writes',async()=>{
   const dataDir=await mkdtemp(join(tmpdir(),'freedom-auth-'));
   const salt='0123456789abcdef0123456789abcdef';

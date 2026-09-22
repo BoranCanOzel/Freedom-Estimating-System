@@ -212,7 +212,8 @@
   }
   .tab:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
   .option-tab{display:flex;align-items:stretch;position:relative}
-  .option-tab>.tab{border-top-right-radius:0;padding-right:8px}
+  .option-tab>.tab{border-top-right-radius:0;padding-right:8px;min-width:0;max-width:210px}
+  .option-tab-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
   .option-close{border:1px solid var(--rule);border-left:0;border-bottom:0;border-radius:0 5px 0 0;background:var(--card);color:var(--muted);min-width:28px;padding:3px;font:18px var(--f-sans);cursor:pointer}
   .option-close:hover:not(:disabled){background:var(--calc);color:#c65a4f}
   .option-close:disabled{opacity:.3;cursor:default}
@@ -4600,7 +4601,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       const order = Array.from(document.querySelectorAll('#rail .tab'))
         .map(t => t.dataset.sheet).filter(Boolean);
       book.sheets.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
-      renderTabs();
+      showView();
       save();
     };
 
@@ -5528,6 +5529,8 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   const railEnd = () => document.getElementById('helpBtn') || document.getElementById('status');
 
   function renderTabs(){
+    // Option numbers describe their current position, never their creation order.
+    book.sheets.forEach((sh, i) => { sh.num = i + 1; });
     const rail = document.getElementById('rail');
     rail.querySelectorAll('.option-tab').forEach(el => el.remove());
     Array.from(rail.querySelectorAll('.tab')).forEach(el => el.remove());
@@ -5556,12 +5559,17 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       }
 
       const lab = document.createElement('span');
-      lab.textContent = sh.num;
+      lab.className = 'option-tab-label';
+      const scope = (sh.title || '').trim();
+      const titleChars = Array.from(scope.replace(/\s+/g, ' '));
+      const shortTitle = titleChars.length > 22 ? titleChars.slice(0, 22).join('').trimEnd() + '…' : titleChars.join('');
+      lab.textContent = sh.num + (shortTitle ? ' - ' + shortTitle : '');
+      t.setAttribute('aria-label', sh.num + (scope ? ' - ' + scope : ' - Untitled option'));
       t.appendChild(lab);
 
       const tip = document.createElement('span');
       tip.className = 'tab-tip';
-      const scope = (sh.title || '').trim();
+      tip.setAttribute('aria-hidden', 'true');
       tip.textContent = scope || 'Option ' + sh.num + ' — no scope written yet';
       t.appendChild(tip);
 
@@ -6610,7 +6618,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     book.sheets.forEach((sh, i) => {
       normalize(sh);
       if (!sh.id) sh.id = id();
-      if (!sh.num) sh.num = i + 1;
+      sh.num = i + 1;
     });
     if (!book.sheets.length) book.sheets = [seed(1)];
     projectTree();
@@ -6620,7 +6628,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         (tk.sheets || []).forEach((sh, i) => {
           normalize(sh);
           if (!sh.id) sh.id = id();
-          if (!sh.num) sh.num = i + 1;
+          sh.num = i + 1;
         });
       }))));
     activeTakeoff();
@@ -6670,6 +6678,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   document.getElementById('title').addEventListener('input', e => {
     state.title = e.target.value;
     grow(e.target);
+    renderTabs();
     save();
   });
 
@@ -9712,7 +9721,67 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
   document.getElementById('edClose').addEventListener('click', closeEditor);
   document.getElementById('edCancel').addEventListener('click', closeEditor);
-  document.getElementById('edSave').addEventListener('click', () => {
+  // Keep unit numbers: different suites at one street address are different jobs.
+  function addressKey(address){
+    const aliases = {street:'st',road:'rd',avenue:'ave',boulevard:'blvd',drive:'dr',
+      lane:'ln',court:'ct',place:'pl',highway:'hwy',north:'n',south:'s',east:'e',west:'w',
+      suite:'unit',ste:'unit',apartment:'unit',apt:'unit'};
+    return String(address || '').normalize('NFKC').toLowerCase().replace(/#/g, ' unit ')
+      .replace(/[.,]/g, ' ').trim().split(/\s+/).map(word => aliases[word] || word).join(' ');
+  }
+
+  function matchingJobAddresses(address){
+    const key = addressKey(address);
+    if (!key) return [];
+    return (book.lists || []).flatMap(list => (list.companies || []).flatMap(co =>
+      (co.projects || []).filter(pr => addressKey(pr.address) === key).map(pr => ({list, co, pr}))));
+  }
+
+  function chooseExistingJob(matches, onContinue){
+    const pop = document.createElement('dialog');
+    pop.className = 'confirm-pop';
+    pop.setAttribute('aria-labelledby', 'duplicate-address-title');
+    const heading = document.createElement('h2');
+    heading.id = 'duplicate-address-title';
+    heading.textContent = 'This address has already been added';
+    const msg = document.createElement('p');
+    msg.textContent = 'Would you like to view an existing project instead, or continue creating a new one?';
+    pop.append(heading, msg);
+    matches.forEach(({list, co, pr}) => {
+      const entry = document.createElement('p');
+      const label = document.createElement('div');
+      label.textContent = [list.name, co.name, pr.name, pr.address].filter(Boolean).join(' · ');
+      const open = document.createElement('button');
+      open.type = 'button'; open.className = 'btn alt'; open.textContent = 'View existing project';
+      open.addEventListener('click', () => {
+        pop.close(); closeEditor();
+        book.activeList = list.id;
+        co.collapsed = pr.collapsed = false;
+        document.getElementById('projSearch').value = '';
+        book.statusHidden = []; book.fieldPicks = {};
+        if (pr.takeoffs?.length) openTakeoff(pr.takeoffs[0].id);
+        else {
+          activeTakeoff();
+          state = book.sheets.find(sh => sh.id === book.active) || book.sheets[0];
+          showView(); renderProjects(); save();
+        }
+        openEditor('project', pr);
+      });
+      entry.append(label, open); pop.appendChild(entry);
+    });
+    const row = document.createElement('div'); row.className = 'cp-row';
+    const cancel = document.createElement('button');
+    cancel.type = 'button'; cancel.className = 'btn alt'; cancel.textContent = 'Back';
+    cancel.addEventListener('click', () => pop.close());
+    const proceed = document.createElement('button');
+    proceed.type = 'button'; proceed.className = 'btn'; proceed.textContent = 'Create new project anyway';
+    proceed.addEventListener('click', () => { pop.close(); onContinue(); });
+    row.append(cancel, proceed); pop.appendChild(row);
+    pop.addEventListener('close', () => pop.remove());
+    document.body.appendChild(pop); pop.showModal(); cancel.focus();
+  }
+
+  document.getElementById('edSave').addEventListener('click', function saveEditor(event, allowDuplicate = false){
     if (edMode === 'listopts'){
       closeEditor();
       renderProjects();
@@ -9729,6 +9798,13 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       return;
     }
     if (edMode === 'project'){
+      if (!prDraft.id && !allowDuplicate){
+        const matches = matchingJobAddresses(prDraft.address);
+        if (matches.length){
+          chooseExistingJob(matches, () => saveEditor(null, true));
+          return;
+        }
+      }
       const rec = Object.assign({}, prDraft, {id: prDraft.id || id()});
       rec.takeoffs = rec.takeoffs || [];
       const dest = projectTree().find(c => c.id === rec.companyId) || projectTree()[0];
