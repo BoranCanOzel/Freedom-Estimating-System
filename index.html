@@ -211,6 +211,8 @@
     box-shadow:inset 0 3px 0 var(--amber);
   }
   .tab:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+  #sheetTable tr.multi-row>td{box-shadow:inset 0 2px var(--amber),inset 0 -2px var(--amber);background:var(--calc)!important}
+  #sheetTable .multi-input{outline:2px solid var(--amber);outline-offset:-2px;background:var(--calc)!important}
   .option-tab{display:flex;align-items:stretch;position:relative}
   .option-tab>.tab{border-top-right-radius:0;padding-right:8px;min-width:0;max-width:210px}
   .option-tab-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
@@ -738,6 +740,19 @@
     font-family:var(--f-mono);font-size:9.5px;line-height:1.5;color:var(--faint);
   }
   .lib-foot b{color:var(--muted)}
+  .lib-create{border:1px solid var(--rule);border-radius:6px;background:var(--card);overflow:hidden}
+  .lib-create>summary{display:flex;justify-content:space-between;align-items:center;padding:11px 13px;cursor:pointer;font:600 13px var(--f-sans);color:var(--ink);list-style:none}
+  .lib-create>summary::-webkit-details-marker{display:none}
+  .lib-create[open]>summary{border-bottom:1px solid var(--rule)}
+  .lib-create[open]>summary span{transform:rotate(180deg)}
+  .lib-create-choices{display:grid;padding:4px}
+  #library .lib-create-choices button{display:grid;gap:3px;width:100%;text-align:left;padding:9px;border:0;border-radius:4px;background:transparent;color:var(--ink);cursor:pointer;font:12px var(--f-sans)}
+  #library .lib-create-choices button:hover{background:var(--calc)}
+  .lib-create-choices small{color:var(--muted);font-size:11px}
+  .lib-create :is(summary,button):focus-visible,.lib-save-existing>summary:focus-visible{outline:2px solid var(--amber);outline-offset:-2px}
+  .lib-save-existing{margin-top:10px}
+  .lib-save-existing>summary{cursor:pointer;color:var(--muted);font:12px var(--f-sans);padding:5px 0}
+  .lib-save-existing #libCapScope{margin:8px 0}
 
   .tpl{
     display:flex;align-items:center;gap:8px;padding:7px 8px;
@@ -3016,28 +3031,30 @@
       <div class="lib-list" id="libAll"></div>
     </div>
 
-    <div class="lib-block">
-      <div class="lib-title">Create</div>
-      <div class="lib-actions wrap">
-        <button type="button" class="btn alt tiny" id="libNew">+ Item</button>
-        <button type="button" class="btn alt tiny" id="libNewPart">+ Part</button>
-        <button type="button" class="btn alt tiny" id="libNewCon">+ Construct</button>
-        <button type="button" class="btn alt tiny" id="libNewSvc">+ Service</button>
-        <button type="button" class="btn alt tiny" id="libNewSec">+ Section</button>
-        <button type="button" class="btn alt tiny" id="libNewScope">+ Scope</button>
-        <button type="button" class="btn alt tiny" id="libCapScope">Save this option</button>
-      </div>
-
-      <div class="lib-cap">
-        <div class="lib-hint">Save a section from this option:</div>
+    <div class="lib-block" id="libCreateBlock">
+      <details class="lib-create" id="libCreate">
+        <summary>+ Create template <span aria-hidden="true">⌄</span></summary>
+        <div class="lib-create-choices">
+          <button type="button" id="libNew"><strong>Item</strong><small>A single estimating line</small></button>
+          <button type="button" id="libNewPart"><strong>Part</strong><small>A reusable component with a cost</small></button>
+          <button type="button" id="libNewCon"><strong>Construct</strong><small>An assembly of parts</small></button>
+          <button type="button" id="libNewSvc"><strong>Service</strong><small>A base service with add-ons</small></button>
+          <button type="button" id="libNewSec"><strong>Section</strong><small>A group of estimating lines</small></button>
+          <button type="button" id="libNewScope"><strong>Scope</strong><small>A reusable option layout</small></button>
+        </div>
+      </details>
+      <details class="lib-save-existing">
+        <summary>Save from this option</summary>
+        <button type="button" class="btn alt tiny" id="libCapScope">Save entire option</button>
+        <div class="lib-hint">Or choose a section:</div>
         <div class="lib-list" id="libCapture"></div>
-      </div>
+      </details>
     </div>
 
     </div>
 
   </div>
-  <div class="lib-foot">Drag a card onto the sheet to place it, or use <b>+</b> to add it at the end.</div>
+  <div class="lib-foot">Drag a template onto the sheet to place it.</div>
 </aside>
 
 <div id="libGhost" class="lib-ghost" hidden></div>
@@ -3570,20 +3587,9 @@
     const del = document.createElement('button');
     del.className = 'del';
     del.innerHTML = '&times;';
-    del.title = 'Remove this section — its line items stay';
-    del.setAttribute('aria-label','Remove this section. Line items inside it stay on the sheet.');
-    del.addEventListener('click', () => {
-      const block = blockOf(tr);
-      const foot = block[block.length - 1];
-      const gone = [tr.dataset.id];
-      if (foot !== tr && foot.dataset.type === 'sectionEnd'){ gone.push(foot.dataset.id); foot.remove(); }
-      state.rows = state.rows.filter(r => !gone.includes(r.id));
-      gone.forEach(g => refs.delete(g));
-      tr.remove();
-      renumber();
-      applyCollapse();
-      recalc();
-    });
+    del.title = 'Delete this section';
+    del.setAttribute('aria-label','Delete this section');
+    del.addEventListener('click', () => confirmSectionDeletion(state.id, row.id, del));
     tdDel.appendChild(del);
 
     tdItem.colSpan = 1 + leadKeys().length;   // Item through Cost, so long section names have room
@@ -3981,6 +3987,39 @@
     document.body.appendChild(pop);
     pop.showModal();
     no.focus();
+  }
+
+  function confirmSectionDeletion(sheetId, sectionId, anchor){
+    const pop = document.createElement('dialog');
+    pop.className = 'confirm-pop'; pop.setAttribute('aria-label', 'Delete section');
+    const heading = document.createElement('h2'); heading.textContent = 'Delete section';
+    const message = document.createElement('p');
+    message.textContent = 'Do you want to delete the items under this section as well? Deleting everything also removes any subsections inside it.';
+    const actions = document.createElement('div'); actions.className = 'cp-row'; actions.style.flexWrap = 'wrap';
+    const remove = includeItems => {
+      const sheet = book.sheets.find(sh => sh.id === sheetId);
+      const start = sheet?.rows.findIndex(r => r.id === sectionId && r.type === 'section');
+      if (start == null || start < 0) return;
+      const end = sectionEndIndex(sheet.rows, start);
+      if (includeItems) sheet.rows.splice(start, end - start + 1);
+      else {
+        if (sheet.rows[end]?.type === 'sectionEnd') sheet.rows.splice(end, 1);
+        sheet.rows.splice(start, 1);
+      }
+      if (state.id === sheetId){ state = sheet; renderAll(); }
+      save();
+    };
+    const button = (label, action, danger = false) => {
+      const b = document.createElement('button'); b.type = 'button';
+      b.className = danger ? 'btn danger' : 'btn alt'; b.textContent = label;
+      b.addEventListener('click', () => { pop.close(); action?.(); });
+      actions.appendChild(b); return b;
+    };
+    const cancel = button('Cancel');
+    button('Keep items', () => remove(false));
+    button('Delete section and items', () => remove(true), true);
+    pop.addEventListener('close', () => { pop.remove(); if (anchor.isConnected) anchor.focus(); });
+    pop.append(heading,message,actions); document.body.appendChild(pop); pop.showModal(); cancel.focus();
   }
 
   function colKill(group, item, name){
@@ -5750,6 +5789,23 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     applyZoom();
     renderStickies();
     const hit = findTakeoff(book.activeTakeoff);
+    let empty = document.getElementById('emptyTakeoff');
+    if (!empty){
+      empty = document.createElement('div'); empty.id = 'emptyTakeoff'; empty.className = 'card';
+      empty.style.padding = '32px';
+      empty.textContent = 'No takeoff selected. Open Projects to add a company, project, and takeoff.';
+      document.getElementById('sheetCard').before(empty);
+    }
+    empty.hidden = !!hit;
+    document.getElementById('rail').hidden = !hit;
+    const pageActions = document.getElementById('workspace-page-actions');
+    if (pageActions) pageActions.hidden = !hit;
+    if (!hit){
+      ['sheetCard','summaryCard','scopesCard','loadCard','wageCard','libToggle'].forEach(id => document.getElementById(id).hidden = true);
+      document.body.classList.remove('lib-open');
+      document.dispatchEvent(new CustomEvent('estimator:view', {detail:{view:'empty'}}));
+      return;
+    }
     if (hit) hit.tk.active = book.active;
     const known = ['summary','scopes','load','wage'];
     const v = known.indexOf(book.view) >= 0 ? book.view : 'sheet';
@@ -6085,6 +6141,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   }
 
   function renderAll(){
+    clearMultiSelection();
     clearSheetDropPreview(false);
     applyHiddenCols();
     renderColumnHeaders();
@@ -6222,6 +6279,47 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   scroller.addEventListener('scroll', () => {
     if (!grandFrame && num(state.roundTotal)) grandFrame = requestAnimationFrame(() => { grandFrame = 0; placeGrandTab(); });
   }, {passive:true});
+  const selectedLineIds = new Set();
+  const selectedInputs = new Set();
+  let copyingSelectedInput = false;
+  function clearMultiSelection(){
+    selectedLineIds.clear(); selectedInputs.clear();
+    document.querySelectorAll('.multi-row,.multi-input').forEach(el => el.classList.remove('multi-row','multi-input'));
+  }
+  body.addEventListener('pointerdown', event => {
+    const row = event.target.closest('tr[data-type="item"]');
+    const input = event.target.closest('input:not([type=checkbox]):not([type=file]),textarea');
+    if (event.ctrlKey || event.metaKey){
+      if (!row) return;
+      if (input && !input.readOnly && !input.disabled){
+        selectedLineIds.clear(); body.querySelectorAll('.multi-row').forEach(el => el.classList.remove('multi-row'));
+        if (selectedInputs.has(input)) selectedInputs.delete(input); else selectedInputs.add(input);
+        input.classList.toggle('multi-input',selectedInputs.has(input));
+        event.preventDefault(); event.stopPropagation(); input.focus(); input.select();
+      } else if (!event.target.closest('button:not(.grip),select,a')){
+        selectedInputs.clear(); body.querySelectorAll('.multi-input').forEach(el => el.classList.remove('multi-input'));
+        const id = row.dataset.id;
+        if (selectedLineIds.has(id)) selectedLineIds.delete(id); else selectedLineIds.add(id);
+        row.classList.toggle('multi-row',selectedLineIds.has(id));
+        event.preventDefault(); event.stopPropagation();
+      }
+    } else if (!(input && selectedInputs.has(input)) && !selectedLineIds.has(row?.dataset.id)) clearMultiSelection();
+  }, true);
+  body.addEventListener('input', event => {
+    if (copyingSelectedInput || event.isComposing || !selectedInputs.has(event.target)) return;
+    copyingSelectedInput = true;
+    try {
+      for (const input of selectedInputs){
+        if (input === event.target || !input.isConnected) continue;
+        input.value = event.target.value;
+        input.dispatchEvent(new Event('input',{bubbles:true}));
+      }
+    } finally { copyingSelectedInput = false; }
+  });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') clearMultiSelection(); });
+  document.addEventListener('pointerdown', event => {
+    if (!body.contains(event.target)) clearMultiSelection();
+  });
   let drag = null;
   let sheetDropPreview = null;
 
@@ -6310,7 +6408,8 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     if (e.button > 0) return;
     e.preventDefault();
     grip.focus({preventScroll:true});
-    const block = blockOf(tr);
+    const block = selectedLineIds.has(tr.dataset.id)
+      ? Array.from(body.children).filter(el => selectedLineIds.has(el.dataset.id)) : blockOf(tr);
     drag = {tr, block, sourceId:state.id, y:e.clientY, x:e.clientX, target:null,
       previewRows:previewCopies(block.map(el => rowById(el.dataset.id)))};
     drag.block.forEach(el => el.classList.add('dragging'));
@@ -6453,8 +6552,9 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       return;
     }
     if (toLib !== null){
-      const rowObj = rowById(block[0].dataset.id);
-      if (rowObj) saveRowAsTemplate(rowObj, toLib);
+      const rows = block.map(el => rowById(el.dataset.id)).filter(Boolean);
+      if (rows[0]?.type === 'section') saveRowAsTemplate(rows[0], toLib);
+      else rows.forEach(row => saveRowAsTemplate(row, toLib));
       return;
     }
 
@@ -7088,7 +7188,10 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     const rm = document.createElement('button');
     rm.type = 'button'; rm.className = 'tpl-btn rm'; rm.innerHTML = '&times;';
     rm.title = 'Delete this template';
-    rm.addEventListener('click', e => { e.stopPropagation(); onRemove(); });
+    rm.addEventListener('click', e => {
+      e.stopPropagation();
+      confirmPop(rm, 'Delete the template "' + (t.name || 'Untitled') + '"?', onRemove, 'Delete');
+    });
 
     el.append(edit, duplicate, rm);
     el.addEventListener('pointerdown', e => {
@@ -7790,11 +7893,13 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         else flash(warning, true);
         return;
       }
-      lib.folders = lib.folders.filter(fd => fd !== path);
-      book.folders = lib.folders;
-      if (underFolder(libPath, path)) libPath = parentFolder(path);
-      renderLibrary();
-      save();
+      confirmPop(x, 'Delete the folder "' + path + '"?', () => {
+        lib.folders = lib.folders.filter(fd => fd !== path);
+        book.folders = lib.folders;
+        if (underFolder(libPath, path)) libPath = parentFolder(path);
+        renderLibrary();
+        save();
+      }, 'Delete');
     });
 
     head.append(rename, x);
@@ -9945,6 +10050,20 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     flash('template saved');
   });
 
+  const libraryCreate = document.getElementById('libCreate');
+  document.getElementById('libTemplates').prepend(document.getElementById('libCreateBlock'));
+  libraryCreate.addEventListener('click', event => {
+    if (event.target.closest('button')) libraryCreate.open = false;
+  });
+  libraryCreate.addEventListener('keydown', event => {
+    if (event.key === 'Escape'){
+      event.preventDefault(); event.stopPropagation();
+      libraryCreate.open = false; libraryCreate.querySelector('summary').focus();
+    }
+  });
+  document.addEventListener('click', event => {
+    if (!libraryCreate.contains(event.target)) libraryCreate.open = false;
+  });
   document.getElementById('libNew').addEventListener('click', () => openEditor('item', null));
   document.getElementById('libNewPart').addEventListener('click', () => openEditor('part', null));
   document.getElementById('libNewCon').addEventListener('click', () => openEditor('construct', null));
@@ -10838,11 +10957,13 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       x.title = 'Delete this folder — its subtypes move to Unfiled';
       x.addEventListener('click', ev => {
         ev.stopPropagation();
-        const under = f => f === kid.path || String(f).indexOf(kid.path + '/') === 0;
-        catalog().folders = catalog().folders.filter(f => !under(f));
-        catalog().subtypes.forEach(t => { if (under(t.folder || '')) t.folder = ''; });
-        renderCatalog();
-        save();
+        confirmPop(x, 'Delete the folder "' + kid.path + '"? Its subtypes will move to Unfiled.', () => {
+          const under = f => f === kid.path || String(f).indexOf(kid.path + '/') === 0;
+          catalog().folders = catalog().folders.filter(f => !under(f));
+          catalog().subtypes.forEach(t => { if (under(t.folder || '')) t.folder = ''; });
+          renderCatalog();
+          save();
+        }, 'Delete');
       });
       head.appendChild(x);
       box.appendChild(head);
@@ -10930,9 +11051,10 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
   // every takeoff owns a workbook of options; book.sheets points at the open one
   function projectTree(){
+    const legacy = !Array.isArray(book.lists) || !book.lists.length;
     const list = activeList();
     book.companies = list.companies;
-    if (!Array.isArray(book.companies) || !book.companies.length){
+    if (legacy && !book.companies.length){
       const tk = {id:id(), name:'Takeoff 1', note:'', custom:{},
                   sheets: book.sheets && book.sheets.length ? book.sheets : [seed(1)]};
       tk.active = tk.sheets[0].id;
@@ -10963,7 +11085,13 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       eachTakeoff((tk, pr, co) => { if (!hit) hit = {tk, pr, co}; });
       if (hit) book.activeTakeoff = hit.tk.id;
     }
-    if (!hit) return null;
+    if (!hit){
+      book.activeTakeoff = null;
+      book.active = null;
+      book.sheets = [seed(1)];
+      state = book.sheets[0];
+      return null;
+    }
     const tk = hit.tk;
     if (!Array.isArray(tk.sheets) || !tk.sheets.length){
       tk.sheets = [seed(1)];
@@ -10972,6 +11100,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     book.sheets = tk.sheets;              // the workbook the app edits
     if (!tk.sheets.some(x => x.id === tk.active)) tk.active = tk.sheets[0].id;
     book.active = tk.active;
+    state = book.sheets.find(sh => sh.id === book.active) || book.sheets[0];
     return hit;
   }
 
@@ -11040,12 +11169,17 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         edBtn('&#9998;', 'Edit this company', e => { e.stopPropagation(); openEditor('company', co); }, 'p-btn'),
         edBtn('&times;', 'Delete this company', e => {
           e.stopPropagation();
-          confirmPop(ch, 'Delete "' + (co.name || 'company') + '" and everything under it?', () => {
-            activeList().companies.splice(book.companies.findIndex(x => x.id === co.id), 1);
+          confirmPop(ch, 'Delete "' + (co.name || 'company') + '" and all its projects and takeoffs?', () => {
+            const companies = activeList().companies;
+            const at = companies.findIndex(x => x.id === co.id);
+            if (at < 0) return;
+            companies.splice(at, 1);
+            closeEditor();
             activeTakeoff();
             renderProjects();
+            showView();
             save();
-          });
+          }, 'Delete');
         }, 'p-btn rm')
       );
       cw.appendChild(ch);
@@ -11070,19 +11204,8 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
           ph.append(
             edBtn('+', 'Add a takeoff', e => { e.stopPropagation(); openEditor('takeoff', {projectId:pr.id}); }, 'p-btn'),
             edBtn('&#9998;', 'Edit this project', e => { e.stopPropagation(); openEditor('project', pr); }, 'p-btn'),
-            edBtn('&#10697;', 'Duplicate this project', e => {
-              e.stopPropagation();
-              const copy = JSON.parse(JSON.stringify(pr));
-              copy.id = id();
-              copy.name = (pr.name || 'Project') + ' copy';
-              (copy.takeoffs || []).forEach(tk => {
-                tk.id = id();
-                (tk.sheets || []).forEach(sh => { sh.id = id(); });
-                tk.active = tk.sheets && tk.sheets[0] ? tk.sheets[0].id : null;
-              });
-              co.projects.push(copy);
-              renderProjects();
-              save();
+            edBtn('&#8644;', 'Move or copy this project', e => {
+              e.stopPropagation(); moveOrCopy('project', pr.id);
             }, 'p-btn'),
             edBtn('&times;', 'Delete this project', e => {
               e.stopPropagation();
@@ -11090,6 +11213,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
                 co.projects = co.projects.filter(x => x.id !== pr.id);
                 activeTakeoff();
                 renderProjects();
+                showView();
                 save();
               });
             }, 'p-btn rm')
@@ -11114,16 +11238,8 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
               });
               th.append(
                 edBtn('&#9998;', 'Edit this takeoff', e => { e.stopPropagation(); openEditor('takeoff', tk); }, 'p-btn'),
-                edBtn('&#10697;', 'Duplicate this takeoff', e => {
-                  e.stopPropagation();
-                  const copy = JSON.parse(JSON.stringify(tk));
-                  copy.id = id();
-                  copy.name = (tk.name || 'Takeoff') + ' copy';
-                  (copy.sheets || []).forEach(sh => { sh.id = id(); });
-                  copy.active = copy.sheets && copy.sheets[0] ? copy.sheets[0].id : null;
-                  pr.takeoffs.push(copy);
-                  renderProjects();
-                  save();
+                edBtn('&#8644;', 'Move or copy this takeoff', e => {
+                  e.stopPropagation(); moveOrCopy('takeoff', tk.id);
                 }, 'p-btn'),
                 edBtn('&times;', 'Delete this takeoff', e => {
                   e.stopPropagation();
@@ -11156,6 +11272,102 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       if (actions.children.length) head.append(actions);
     }
     document.dispatchEvent(new Event('estimator:projects'));
+  }
+
+  function copyProjectRecord(source){
+    const copy = structuredClone(source), ids = new Map();
+    function renew(value){
+      if (!value || typeof value !== 'object') return;
+      if (value.id){
+        if (!ids.has(value.id)) ids.set(value.id, id());
+        value.id = ids.get(value.id);
+      }
+      Object.values(value).forEach(renew);
+    }
+    function remap(value){
+      if (!value || typeof value !== 'object') return;
+      for (const key of Object.keys(value)){
+        if (['sid','active'].includes(key) && ids.has(value[key])) value[key] = ids.get(value[key]);
+        remap(value[key]);
+        if (ids.has(key)){ value[ids.get(key)] = value[key]; delete value[key]; }
+      }
+    }
+    renew(copy); remap(copy);
+    return copy;
+  }
+
+  function moveOrCopy(kind, sourceId){
+    const isProject = kind === 'project';
+    const locate = () => {
+      for (const co of projectTree()) for (const pr of co.projects || []){
+        if (isProject && pr.id === sourceId) return {co, pr, source:pr, parent:co};
+        const tk = (pr.takeoffs || []).find(t => t.id === sourceId);
+        if (!isProject && tk) return {co, pr, source:tk, parent:pr};
+      }
+    };
+    const initial = locate();
+    if (!initial) return;
+    const pop = document.createElement('dialog');
+    pop.className = 'confirm-pop'; pop.setAttribute('aria-label', 'Move or copy ' + kind);
+    const heading = document.createElement('h2');
+    heading.textContent = 'Move or copy ' + kind;
+    const description = document.createElement('p'); description.textContent = initial.source.name || 'Untitled ' + kind;
+    const field = (name, select) => {
+      const label = document.createElement('label'); label.className = 'ed-f';
+      label.append(document.createTextNode(name), select); pop.appendChild(label);
+      select.setAttribute('aria-label', name);
+      select.className = 'ed-select';
+    };
+    pop.append(heading, description);
+    const action = document.createElement('select');
+    [['duplicate','Duplicate here'],['move','Move to…'],['copy','Copy to…']].forEach(([value,label]) => action.add(new Option(label,value)));
+    field('Action', action);
+    const company = document.createElement('select');
+    projectTree().forEach(co => company.add(new Option(co.name || 'Untitled company',co.id)));
+    company.value = initial.co.id; field('Destination company', company);
+    const project = document.createElement('select'); field('Destination project', project);
+    const error = document.createElement('p'); error.setAttribute('role','alert'); pop.appendChild(error);
+    const row = document.createElement('div'); row.className = 'cp-row';
+    const cancel = document.createElement('button'); cancel.type='button'; cancel.className='btn alt'; cancel.textContent='Cancel';
+    const apply = document.createElement('button'); apply.type='button'; apply.className='btn';
+    row.append(cancel,apply); pop.appendChild(row);
+    const update = () => {
+      const duplicate = action.value === 'duplicate';
+      company.parentElement.hidden = duplicate;
+      project.parentElement.hidden = duplicate || isProject;
+      const dest = isProject ? company.value : project.value;
+      apply.textContent = duplicate ? 'Duplicate' : action.value === 'move' ? 'Move' : 'Copy';
+      apply.disabled = !duplicate && (!dest || (action.value === 'move' && dest === initial.parent.id));
+      error.textContent = !duplicate && !isProject && !project.value ? 'This company has no projects. Add a project there first.' : '';
+    };
+    const projects = () => {
+      project.replaceChildren();
+      (projectTree().find(co => co.id === company.value)?.projects || []).forEach(pr => project.add(new Option(pr.name || 'Untitled project',pr.id)));
+      if (company.value === initial.co.id) project.value = initial.pr.id;
+      update();
+    };
+    company.addEventListener('change', projects); action.addEventListener('change', update); project.addEventListener('change',update);
+    cancel.addEventListener('click', () => pop.close());
+    apply.addEventListener('click', () => {
+      const hit = locate(), duplicate = action.value === 'duplicate';
+      const co = duplicate ? hit?.co : projectTree().find(c => c.id === company.value);
+      const dest = isProject ? co : duplicate ? hit?.pr : co?.projects?.find(p => p.id === project.value);
+      if (!hit || !dest){ error.textContent = 'The source or destination changed. Close this window and try again.'; return; }
+      const key = isProject ? 'projects' : 'takeoffs';
+      if (action.value === 'move' && dest.id === hit.parent.id) return;
+      const record = action.value === 'move' ? hit.source : copyProjectRecord(hit.source);
+      if (action.value !== 'move'){
+        const base = (hit.source.name || kind) + ' copy';
+        record.name = base;
+        for (let n=2; (dest[key] || []).some(r => r.name === record.name); n++) record.name = base + ' ' + n;
+      } else hit.parent[key] = hit.parent[key].filter(r => r.id !== sourceId);
+      dest[key] ||= []; dest[key].push(record);
+      co.collapsed = false; dest.collapsed = false;
+      pop.close(); renderProjects(); showView(); save();
+      flash(kind + (action.value === 'move' ? ' moved' : ' copied'));
+    });
+    pop.addEventListener('close', () => pop.remove());
+    projects(); document.body.appendChild(pop); pop.showModal(); action.focus();
   }
 
   // drag a project onto a company, or a takeoff onto a project

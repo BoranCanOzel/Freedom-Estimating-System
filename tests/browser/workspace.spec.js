@@ -29,6 +29,171 @@ async function openWorkbook(page, data = workbook(), name = 'Workspace tester') 
   await expect(page.locator('#server-status')).toHaveText('All changes saved', {timeout:20000});
 }
 
+test('Ctrl selection edits multiple fields and drags nonadjacent items together', async ({page}) => {
+  const data=workbook();
+  data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0].rows=['a','b','c','d'].map(id=>({id,kind:'labor',name:id,count:1,time:1,days:1,cost:10}));
+  await openWorkbook(page,data);
+  const row=id=>page.locator('#body tr[data-id="'+id+'"]');
+  const first=row('a').locator('.name-in'), third=row('c').locator('.name-in');
+  await first.click({modifiers:['Control']});
+  await third.click({modifiers:['Control']});
+  await third.fill('Shared name');
+  await expect(first).toHaveValue('Shared name');
+  await expect(row('b').locator('.name-in')).toHaveValue('b');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.multi-input')).toHaveCount(0);
+  const costA=row('a').getByRole('textbox',{name:'cost',exact:true}), costC=row('c').getByRole('textbox',{name:'cost',exact:true});
+  await costA.click({modifiers:['Control']});
+  await costC.click({modifiers:['Control']});
+  await costC.fill('45');
+  await expect(costA).toHaveValue('45');
+  await page.keyboard.press('Control+z');
+  await expect(costA).toHaveValue(/^10(?:\.00)?$/);
+  await expect(costC).toHaveValue(/^10(?:\.00)?$/);
+  await page.keyboard.press('Control+y');
+  await expect(costA).toHaveValue(/^45(?:\.00)?$/);
+  await expect(costC).toHaveValue(/^45(?:\.00)?$/);
+  await page.keyboard.press('Escape');
+  await row('a').locator('.grip').click({modifiers:['Control']});
+  await row('c').locator('.grip').click({modifiers:['Control']});
+  await expect(page.locator('#body .multi-row')).toHaveCount(2);
+  const from=await row('a').locator('.grip').boundingBox(), to=await row('d').boundingBox();
+  await page.mouse.move(from.x+from.width/2,from.y+from.height/2); await page.mouse.down();
+  await page.mouse.move(to.x+80,to.y+to.height*.8,{steps:12}); await page.mouse.up();
+  expect(await page.evaluate(()=>window.estimator.exportBook().sheets[0].rows.map(r=>r.id))).toEqual(['b','d','a','c']);
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();
+  await expect(row('a').locator('.name-in')).toHaveValue('Shared name');
+  expect(await page.evaluate(()=>window.estimator.exportBook().sheets[0].rows.map(r=>r.id))).toEqual(['b','d','a','c']);
+});
+
+test('section deletion offers keeping items or deleting the complete nested section', async ({page}) => {
+  const data=workbook();
+  const sh=data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0];
+  const item=id=>({id,kind:'labor',name:id,count:1,time:1,days:1,cost:10});
+  sh.rows=[item('before'),{id:'parent',type:'section',name:'Parent'},item('inside'),
+    {id:'child',type:'section',name:'Child'},item('nested'),{id:'child-end',type:'sectionEnd',sid:'child'},
+    {id:'parent-end',type:'sectionEnd',sid:'parent'},item('after')];
+  await openWorkbook(page,data);
+  const remove=()=>page.locator('#body tr[data-id="parent"]').getByRole('button',{name:'Delete this section',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'Delete section',exact:true});
+  const ids=()=>page.evaluate(()=>window.estimator.exportBook().sheets[0].rows.map(r=>r.id));
+  await remove();
+  await expect(dialog).toContainText('Do you want to delete the items under this section as well?');
+  await expect(dialog.getByRole('button',{name:'Cancel',exact:true})).toBeFocused();
+  await page.keyboard.press('Escape');
+  expect(await ids()).toEqual(sh.rows.map(r=>r.id));
+  await remove();
+  await dialog.getByRole('button',{name:'Keep items',exact:true}).click();
+  expect(await ids()).toEqual(['before','inside','child','nested','child-end','after']);
+  await page.keyboard.press('Control+z');
+  expect(await ids()).toEqual(sh.rows.map(r=>r.id));
+  await remove();
+  await dialog.getByRole('button',{name:'Delete section and items',exact:true}).click();
+  expect(await ids()).toEqual(['before','after']);
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();
+  await expect(page.locator('#title')).toHaveValue('North scope');
+  expect(await ids()).toEqual(['before','after']);
+});
+
+test('company deletion confirms, switches active takeoffs, and preserves an empty list', async ({page}) => {
+  const data=workbook();
+  data.lists[0].companies.push({id:'remaining',name:'Remaining customer',projects:[{id:'remaining-project',name:'Other job',takeoffs:[{id:'remaining-takeoff',name:'Other takeoff',sheets:[sheet('remaining-sheet','Remaining scope')]}]}]});
+  await openWorkbook(page,data); await page.locator('#server-projects').click();
+  await page.locator('#addCompany').click();
+  await page.locator('#editor').getByLabel('Company name',{exact:true}).fill('New empty company');
+  await page.locator('#edSave').click();
+  const added=page.locator('.p-co').filter({has:page.getByText('New empty company',{exact:true})});
+  const dialog=page.getByRole('alertdialog');
+  await added.getByTitle('Delete this company',{exact:true}).click();
+  await expect(dialog).toContainText('all its projects and takeoffs');
+  await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
+  await expect(added).toBeVisible();
+  await added.getByTitle('Delete this company',{exact:true}).click();
+  await dialog.getByRole('button',{name:'Delete',exact:true}).click();
+  await expect(added).toHaveCount(0);
+  await page.locator('[data-company="co"]').getByTitle('Delete this company',{exact:true}).click();
+  await dialog.getByRole('button',{name:'Delete',exact:true}).click();
+  await expect(page.locator('#title')).toHaveValue('Remaining scope');
+  expect(await page.evaluate(()=>window.estimator.exportBook().lists[0].companies.map(c=>c.id))).toEqual(['remaining']);
+  await page.locator('[data-company="remaining"]').getByTitle('Delete this company',{exact:true}).click();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-company="remaining"]')).toBeVisible();
+  await page.locator('[data-company="remaining"]').getByTitle('Delete this company',{exact:true}).click();
+  await dialog.getByRole('button',{name:'Delete',exact:true}).click();
+  await expect(page.locator('#emptyTakeoff')).toBeVisible();
+  await expect(page.locator('#sheetCard')).not.toBeVisible();
+  expect(await page.evaluate(()=>window.estimator.exportBook().lists[0].companies)).toEqual([]);
+  await page.keyboard.press('Control+z');
+  await expect(page.locator('#title')).toHaveValue('Remaining scope');
+  await page.keyboard.press('Control+y');
+  await expect(page.locator('#emptyTakeoff')).toBeVisible();
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();
+  await expect(page.locator('#emptyTakeoff')).toBeVisible();
+  expect(await page.evaluate(()=>window.estimator.exportBook().lists[0].companies)).toEqual([]);
+});
+
+test('projects and takeoffs can duplicate, move and copy between customers', async ({page}) => {
+  const data=workbook();
+  data.lists[0].companies[0].collapsed=false;
+  data.lists[0].companies[0].projects[0].collapsed=false;
+  data.lists[0].companies.push({id:'dest-co',name:'Destination customer',projects:[{id:'dest-pr',name:'Destination job',takeoffs:[]}]});
+  const original=data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0];
+  original.units=[{id:'area',label:'SF',qty:50}];
+  original.rows=[{id:'sec',type:'section',name:'Section',units:{area:{qty:20}}},...original.rows,{id:'end',type:'sectionEnd',sid:'sec'}];
+  await openWorkbook(page,data); await page.locator('#server-projects').click();
+  await page.locator('[data-company="co"] > .p-head > .p-name').click();
+  await page.locator('[data-project="north"] > .p-head > .p-name').click();
+  const dialog=page.getByRole('dialog',{name:'Move or copy project',exact:true});
+  const projectAction=page.locator('[data-project="north"] > .p-head').getByTitle('Move or copy this project');
+  await expect(page.getByTitle('Duplicate this project',{exact:true})).toHaveCount(0);
+  await projectAction.click();
+  await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
+  await projectAction.click();
+  await dialog.getByRole('button',{name:'Duplicate',exact:true}).click();
+  let companies=await page.evaluate(()=>window.estimator.exportBook().lists[0].companies);
+  const copied=companies[0].projects.find(p=>p.name==='North job copy').takeoffs[0];
+  expect(copied.id).not.toBe('tn');
+  expect(copied.active).toBe(copied.sheets[0].id);
+  expect(copied.sheets[0].rows[2].sid).toBe(copied.sheets[0].rows[0].id);
+  expect(copied.sheets[0].rows[0].units[copied.sheets[0].units[0].id]).toEqual({qty:20});
+  await projectAction.click();
+  await dialog.getByLabel('Action',{exact:true}).selectOption('copy');
+  await dialog.getByLabel('Destination company').selectOption('dest-co');
+  await dialog.getByRole('button',{name:'Copy',exact:true}).click();
+  await projectAction.click();
+  await dialog.getByLabel('Action',{exact:true}).selectOption('move');
+  await expect(dialog.getByRole('button',{name:'Move',exact:true})).toBeDisabled();
+  await dialog.getByLabel('Destination company').selectOption('dest-co');
+  await dialog.getByRole('button',{name:'Move',exact:true}).click();
+  companies=await page.evaluate(()=>window.estimator.exportBook().lists[0].companies);
+  expect(companies[0].projects.some(p=>p.id==='north')).toBe(false);
+  expect(companies[1].projects.map(p=>p.name)).toEqual(['Destination job','North job copy','North job']);
+  await page.keyboard.press('Control+z');
+  await expect(page.locator('[data-company="co"] [data-project="north"]')).toHaveCount(1);
+  const takeoffDialog=page.getByRole('dialog',{name:'Move or copy takeoff',exact:true});
+  const takeoffAction=page.locator('[data-takeoff="tn"]').getByTitle('Move or copy this takeoff');
+  for (const action of ['duplicate','copy','move']){
+    await takeoffAction.click();
+    await takeoffDialog.getByLabel('Action',{exact:true}).selectOption(action);
+    if(action!=='duplicate'){
+      await takeoffDialog.getByLabel('Destination company').selectOption('dest-co');
+      await takeoffDialog.getByLabel('Destination project').selectOption('dest-pr');
+    }
+    await takeoffDialog.getByRole('button',{name:action==='duplicate'?'Duplicate':action==='copy'?'Copy':'Move',exact:true}).click();
+  }
+  companies=await page.evaluate(()=>window.estimator.exportBook().lists[0].companies);
+  expect(companies[0].projects.find(p=>p.id==='north').takeoffs.map(t=>t.name)).toEqual(['North takeoff copy']);
+  expect(companies[1].projects[0].takeoffs.map(t=>t.name)).toEqual(['North takeoff copy','North takeoff']);
+  await expect(page.locator('#title')).toHaveValue('North scope');
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();
+  await expect(page.locator('#title')).toHaveValue('North scope');
+  expect(await page.evaluate(()=>window.estimator.exportBook().lists[0].companies[1].projects[0].takeoffs.map(t=>t.name))).toEqual(['North takeoff copy','North takeoff']);
+});
+
 test('new jobs detect addresses across customers and offer existing or new projects', async ({page}) => {
   const data=workbook();
   data.lists[0].companies.push({id:'other-customer',name:'Other Customer',projects:[
@@ -376,6 +541,26 @@ test('large estimate scrolls without changing rows or totals', async ({page}) =>
   await expect(page.locator('#tGrand')).toHaveText(total);
 });
 
+test('compact library creation menu opens each editor and supports keyboard dismissal', async ({page}) => {
+  await openWorkbook(page);
+  await page.locator('#libToggle').click();
+  const create=page.locator('#libCreate');
+  for(const [button,mode] of [['libNew','item'],['libNewPart','part'],['libNewCon','construct'],['libNewSvc','service'],['libNewSec','section'],['libNewScope','scope']]){
+    await expect(page.locator('#'+button)).not.toBeVisible();
+    await create.locator('summary').click();
+    await page.locator('#'+button).click();
+    await expect(page.locator('#edTitle')).toHaveText('New '+mode);
+    await expect(create).not.toHaveAttribute('open','');
+    await page.locator('#edCancel').click();
+  }
+  await create.locator('summary').press('Enter');
+  await expect(page.locator('#libNew')).toBeVisible();
+  await create.locator('summary').press('Escape');
+  await expect(page.locator('#libNew')).not.toBeVisible();
+  await page.locator('.lib-save-existing > summary').click();
+  await expect(page.locator('#libCapScope')).toBeVisible();
+});
+
 test('library folders can be renamed with contents preserved and conflicting names rejected', async ({page}) => {
   const data = workbook();
   data.folders = ['Tools','Tools/Empty','Other'];
@@ -419,6 +604,34 @@ test('library folders can be renamed with contents preserved and conflicting nam
   expect(saved.templates.sections[0].folder).toBe('Equipment/Nested');
 });
 
+test('all library template types and empty folders require deletion confirmation', async ({page}) => {
+  const data=workbook();
+  data.folders=['Empty folder'];
+  data.templates=Object.fromEntries(['items','sections','parts','constructs','services','scopes'].map(kind =>
+    [kind,[{id:'delete-'+kind,name:'Delete '+kind,kind:'labor',items:[],parts:[],cost:10}]]));
+  await openWorkbook(page,data);
+  await page.locator('#libToggle').click();
+  const dialog=page.getByRole('alertdialog');
+  for (const kind of Object.keys(data.templates)) {
+    const card=page.locator('#libAll .tpl').filter({has:page.getByText('Delete '+kind,{exact:true})});
+    await card.getByTitle('Delete this template').click();
+    await expect(dialog).toContainText('Delete '+kind);
+    await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
+    await expect(card).toBeVisible();
+    await card.getByTitle('Delete this template').click();
+    await dialog.getByRole('button',{name:'Delete',exact:true}).click();
+    await expect(card).toHaveCount(0);
+  }
+  const folder=page.locator('#libAll .folder-head[data-folder="Empty folder"]');
+  await folder.getByTitle('Delete this folder',{exact:true}).click();
+  await expect(dialog).toContainText('Empty folder');
+  await page.keyboard.press('Escape');
+  await expect(folder).toBeVisible();
+  await folder.getByTitle('Delete this folder',{exact:true}).click();
+  await dialog.getByRole('button',{name:'Delete',exact:true}).click();
+  await expect(folder).toHaveCount(0);
+});
+
 test('library Duplicate creates independent copies in the same folder and saves them', async ({page}) => {
   const data = workbook();
   data.templates = {items:[{id:'original-template',name:'Saw',folder:'Tools',kind:'equipment',cost:125,
@@ -440,6 +653,17 @@ test('library Duplicate creates independent copies in the same folder and saves 
   await expect(page.locator('#libAll .tpl-name').getByText('Saw (copy 2)', {exact:true})).toBeVisible();
   const copy = page.locator('#libAll .tpl').filter({has:page.getByText('Saw (copy)', {exact:true})});
   await copy.getByTitle('Delete this template').click();
+  const confirmation = page.getByRole('alertdialog');
+  await expect(confirmation).toContainText('Saw (copy)');
+  await expect(copy).toBeVisible();
+  await confirmation.getByRole('button', {name:'Cancel',exact:true}).click();
+  await expect(copy).toBeVisible();
+  await copy.getByTitle('Delete this template').click();
+  await page.keyboard.press('Escape');
+  await expect(copy).toBeVisible();
+  await copy.getByTitle('Delete this template').click();
+  await confirmation.getByRole('button', {name:'Delete',exact:true}).click();
+  await expect(copy).toHaveCount(0);
   await expect(original).toBeVisible();
   await expect(page.locator('#server-status')).toHaveText('All changes saved');
   await page.reload();
@@ -774,6 +998,7 @@ test('nested sections retain totals, collapse state, duplication and library dro
   for(const r of sh.rows){if(r.type==='section')stack.push(r.id);if(r.type==='sectionEnd')expect(r.sid).toBe(stack.pop());}
   expect(stack).toEqual([]);
   await page.locator('#libToggle').click();
+  await page.locator('.lib-save-existing > summary').click();
   await page.locator('#libCapture .tpl').filter({hasText:'Parent'}).first().locator('button').click();
   const template=page.locator('#libAll .tpl').filter({hasText:'Parent'}).first();
   await expect(template).toBeVisible();
@@ -934,6 +1159,7 @@ test('moving a section nests its whole subtree and removing the parent keeps chi
   await expect(row('work')).toBeVisible();
   await expect(row('ae').locator('.sub .v')).toHaveText('25.00');
   await row('a').locator('.del').click();
+  await page.getByRole('dialog',{name:'Delete section',exact:true}).getByRole('button',{name:'Keep items',exact:true}).click();
   await expect(row('a')).toHaveCount(0);
   await expect(row('ae')).toHaveCount(0);
   await expect(row('b')).toBeVisible();
@@ -956,6 +1182,7 @@ test('section drop ghost matches committed rows after subtotals and cancels with
   ];
   await openWorkbook(page,data);
   await page.locator('#libToggle').click();
+  await page.locator('.lib-save-existing > summary').click();
   await page.locator('#libCapture .tpl').filter({hasText:'Inner'}).locator('button').click();
   const template=page.locator('#libAll .tpl').filter({hasText:'Inner'}).first();
   const original=await page.evaluate(()=>JSON.stringify(window.estimator.exportBook().sheets));
