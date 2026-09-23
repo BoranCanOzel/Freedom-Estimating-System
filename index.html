@@ -1519,6 +1519,15 @@
   .summary-map-link{display:inline-flex;align-items:center;min-height:32px;margin:4px 0 8px;padding:6px 10px;border:1px solid var(--rule);border-radius:5px;background:var(--card);color:var(--ink);font:500 12px var(--f-sans);text-decoration:none}
   .summary-map-link:hover{border-color:var(--amber);background:var(--calc)}
   .summary-map-link:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+  .summary-map-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
+  .summary-map-actions .summary-map-link{margin:0}
+  .summary-map-actions [aria-disabled="true"]{opacity:.55;cursor:default}
+  .summary-map-hint{font:12px var(--f-sans);color:var(--muted)}
+  #summaryProjectName{overflow-wrap:anywhere}
+  .summary-context{display:flex;flex-wrap:wrap;gap:8px 24px;margin:10px 0 0;font:13px var(--f-sans)}
+  .summary-context>div{min-width:0;max-width:100%}
+  .summary-context dt{font-size:11px;color:var(--muted);margin-bottom:3px}
+  .summary-context dd{margin:0;color:var(--ink);overflow-wrap:anywhere;white-space:pre-line}
 
   .panel-grab{
     position:absolute;top:0;bottom:0;width:6px;cursor:col-resize;z-index:6;
@@ -2919,7 +2928,12 @@
   <div class="card" id="summaryCard" hidden>
     <div class="head">
       <div class="eyebrow-row"><span class="eyebrow">Summary</span></div>
-      <div class="sum-title">All options on this job</div>
+      <div class="sum-title" id="summaryProjectName">All options on this job</div>
+      <dl id="summaryContext" class="summary-context" aria-label="Current project details"></dl>
+      <div class="summary-map-actions">
+        <a id="summaryMap" class="summary-map-link" target="_blank" rel="noopener noreferrer" aria-disabled="true">Map</a>
+        <span id="summaryMapHint" class="summary-map-hint">Add a job or customer address to open the map.</span>
+      </div>
     </div>
     <div class="scroll">
       <div class="sum-blocks" id="sumBlocks"></div>
@@ -5991,6 +6005,34 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     const wrap = document.getElementById('sumBlocks');
     wrap.innerHTML = '';
     const hit = findTakeoff(book.activeTakeoff);
+    const map = document.getElementById('summaryMap');
+    const mapHint = document.getElementById('summaryMapHint');
+    const address = hit && (String(hit.pr.address || '').trim() || String(hit.co.address || '').trim());
+    document.getElementById('summaryProjectName').textContent = String(hit?.pr.name || '').trim() || 'All options on this job';
+    const context = document.getElementById('summaryContext');
+    context.replaceChildren();
+    if (hit){
+      const fields = [['Customer', hit.co.name], ['Takeoff', hit.tk.name], ['Status', hit.pr.status],
+        [String(hit.pr.address || '').trim() ? 'Job address' : 'Customer address', address]];
+      for (const [label, value] of fields){
+        if (!String(value || '').trim()) continue;
+        const field = document.createElement('div'), term = document.createElement('dt'), detail = document.createElement('dd');
+        term.textContent = label; detail.textContent = value;
+        field.append(term, detail); context.appendChild(field);
+      }
+    }
+    if (address){
+      map.href = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(address);
+      map.removeAttribute('aria-disabled');
+      map.setAttribute('aria-label', 'Open ' + address + ' in Google Maps');
+      map.title = address;
+    } else {
+      map.removeAttribute('href');
+      map.setAttribute('aria-disabled', 'true');
+      map.setAttribute('aria-label', 'Map unavailable: add a job or customer address');
+      map.title = 'Add a job or customer address to open the map.';
+    }
+    mapHint.hidden = !!address;
     if (!hit) return;
     const co = hit.co, pr = hit.pr, tk = hit.tk;
 
@@ -6003,7 +6045,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
                   [projectAddress ? 'Job address' : 'Customer address', projectAddress || co.address, true],
                   ['Contacts', pr.contacts], ['Email', pr.email], ['Notes', pr.notes]]
       .concat(customFields('project').map(f => [f, (pr.custom && pr.custom[f]) || '']));
-    wrap.appendChild(sumBlock('proj', 'Project', proj));
+    wrap.appendChild(sumBlock('summary-project', 'Project', proj));
 
     const take = [['Takeoff', tk.name], ['Description', tk.note]]
       .concat(customFields('takeoff').map(f => [f, (tk.custom && tk.custom[f]) || '']));

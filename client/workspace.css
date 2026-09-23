@@ -139,4 +139,40 @@ body.server-mode .workspace-menu summary:focus-visible,body.server-mode button:f
 body.server-mode #server-welcome{padding-left:calc(var(--workspace-project-width) + 40px)}
 @media(max-width:900px){body.server-mode.workspace-projects-open.server-active>.sheet{margin-left:0}body.server-mode #server-people{display:none}body.server-mode #server-title{max-width:28vw}body.server-mode #server-status{font-size:10px}body.server-mode.workspace-projects-open .ed.ed-left,body.server-mode:not(.workspace-projects-open) .ed.ed-left{left:20px;right:20px;max-width:calc(100vw - 40px);width:410px}}
 @media(max-width:650px){body.server-mode #server-bar{gap:4px}body.server-mode #workspace-menus{order:2}body.server-mode #server-status{order:3;flex:1;text-align:right}body.server-mode #server-title{max-width:none}body.server-mode #server-signout{max-width:100px;font-size:11px}body.server-mode #server-drawer{top:101px;left:10px;width:calc(100vw - 20px);bottom:12px}body.server-mode .ed{top:101px}body.server-mode #server-welcome{padding:30px}body.server-mode .workspace-menu-content{max-height:calc(100vh - 160px)}}
+/* Carry the original stone and metal theme through the shared workspace chrome. */
+body.server-mode.medieval #server-bar,
+body.server-mode.medieval #server-drawer .server-drawer-head,
+body.server-mode.medieval #projects>.lib-head,
+body.server-mode.medieval #projects .lib-foot{
+  background:var(--tx-speck),var(--tx-speckd),var(--tx-stone),#414C54;
+  border-color:#171E23;
+  box-shadow:inset 0 1px 0 #ffffff20,0 2px 5px #0005;
+}
+body.server-mode.medieval #server-drawer,
+body.server-mode.medieval #projects{
+  background:var(--tx-speckd),var(--tx-stone),#232B31;
+}
+body.server-mode.medieval #server-bar button,
+body.server-mode.medieval .workspace-menu>summary,
+body.server-mode.medieval #workspace-toggle-notes{
+  background:linear-gradient(#4E5A63,#3A444C 60%,#323B42);
+  border:1px solid #161B1F;color:#E9EDEE;
+  text-shadow:0 1px 0 #0009;
+  box-shadow:inset 0 1px 0 #ffffff29,0 2px 3px #0006;
+}
+body.server-mode.medieval #server-bar button:hover,
+body.server-mode.medieval .workspace-menu>summary:hover,
+body.server-mode.medieval .workspace-menu[open]>summary,
+body.server-mode.medieval #workspace-toggle-notes:hover{
+  background:linear-gradient(#5B6871,#46515A 60%,#3C464E);color:#fff;
+}
+body.server-mode.medieval #sheetTable .h-adds .btn{
+  background:linear-gradient(#D8742E,#B5561B 55%,#9C4613);
+  border-color:#5A2507;color:#FFF1E0;
+  text-shadow:0 1px 0 #461800a6;
+  box-shadow:inset 0 1px 0 #ffd6a873,inset 0 -2px 0 #00000029,0 2px 3px #0006;
+}
+body.server-mode.medieval #sheetTable .h-adds .btn:hover{
+  background:linear-gradient(#E6863E,#C26124 55%,#A74E17);border-color:#5A2507;color:#fff;
+}
 @media print{body.server-mode .workspace-actions,body.server-mode #workspace-menus,body.server-mode #workspace-toggle-notes{display:none!important}body.server-mode.workspace-projects-open.server-active>.sheet{margin-left:0}}

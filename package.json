@@ -5,7 +5,7 @@
   "type": "module",
   "engines": { "node": ">=24.0.0" },
   "scripts": {
-    "build": "esbuild client/app.js --bundle --format=iife --loader:.png=file --outfile=dist/app.js",
+    "build": "esbuild client/app.js --bundle --format=iife --loader:.png=file --public-path=/assets --outfile=dist/app.js",
     "start": "node --env-file-if-exists=.env server.js",
     "test": "node --test tests/*.test.js",
     "test:browser": "playwright test",
