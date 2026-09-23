@@ -18,7 +18,7 @@ test('authenticated projects, real-time changes, access dates, snapshots, and re
   let base = 'http://127.0.0.1:' + app.server.address().port;
   const sockets = [];
   async function login(name) {
-    const res = await fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+    const res = await fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,password:"1313"})});
     assert.equal(res.status,200); return res.headers.get('set-cookie').split(';')[0];
   }
   async function request(path, cookie, method='GET',body) {
@@ -83,7 +83,7 @@ test('recent project views are per user, resolve current names, and survive rest
   app.server.listen(0,'127.0.0.1');await once(app.server,'listening');
   let base='http://127.0.0.1:'+app.server.address().port;
   const sockets=[];
-  const login=async name=>{const response=await fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});return response.headers.get('set-cookie').split(';')[0];};
+  const login=async name=>{const response=await fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,password:"1313"})});return response.headers.get('set-cookie').split(';')[0];};
   const request=(path,cookie)=>fetch(base+path,{headers:{cookie}});
   try {
     const alice=await login('Alice'),bob=await login('Bob');
@@ -112,8 +112,34 @@ test('recent project views are per user, resolve current names, and survive rest
   } finally {for(const ws of sockets)ws.terminate();await app.close();await rm(dataDir,{recursive:true,force:true});}
 });
 
-test('production refuses to start without accounts',()=>{
-  assert.throws(()=>createApp({production:true,users:{}}),/APP_USERS/);
+test('passwordless configuration is refused in every mode',()=>{
+  for (const production of [false,true]) assert.throws(()=>createApp({production,users:{},sitePasswordHash:''}),/password is required/);
+});
+
+test('shipped password works without auth environment and ignores stale environment settings',async()=>{
+  const dataDir=await mkdtemp(join(tmpdir(),'freedom-default-auth-'));
+  const previous={APP_USERS:process.env.APP_USERS,SITE_PASSWORD_HASH:process.env.SITE_PASSWORD_HASH};
+  try {
+    for (const stale of [false,true]) {
+      if (stale) { process.env.APP_USERS='invalid old configuration';process.env.SITE_PASSWORD_HASH=''; }
+      else { delete process.env.APP_USERS;delete process.env.SITE_PASSWORD_HASH; }
+      const app=createApp({dataDir});
+      app.server.listen(0,'127.0.0.1');await once(app.server,'listening');
+      const base='http://127.0.0.1:'+app.server.address().port;
+      try {
+        assert.equal((await fetch(base+'/api/session').then(r=>r.json())).passwordRequired,true);
+        assert.equal((await fetch(base+'/server-auth.js')).status,404);
+        assert.equal((await fetch(base+'/api/projects')).status,401);
+        for (const password of ['', 'wrong', '1313']) {
+          const response=await fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Tester',password})});
+          assert.equal(response.status,password==='1313'?200:401);
+        }
+      } finally { await app.close(); }
+    }
+  } finally {
+    for (const [key,value] of Object.entries(previous)) { if(value===undefined) delete process.env[key];else process.env[key]=value; }
+    await rm(dataDir,{recursive:true,force:true});
+  }
 });
 
 test('shared password gates the page, assets, reads, writes and old sessions',async()=>{
@@ -121,12 +147,12 @@ test('shared password gates the page, assets, reads, writes and old sessions',as
   const salt='0123456789abcdef0123456789abcdef';
   const password='shared-test-password';
   const hash='scrypt:'+salt+':'+scryptSync(password,salt,32).toString('hex');
-  let app=createApp({dataDir,users:{},sitePasswordHash:'',production:false});
+  let app=createApp({dataDir,users:{},production:false});
   async function listen(){app.server.listen(0,'127.0.0.1');await once(app.server,'listening');return 'http://127.0.0.1:'+app.server.address().port;}
   let base=await listen();
   const login=async(name,password)=>fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,password})});
   try {
-    const old=(await login('Previous visitor','')).headers.get('set-cookie').split(';')[0];
+    const old=(await login('Previous visitor','1313')).headers.get('set-cookie').split(';')[0];
     await app.close();
     app=createApp({dataDir,users:{},sitePasswordHash:hash,production:false});base=await listen();
     assert.equal((await fetch(base+'/api/session').then(r=>r.json())).passwordRequired,true);
@@ -157,7 +183,7 @@ test('password accounts reject bad credentials and cross-origin writes',async()=
   const dataDir=await mkdtemp(join(tmpdir(),'freedom-auth-'));
   const salt='0123456789abcdef0123456789abcdef';
   const hash='scrypt:'+salt+':'+scryptSync('test-password-123',salt,32).toString('hex');
-  const app=createApp({dataDir,users:{Alice:hash},production:false});
+  const app=createApp({dataDir,users:{Alice:hash},sitePasswordHash:'',production:false});
   app.server.listen(0,'127.0.0.1'); await once(app.server,'listening');
   const base='http://127.0.0.1:'+app.server.address().port;
   try {

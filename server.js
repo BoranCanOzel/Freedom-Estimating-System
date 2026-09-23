@@ -9,6 +9,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import * as Y from 'yjs';
 import { writeBook, readBook, validateBook } from './shared/model.js';
 import { resolveLocation } from './shared/navigation.js';
+import { sitePasswordHash as configuredPasswordHash } from './server-auth.js';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const encode = doc => Buffer.from(Y.encodeStateAsUpdate(doc)).toString('base64');
@@ -17,9 +18,9 @@ const validId = id => /^[a-f0-9-]{36}$/.test(id);
 
 export function createApp(options = {}) {
   const production = options.production ?? process.env.NODE_ENV === 'production';
-  const users = options.users ?? JSON.parse(process.env.APP_USERS || '{}');
-  const sitePasswordHash = options.sitePasswordHash ?? process.env.SITE_PASSWORD_HASH ?? '';
-  if (production && !sitePasswordHash && !Object.keys(users).length) throw new Error('Production requires SITE_PASSWORD_HASH or APP_USERS. See .env.example.');
+  const users = options.users ?? {};
+  const sitePasswordHash = options.sitePasswordHash ?? configuredPasswordHash;
+  if (!sitePasswordHash && !Object.keys(users).length) throw new Error('A password is required. Configure server-auth.js.');
   if (sitePasswordHash && !/^scrypt:[a-f0-9]{32}:[a-f0-9]{64}$/.test(sitePasswordHash)) throw new Error('Invalid SITE_PASSWORD_HASH.');
   for (const hash of Object.values(users)) if (!/^scrypt:[a-f0-9]{32}:[a-f0-9]{64}$/.test(hash)) throw new Error('Invalid APP_USERS password hash. Use npm run password.');
   const dataDir = resolve(options.dataDir || process.env.DATA_DIR || join(root, 'data'));
@@ -39,7 +40,7 @@ export function createApp(options = {}) {
       project_id TEXT NOT NULL, list_id TEXT NOT NULL, takeoff_id TEXT NOT NULL, sheet_id TEXT NOT NULL,
       view TEXT NOT NULL, viewed_at TEXT NOT NULL, PRIMARY KEY(workbook_id,name,project_id));`);
   db.exec('CREATE TABLE IF NOT EXISTS auth_configuration (id INTEGER PRIMARY KEY, fingerprint TEXT NOT NULL)');
-  const fingerprint = createHash('sha256').update(JSON.stringify([sitePasswordHash,users])).digest('hex');
+  const fingerprint = createHash('sha256').update(JSON.stringify(['mandatory-password-v1',sitePasswordHash,users])).digest('hex');
   if (db.prepare('SELECT fingerprint FROM auth_configuration WHERE id=1').get()?.fingerprint !== fingerprint) {
     db.exec('DELETE FROM sessions');
     db.prepare('INSERT OR REPLACE INTO auth_configuration VALUES (1,?)').run(fingerprint);
@@ -100,13 +101,13 @@ export function createApp(options = {}) {
     }
     return rooms.get(id);
   }
-  app.get('/api/session', (req, res) => res.json({ user: session(req)?.name || null, passwordRequired: !!sitePasswordHash || Object.keys(users).length > 0 }));
+  app.get('/api/session', (req, res) => res.json({ user: session(req)?.name || null, passwordRequired: true }));
   app.post('/api/login', (req, res) => {
     const ip = req.ip, recent = (loginAttempts.get(ip) || []).filter(t => Date.now() - t < 60000);
     if (recent.length >= 10) return res.status(429).json({ error: 'Too many attempts. Try again in a minute.' });
     recent.push(Date.now()); loginAttempts.set(ip, recent);
     const name = String(req.body.name || '').trim().slice(0, 80), password = String(req.body.password || '');
-    let allowed = name.length > 0 && !sitePasswordHash && !Object.keys(users).length;
+    let allowed = false;
     const credential = sitePasswordHash || (Object.hasOwn(users,name) ? users[name] : '');
     if (credential) {
       const [, salt, hash] = credential.split(':');

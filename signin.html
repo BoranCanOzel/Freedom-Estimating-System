@@ -31,8 +31,6 @@
       if (!response.ok) throw new Error('Unable to check sign-in. Reload to try again.');
       const session=await response.json();
       if (session.user) { location.reload(); return; }
-      document.getElementById('server-password-label').hidden=!session.passwordRequired;
-      document.getElementById('server-login-password').required=session.passwordRequired;
       button.disabled=false;
     }).catch(reason=>{error.textContent=reason.message;});
     form.addEventListener('submit',async event=>{

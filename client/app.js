@@ -438,7 +438,7 @@ document.body.insertAdjacentHTML('afterbegin', `
   <input id="server-import-file" type="file" accept=".json,application/json" multiple hidden>
   <dialog id="server-login"><form id="server-login-form"><h2>Freedom Estimating</h2><p id="server-login-hint">Sign in to your shared projects.</p>
     <label>Name<input id="server-login-name" autocomplete="username" required maxlength="80"></label>
-    <label id="server-password-label">Password<input id="server-login-password" type="password" autocomplete="current-password"></label>
+    <label id="server-password-label">Password<input id="server-login-password" type="password" autocomplete="current-password" required></label>
     <p id="server-login-error" role="alert"></p><button type="submit">Sign in</button></form></dialog>
   <dialog id="server-name-dialog"><form id="server-name-form"><h2 id="server-name-title"></h2>
     <label>Project name<input id="server-name-input" required maxlength="160"></label><div class="server-dialog-actions"><button type="button" id="server-name-cancel">Cancel</button><button type="submit">Save</button></div>
@@ -532,8 +532,8 @@ async function boot() {
   const session = await api('/session');
   if (session.user) await signedIn(session.user);
   else {
-    $('server-password-label').hidden = !session.passwordRequired;
-    $('server-login-hint').textContent = session.passwordRequired ? 'Sign in to your shared projects.' : 'Enter your name for this local development session.';
+    $('server-password-label').hidden = false;
+    $('server-login-hint').textContent = 'Sign in to your shared projects.';
     $('server-login').showModal();
     $('server-login').addEventListener('cancel', event => event.preventDefault());
     $('server-login-form').onsubmit = async event => {

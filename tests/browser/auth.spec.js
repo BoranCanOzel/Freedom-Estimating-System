@@ -6,11 +6,11 @@ import { join } from 'node:path';
 import { once } from 'node:events';
 import { createApp } from '../../server.js';
 
-test('shared website password hides the estimator until sign-in and after sign-out',async({page})=>{
+for (const shipped of [false,true]) test(`${shipped ? 'Shipped' : 'Custom'} website password hides the estimator until sign-in and after sign-out`,async({page})=>{
   const dataDir=await mkdtemp(join(tmpdir(),'freedom-browser-auth-'));
-  const salt='0123456789abcdef0123456789abcdef', password='browser-test-password';
+  const salt='0123456789abcdef0123456789abcdef', password=shipped ? '1313' : 'browser-test-password';
   const sitePasswordHash='scrypt:'+salt+':'+scryptSync(password,salt,32).toString('hex');
-  const app=createApp({dataDir,sitePasswordHash,users:{},production:false});
+  const app=createApp({dataDir,...(shipped ? {} : {sitePasswordHash}),users:{},production:false});
   app.server.listen(0,'127.0.0.1');await once(app.server,'listening');
   const base='http://127.0.0.1:'+app.server.address().port;
   try {

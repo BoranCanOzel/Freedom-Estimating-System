@@ -11,11 +11,11 @@ npm ci --include=dev
 npm start
 ```
 
-Open `http://localhost:3000`. In development, enter a display name. Open a second browser session with another name, then open the same saved project to collaborate. The server binds to localhost by default.
+Open `http://localhost:3000`. Enter your display name and the shared website password. Open a second browser session with another name, then open the same saved project to collaborate. The server binds to localhost by default.
 
 This workspace also has an ignored portable Node runtime under `.tools` for local testing; it is not part of the deployment.
 
-To require a shared website password, set `SITE_PASSWORD_HASH` in the private `.env` file or hosting environment. It accepts the same scrypt hash format as account passwords and takes precedence over `APP_USERS`; people enter their own display name and the shared password. Restart the Node server after changing authentication settings. Existing sessions are invalidated when the password configuration changes. Signed-out visitors receive only the sign-in page; the estimator, its assets, data APIs, and WebSocket connections require authentication. Production requires either a shared password hash or configured password accounts. Keep `.env` private and configure the same hash separately on the deployed server.
+Website login always requires a password. Its scrypt hash is shipped in the server-only `server-auth.js` file, so authentication needs no `.env` settings. `APP_USERS` and `SITE_PASSWORD_HASH` environment variables are no longer used. To change the password, generate a hash with `npm run password -- "a new password of at least 12 characters"`, replace the value in `server-auth.js`, and restart Node. Changing authentication invalidates existing sessions. Signed-out visitors cannot access the estimator, its assets, data APIs, or WebSocket connections.
 
 ## aaPanel deployment
 
@@ -25,7 +25,7 @@ The site now needs a running Node process. Serving `index.html` as a static site
 2. Keep the existing Git checkout. Run `npm ci --include=dev` and `npm run build` after each pull.
 3. Create a persistent data directory **outside the checkout**, for example `/www/server/freedom-estimating-data`. Give the Node process user read/write access. Do not place it under an Nginx public document root.
 4. Copy `.env.example` to `.env` (ignored by Git), or configure equivalent environment variables in aaPanel. Set `NODE_ENV=production`, `HOST=127.0.0.1`, `PORT=3000`, `DATA_DIR`, and `TRUST_PROXY=true` when behind the trusted local proxy.
-5. Generate a password hash for each user with `npm run password -- "a unique password of at least 12 characters"`. Set `APP_USERS` to a JSON object mapping usernames to generated hashes. For example: `{"boran":"scrypt:<salt>:<hash>","estimator":"scrypt:<salt>:<hash>"}`. Use the actual generated values, not these placeholders. Avoid leaving real passwords in shell history.
+5. Website password protection is already configured in `server-auth.js`; no authentication environment setup is needed.
 6. Start command: **`npm start`**, working directory: the repository. Enable restart on failure and boot. Use **one Node process**; multiple workers would need a shared realtime message bus.
 7. Replace the old static-site location with a reverse proxy to `http://127.0.0.1:3000`. Enable HTTPS and WebSocket forwarding. See [deploy/nginx.conf](deploy/nginx.conf) for the location settings. Production session cookies require HTTPS.
 8. After each Git deployment: install dependencies, build, then restart the Node process. Existing SQLite records and sessions persist in `DATA_DIR`.
@@ -34,7 +34,7 @@ If your process manager starts `server.js` directly instead of `npm start`, load
 
 If `/api/preferences` returns an HTML `Cannot GET` page after a pull, the frontend was rebuilt while the old Node process is still running. Restart the Node project in aaPanel. The client tolerates a missing preferences route so existing workbooks remain accessible during this version mismatch; account settings need the updated server. API errors identify the route and HTTP status instead of exposing a JSON parsing error.
 
-The app intentionally refuses to start in production without valid `APP_USERS`. Every configured account is a member of the same estimating team and can open/edit all projects. Per-project roles and account-management screens are not included.
+The app refuses to start with a passwordless configuration in any mode. Everyone who signs in with the shared password can open/edit all projects. Per-project roles and account-management screens are not included.
 
 ## Projects and files
 

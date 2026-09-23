@@ -15,7 +15,7 @@ async function openWorkbook(page, data = workbook(), name = 'Workspace tester') 
   await page.goto('/');
   if (!reuse) {
     await page.locator('#server-login-name').fill(name);
-    await page.locator('#server-login-form button').click(); await expect(page.locator('#server-login')).not.toBeVisible();
+    await page.locator('#server-login-password').fill('1313');await page.locator('#server-login-password').fill('1313');await page.locator('#server-login-form button').click(); await expect(page.locator('#server-login')).not.toBeVisible();
     if (name === 'Workspace tester') workspaceCookies = await page.context().cookies();
   }
   await expect(page.locator('#server-status')).toHaveText(/^(All changes saved|No project open)$/,{timeout:20000});
@@ -402,7 +402,7 @@ test('undo only affects my edits and redo syncs to other estimators', async ({pa
     const peer=await context.newPage();
     await peer.goto('/');
     await peer.locator('#server-login-name').fill('Undo peer '+Date.now());
-    await peer.locator('#server-login-form button').click();
+    await peer.locator('#server-login-password').fill('1313');await peer.locator('#server-login-password').fill('1313');await peer.locator('#server-login-form button').click();
     await expect(peer.locator('#server-login')).not.toBeVisible();
     const name=await page.locator('#server-title').textContent();
     await peer.locator('#server-list .server-project').filter({hasText:name}).click();
@@ -484,7 +484,7 @@ test('last selected workbook survives sign-out and opens in a fresh browser',asy
   const context=await browser.newContext({baseURL});
   try {
     const fresh=await context.newPage();await fresh.goto('/');
-    await fresh.locator('#server-login-name').fill(name);await fresh.locator('#server-login-form button').click();
+    await fresh.locator('#server-login-name').fill(name);await fresh.locator('#server-login-password').fill('1313');await fresh.locator('#server-login-password').fill('1313');await fresh.locator('#server-login-form button').click();
     await expect(fresh.locator('#server-status')).toHaveText('All changes saved');
     await expect(fresh.locator('#server-title')).toHaveText(selected);
     await expect(fresh.locator('#title')).toHaveValue('Remember this tab');
@@ -800,7 +800,7 @@ test('project presence, tab highlights, collapse and recent views work for two u
   await openWorkbook(page,data,name);
   const context=await browser.newContext({baseURL}), peer=await context.newPage();
   try {
-    await peer.goto('/');await peer.locator('#server-login-name').fill(other);await peer.locator('#server-login-form button').click();
+    await peer.goto('/');await peer.locator('#server-login-name').fill(other);await peer.locator('#server-login-password').fill('1313');await peer.locator('#server-login-password').fill('1313');await peer.locator('#server-login-form button').click();
     const workbookName=await page.locator('#server-title').textContent();
     await peer.locator('#server-list .server-project').filter({hasText:workbookName}).click();
     await expect(peer.locator('#server-status')).toHaveText('All changes saved');

@@ -4,7 +4,7 @@ test('two estimators share edits, cursors, reconnects and projects', async ({ br
   const a = await browser.newContext({baseURL}), b = await browser.newContext({baseURL});
   const alice = await a.newPage(), bob = await b.newPage(), errors=[];
   for(const page of [alice,bob])page.on('pageerror',e=>errors.push(e.message));
-  async function login(page,name){await page.goto('/');await page.locator('#server-login-name').fill(name);await page.locator('#server-login-form button').click();await expect(page.locator('#server-login')).not.toBeVisible();}
+  async function login(page,name){await page.goto('/');await page.locator('#server-login-name').fill(name);await page.locator('#server-login-password').fill('1313');await page.locator('#server-login-form button').click();await expect(page.locator('#server-login')).not.toBeVisible();}
   try {
     await login(alice,'Alice '+Date.now()); await login(bob,'Bob '+Date.now());
     const name='Browser test '+Date.now();
@@ -68,7 +68,7 @@ test('two estimators share edits, cursors, reconnects and projects', async ({ br
 });
 
 test('imports legacy JSON and server snapshots without losing hierarchy or libraries', async ({page}) => {
-  await page.goto('/');await page.locator('#server-login-name').fill('Importer');await page.locator('#server-login-form button').click();
+  await page.goto('/');await page.locator('#server-login-name').fill('Importer');await page.locator('#server-login-password').fill('1313');await page.locator('#server-login-form button').click();
   const book={sheets:[{id:'s1',title:'Original scope',rows:[{id:'r1',kind:'labor',name:'Legacy item',cost:50,count:1,time:1,days:1}]}],
     companies:[{id:'co1',name:'Customer',projects:[{id:'pr1',name:'Job',takeoffs:[{id:'tk1',name:'Takeoff',sheets:[{id:'s1',title:'Original scope',rows:[{id:'r1',kind:'labor',name:'Legacy item',cost:50,count:1,time:1,days:1}]}]}]}]}],
     templates:{items:[{id:'tpl1',name:'Library item',kind:'labor',cost:25}],sections:[],scopes:[]}};
