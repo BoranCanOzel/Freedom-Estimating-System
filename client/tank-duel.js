@@ -40,6 +40,12 @@ export function setupTankDuel(getConnection, notify) {
   }
   function draw(ground = state?.ground, projectile = null) {
     if (!ground || !state) return;
+    const bounds = canvas.getBoundingClientRect(), density = window.devicePixelRatio || 1;
+    if (!bounds.width || !bounds.height) return;
+    const width = Math.round(bounds.width * density), height = Math.round(bounds.height * density);
+    if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
+    const sx = bounds.width / 1000, sy = bounds.height / 280;
+    ctx.setTransform(density * sx,0,0,density * sy,0,0);
     ctx.clearRect(0,0,1000,280);
     ctx.fillStyle='#695f59';ctx.beginPath();ctx.moveTo(0,280);
     for(let x=0;x<=1000;x+=10)ctx.lineTo(x,Math.max(55,ground[x]-38));
@@ -50,15 +56,18 @@ export function setupTankDuel(getConnection, notify) {
     for (const [index,x] of [85,915].entries()) {
       const y=ground[x], color=index===0?'#6ddbd0':'#ffb86a';
       const angle=(index===state.you?Number($('angle').value):state.angles[index])*Math.PI/180;
-      ctx.fillStyle='#20282c';ctx.fillRect(x-18,y-8,36,8);
-      ctx.fillStyle=color;ctx.fillRect(x-15,y-17,30,11);ctx.beginPath();ctx.arc(x,y-15,8,Math.PI,0);ctx.fill();
-      ctx.strokeStyle=color;ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(x,y-12);ctx.lineTo(x+Math.cos(angle)*25,y-12-Math.sin(angle)*25);ctx.stroke();
+      ctx.save();ctx.translate(x,y);ctx.scale(1/sx,1/sy);
+      ctx.fillStyle='#20282c';ctx.fillRect(-18,-8,36,8);
+      ctx.fillStyle=color;ctx.fillRect(-15,-17,30,11);ctx.beginPath();ctx.arc(0,-15,8,Math.PI,0);ctx.fill();
+      ctx.strokeStyle=color;ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(0,-12);ctx.lineTo(Math.cos(angle)*25,-12-Math.sin(angle)*25);ctx.stroke();
+      if(index===state.turn&&!state.finished){ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(0,-43);ctx.lineTo(-5,-50);ctx.lineTo(5,-50);ctx.fill();}
+      ctx.restore();ctx.save();ctx.scale(1/sx,1/sy);
       ctx.font='bold 12px system-ui';ctx.textAlign=index===0?'left':'right';
-      ctx.shadowColor='#172129';ctx.shadowBlur=4;ctx.fillText(state.names[index].slice(0,24),index===0?16:984,22);ctx.shadowBlur=0;
-      if(index===state.turn&&!state.finished){ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(x,y-43);ctx.lineTo(x-5,y-50);ctx.lineTo(x+5,y-50);ctx.fill();}
+      ctx.fillStyle=color;ctx.shadowColor='#172129';ctx.shadowBlur=4;ctx.fillText(state.names[index].slice(0,24),index===0?16:bounds.width-16,22);ctx.restore();
     }
-    if(projectile){ctx.fillStyle='#fff2af';ctx.shadowBlur=12;ctx.shadowColor='#ffc65b';ctx.beginPath();ctx.arc(projectile[0],projectile[1],4,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;}
+    if(projectile){ctx.save();ctx.translate(...projectile);ctx.scale(1/sx,1/sy);ctx.fillStyle='#fff2af';ctx.shadowBlur=12;ctx.shadowColor='#ffc65b';ctx.beginPath();ctx.arc(0,0,4,0,Math.PI*2);ctx.fill();ctx.restore();}
   }
+  new ResizeObserver(()=>draw()).observe(canvas);
   for(const name of ['angle','power']) $(name).oninput=()=>{ $(name+'-value').textContent=$(name).value+(name==='angle'?'°':'');draw(); };
   $('sound').onclick=()=>{muted=!muted;$('sound').textContent=muted?'Sound off':'Sound on';$('sound').setAttribute('aria-pressed',String(!muted));};
   $('accept').onclick=()=>{if(send('accept'))$('accept').disabled=true;};
@@ -93,7 +102,7 @@ export function setupTankDuel(getConnection, notify) {
           const progress=Math.min(1,(now-started)/1400), points=message.shot.path;
           draw(previous,points[Math.min(points.length-1,Math.floor(progress*(points.length-1)))]);
           if(progress<1)frame=requestAnimationFrame(animate);
-          else{draw();if(message.shot.impact){ctx.strokeStyle='#ffdf90';ctx.lineWidth=5;ctx.beginPath();ctx.arc(...message.shot.impact,24,0,Math.PI*2);ctx.stroke();}timer=setTimeout(()=>{animating=false;controls();draw();if(state.finished)sound('win');},350);}
+          else{draw();if(message.shot.impact){ctx.save();ctx.translate(...message.shot.impact);const bounds=canvas.getBoundingClientRect();ctx.scale(1000/bounds.width,280/bounds.height);ctx.strokeStyle='#ffdf90';ctx.lineWidth=5;ctx.beginPath();ctx.arc(0,0,24,0,Math.PI*2);ctx.stroke();ctx.restore();}timer=setTimeout(()=>{animating=false;controls();draw();if(state.finished)sound('win');},350);}
         };frame=requestAnimationFrame(animate);
       }else{controls();draw();}
     }

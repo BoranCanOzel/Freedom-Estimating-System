@@ -36,8 +36,15 @@ test('Ctrl selection edits multiple fields and drags nonadjacent items together'
 
   const row=id=>page.locator('#body tr[data-id="'+id+'"]');
   const first=row('a').locator('.name-in'), third=row('c').locator('.name-in');
-  await first.click({modifiers:['Control']});
+  await first.click();
   await third.click({modifiers:['Control']});
+  await expect(page.locator('.multi-input')).toHaveCount(2);
+  await expect(first).toHaveClass(/multi-input/);
+  await first.click({modifiers:['Control']});
+  await expect(page.locator('.multi-input')).toHaveCount(1);
+  await expect(third).toHaveClass(/multi-input/);
+  await first.click({modifiers:['Control']});
+  await expect(page.locator('.multi-input')).toHaveCount(2);
   await third.fill('Shared name');
   await expect(first).toHaveValue('Shared name');
   await expect(row('b').locator('.name-in')).toHaveValue('b');
@@ -503,9 +510,12 @@ test('shared cursor style persists without changing local mouse cursors', async 
   await expect(page.locator('#add')).toHaveCSS('cursor','pointer');
   await expect(page.locator('#title')).toHaveCSS('cursor','text');
   await expect(page.locator('#sheetTable .col-resizer').first()).toHaveCSS('cursor','col-resize');
+  await page.locator('#workspace-cursor-color').selectOption('#8755ce');
+  await expect(page.locator('body')).toHaveAttribute('data-shared-cursor-color','#8755ce');
   await page.reload();
   await page.locator('#workspace-view > summary').click();
   await expect(page.locator('#workspace-cursor')).toHaveValue('arrow');
+  await expect(page.locator('#workspace-cursor-color')).toHaveValue('#8755ce');
   const savedCrosshair = page.waitForResponse(r=>r.url().endsWith('/api/preferences') && r.request().method()==='PUT');
   await page.locator('#workspace-cursor').selectOption('crosshair');
   expect((await savedCrosshair).ok()).toBe(true);

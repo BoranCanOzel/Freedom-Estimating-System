@@ -6330,8 +6330,10 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   }, {passive:true});
   const selectedLineIds = new Set();
   const selectedInputs = new Set();
+  let singleInputAnchor = null;
   let copyingSelectedInput = false;
   function clearMultiSelection(){
+    singleInputAnchor = null;
     selectedLineIds.clear(); selectedInputs.clear();
     document.querySelectorAll('.multi-row,.multi-input').forEach(el => el.classList.remove('multi-row','multi-input'));
   }
@@ -6342,17 +6344,26 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       if (!row) return;
       if (input && !input.readOnly && !input.disabled){
         selectedLineIds.clear(); body.querySelectorAll('.multi-row').forEach(el => el.classList.remove('multi-row'));
+        if (!selectedInputs.size && singleInputAnchor !== input && singleInputAnchor?.isConnected && body.contains(singleInputAnchor) && !singleInputAnchor.readOnly && !singleInputAnchor.disabled){
+          selectedInputs.add(singleInputAnchor);
+          singleInputAnchor.classList.add('multi-input');
+        }
+        singleInputAnchor = null;
         if (selectedInputs.has(input)) selectedInputs.delete(input); else selectedInputs.add(input);
         input.classList.toggle('multi-input',selectedInputs.has(input));
         event.preventDefault(); event.stopPropagation(); input.focus(); input.select();
       } else if (!event.target.closest('button:not(.grip),select,a')){
+        singleInputAnchor = null;
         selectedInputs.clear(); body.querySelectorAll('.multi-input').forEach(el => el.classList.remove('multi-input'));
         const id = row.dataset.id;
         if (selectedLineIds.has(id)) selectedLineIds.delete(id); else selectedLineIds.add(id);
         row.classList.toggle('multi-row',selectedLineIds.has(id));
         event.preventDefault(); event.stopPropagation();
       }
-    } else if (!(input && selectedInputs.has(input)) && !selectedLineIds.has(row?.dataset.id)) clearMultiSelection();
+    } else {
+      if (!(input && selectedInputs.has(input)) && !selectedLineIds.has(row?.dataset.id)) clearMultiSelection();
+      if (!selectedInputs.size && row && input && !input.readOnly && !input.disabled) singleInputAnchor = input;
+    }
   }, true);
   body.addEventListener('keydown', event => {
     if (event.key !== 'Tab' || event.ctrlKey || event.altKey || event.metaKey) return;

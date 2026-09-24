@@ -38,15 +38,18 @@ test('authenticated projects, real-time changes, access dates, snapshots, and re
     const missing=await request('/api/unknown-route',alice);
     assert.equal(missing.status,404);assert.match(missing.headers.get('content-type'),/application\/json/);
     assert.match((await missing.json()).error,/API route not found/);
-    assert.deepEqual(await (await request('/api/preferences',alice)).json(), {cursor:'classic',lastWorkbook:null});
+    assert.deepEqual(await (await request('/api/preferences',alice)).json(), {cursor:'classic',color:'',lastWorkbook:null});
     for (const cursor of ['classic','crosshair','ring','arrow']) {
       const saved = await request('/api/preferences',alice,'PUT',{cursor});
       assert.equal(saved.status,200,`Save shared cursor: ${cursor}`);
-      assert.deepEqual(await saved.json(),{cursor});
+      assert.deepEqual(await saved.json(),{cursor,color:''});
       assert.equal((await (await request('/api/preferences',alice)).json()).cursor,cursor);
     }
     assert.equal((await request('/api/preferences',alice,'PUT',{cursor:'invalid'})).status,400);
-    assert.deepEqual(await (await request('/api/preferences',bob)).json(), {cursor:'classic',lastWorkbook:null});
+    assert.equal((await request('/api/preferences',alice,'PUT',{color:'invalid'})).status,400);
+    assert.deepEqual(await (await request('/api/preferences',alice,'PUT',{color:'#2878d0'})).json(),{cursor:'arrow',color:'#2878d0'});
+    assert.deepEqual(await (await request('/api/preferences',alice,'PUT',{cursor:'arrow'})).json(),{cursor:'arrow',color:'#2878d0'});
+    assert.deepEqual(await (await request('/api/preferences',bob)).json(), {cursor:'classic',color:'',lastWorkbook:null});
     const rejected=await request('/api/projects',alice,'POST',{name:'bad',book:{random:true}}); assert.equal(rejected.status,400);
     const created=await request('/api/projects',alice,'POST',{name:'Job 1',book:{sheets:[{id:'s',rows:[{id:'r',name:'Saw',count:1,cost:10}]}]}});
     assert.equal(created.status,201); const project=await created.json();
@@ -74,8 +77,8 @@ test('authenticated projects, real-time changes, access dates, snapshots, and re
     assert.equal(saved.sheets[0].rows[0].count,8);
     app=createApp({dataDir,users:{},production:false}); app.server.listen(0,'127.0.0.1'); await once(app.server,'listening');
     base='http://127.0.0.1:'+app.server.address().port;
-    assert.deepEqual(await (await request('/api/preferences',alice)).json(), {cursor:'arrow',lastWorkbook:null});
-    assert.deepEqual(await (await request('/api/preferences',bob)).json(), {cursor:'classic',lastWorkbook:project.id});
+    assert.deepEqual(await (await request('/api/preferences',alice)).json(), {cursor:'arrow',color:'#2878d0',lastWorkbook:null});
+    assert.deepEqual(await (await request('/api/preferences',bob)).json(), {cursor:'classic',color:'',lastWorkbook:project.id});
     const list=await (await request('/api/projects',alice)).json();
     assert.equal(list[0].name,'Job 1');
     const restored=await (await request('/api/projects/'+project.id+'/export',bob)).json(); assert.equal(restored.sheets[0].rows[0].cost,55);

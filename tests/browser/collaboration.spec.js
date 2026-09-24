@@ -39,6 +39,12 @@ test('two estimators share edits, cursors, reconnects and projects', async ({ br
       await expect(bob.locator('#workspace-cursor')).toHaveValue('classic');
     }
     // Scrolling must reuse collaborator nodes rather than rebuilding the header.
+    await alice.locator('#workspace-view').evaluate(el=>{el.open=true;});
+    await alice.locator('#workspace-cursor-color').selectOption('#2878d0');
+    await expect(bob.locator('.server-cursor')).toHaveCSS('color','rgb(40, 120, 208)');
+    await expect(bob.locator('.server-person')).toHaveCSS('border-left-color','rgb(40, 120, 208)');
+    await expect(bob.locator('#workspace-cursor-color')).toHaveValue('');
+    await alice.locator('#workspace-view').evaluate(el=>{el.open=false;});
     const retained = await bob.evaluate(async () => {
       const badge = document.querySelector('.server-person'), cursor = document.querySelector('.server-cursor');
       const scroller = document.querySelector('#sheetCard .scroll');

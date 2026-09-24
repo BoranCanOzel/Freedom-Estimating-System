@@ -26,6 +26,11 @@ test('online players accept a tank duel, trade shots and leave without changing 
     });
     expect(overlay.left).toBeCloseTo(0);expect(overlay.right).toBeCloseTo(overlay.width);expect(overlay.bottom).toBeCloseTo(overlay.height);
     expect(overlay.transparent).toBe(true);expect(overlay.clickThrough).toBe(true);
+    for (const width of [1920,1100]) {
+      await alice.setViewportSize({width,height:1000});
+      await expect.poll(()=>alice.locator('#tank-duel canvas').evaluate(canvas=>Math.abs(canvas.width-canvas.getBoundingClientRect().width*devicePixelRatio))).toBeLessThan(1);
+    }
+    await alice.setViewportSize({width:1440,height:1000});
     await expect(alice.locator('#duel-status')).toHaveText(/turn/);
     const first=await alice.locator('#duel-fire').isEnabled()?alice:bob,second=first===alice?bob:alice;
     await expect(second.locator('#duel-fire')).toBeDisabled();

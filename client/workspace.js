@@ -1,7 +1,7 @@
 import { renderProjectSettings } from './project-settings.js';
 import './workspace.css';
 import './textures.css';
-import { normalizeCursor } from '../shared/cursors.js';
+import { normalizeCursor, cursorColors, normalizeCursorColor } from '../shared/cursors.js';
 
 const $ = id => document.getElementById(id);
 
@@ -39,7 +39,9 @@ export function setupWorkspace() {
             <option value="classic">Classic (original)</option><option value="arrow">Pointer arrow</option>
             <option value="crosshair">Crosshair</option><option value="ring">Ring</option>
           </select>
-        </div><p class="workspace-preference-hint">How others see your cursor on the same page. Saved to your account.</p>
+        </div><div class="workspace-cursor-setting"><label for="workspace-cursor-color">Your color</label>
+          <select id="workspace-cursor-color" disabled>${Object.entries(cursorColors).map(([value,label])=>`<option value="${value}">${label}</option>`).join('')}</select>
+        </div><p class="workspace-preference-hint">Your shared cursor and online color. Saved to your account.</p>
         <div data-for-view="sheet" class="menu-context"><div class="menu-divider"></div>
           <p class="menu-label">Sheet display</p><div id="workspace-pictures"></div><div id="workspace-detail"></div>
         </div>
@@ -185,5 +187,10 @@ export function setupWorkspace() {
     document.body.dataset.sharedCursor = style;
     $('workspace-cursor').value = style;
   }
-  return { sync, closeMenus, setCursor };
+  function setCursorColor(color) {
+    color = normalizeCursorColor(color);
+    document.body.dataset.sharedCursorColor = color;
+    $('workspace-cursor-color').value = color;
+  }
+  return { sync, closeMenus, setCursor, setCursorColor };
 }

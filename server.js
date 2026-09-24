@@ -9,7 +9,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import * as Y from 'yjs';
 import { writeBook, readBook, validateBook } from './shared/model.js';
 import { resolveLocation } from './shared/navigation.js';
-import { cursorStyles, normalizeCursor } from './shared/cursors.js';
+import { cursorStyles, normalizeCursor, cursorColors, normalizeCursorColor } from './shared/cursors.js';
 import { createDuels } from './server-duels.js';
 import { sitePasswordHash as configuredPasswordHash } from './server-auth.js';
 
@@ -41,6 +41,7 @@ export function createApp(options = {}) {
       workbook_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE, name TEXT NOT NULL,
       project_id TEXT NOT NULL, list_id TEXT NOT NULL, takeoff_id TEXT NOT NULL, sheet_id TEXT NOT NULL,
       view TEXT NOT NULL, viewed_at TEXT NOT NULL, PRIMARY KEY(workbook_id,name,project_id));`);
+  if (!db.prepare('PRAGMA table_info(user_preferences)').all().some(column => column.name === 'color')) db.exec("ALTER TABLE user_preferences ADD COLUMN color TEXT NOT NULL DEFAULT ''");
   db.exec('CREATE TABLE IF NOT EXISTS auth_configuration (id INTEGER PRIMARY KEY, fingerprint TEXT NOT NULL)');
   const fingerprint = createHash('sha256').update(JSON.stringify(['mandatory-password-v1',sitePasswordHash,users])).digest('hex');
   if (db.prepare('SELECT fingerprint FROM auth_configuration WHERE id=1').get()?.fingerprint !== fingerprint) {
@@ -136,14 +137,18 @@ export function createApp(options = {}) {
   app.get('/api/preferences', (req, res) => {
     const last = db.prepare(`SELECT a.project_id FROM access a JOIN projects p ON p.id=a.project_id
       WHERE a.name=? ORDER BY a.opened_at DESC, a.project_id LIMIT 1`).get(req.user.name);
-    res.json({cursor:normalizeCursor(db.prepare('SELECT cursor FROM user_preferences WHERE name=?').get(req.user.name)?.cursor),
+    const preferences = db.prepare('SELECT cursor,color FROM user_preferences WHERE name=?').get(req.user.name);
+    res.json({cursor:normalizeCursor(preferences?.cursor), color:normalizeCursorColor(preferences?.color),
       lastWorkbook:last?.project_id || null});
   });
   app.put('/api/preferences', (req, res) => {
-    const cursor = req.body?.cursor;
+    const previous = db.prepare('SELECT cursor,color FROM user_preferences WHERE name=?').get(req.user.name);
+    const cursor = req.body?.cursor ?? normalizeCursor(previous?.cursor);
+    const color = req.body?.color === undefined ? normalizeCursorColor(previous?.color) : req.body.color;
     if (!cursorStyles.includes(cursor)) return res.status(400).json({error:'Choose a supported cursor style.'});
-    db.prepare('INSERT INTO user_preferences(name,cursor) VALUES (?,?) ON CONFLICT(name) DO UPDATE SET cursor=excluded.cursor').run(req.user.name, cursor);
-    res.json({cursor});
+    if (typeof color !== 'string' || !Object.hasOwn(cursorColors,color)) return res.status(400).json({error:'Choose a supported shared cursor color.'});
+    db.prepare('INSERT INTO user_preferences(name,cursor,color) VALUES (?,?,?) ON CONFLICT(name) DO UPDATE SET cursor=excluded.cursor,color=excluded.color').run(req.user.name, cursor, color);
+    res.json({cursor,color});
   });
   app.get('/api/projects', (req, res) => {
     const rows = db.prepare(`SELECT p.*, a.opened_at AS my_opened_at FROM projects p
@@ -265,6 +270,7 @@ export function createApp(options = {}) {
               takeoff: String(p.takeoff || '').slice(0, 100), field: String(p.field || '').slice(0, 500),
               anchor: String(p.anchor || '').slice(0, 500),
               cursor: normalizeCursor(p.cursor),
+              color: normalizeCursorColor(p.color),
               x: Math.max(0, Math.min(1, Number(p.x) || 0)), y: Math.max(0, Math.min(1, Number(p.y) || 0)),
               visible: p.visible === true
             }; presence(); return;

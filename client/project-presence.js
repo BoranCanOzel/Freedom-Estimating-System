@@ -1,6 +1,8 @@
 import { resolveLocation } from '../shared/navigation.js';
+import { normalizeCursorColor } from '../shared/cursors.js';
 
-export function peerColor(name) {
+export function peerColor(name, color) {
+  if (normalizeCursorColor(color)) return color;
   let hash = 0;
   for (const char of name || '') hash = (hash * 31 + char.charCodeAt(0)) | 0;
   return `hsl(${Math.abs(hash) % 360} 65% 42%)`;
@@ -12,7 +14,7 @@ export function setupProjectPresence(bridge) {
     frame = 0;
     const book = {lists:bridge.getProjectLists()}, here = resolveLocation(book,bridge.getLocation());
     const visitors = peers.filter(p=>p.id!==selfId).map(peer=>({peer,location:resolveLocation(book,peer)})).filter(p=>p.location);
-    const next = JSON.stringify([here,visitors.map(({peer,location})=>[peer.id,peer.name,location])]);
+    const next = JSON.stringify([here,visitors.map(({peer,location})=>[peer.id,peer.name,peer.color,location])]);
     if (!dirty && signature === next) return;
     signature = next; dirty = false;
     clear();
@@ -37,7 +39,7 @@ export function setupProjectPresence(bridge) {
       const group=groups.get(host);
       const text = tab ? peer.name : `${peer.name} · ${location.projectName} / ${location.takeoffName} · ${location.tab}`;
       if (!group.people.includes(text)) group.people.push(text);
-      if (!group.colors.includes(peerColor(peer.name))) group.colors.push(peerColor(peer.name));
+      if (!group.colors.includes(peerColor(peer.name,peer.color))) group.colors.push(peerColor(peer.name,peer.color));
     }
     for (const {peer,location:l} of visitors) {
       if (l.list === bridge.getLocation().list) {
@@ -66,6 +68,7 @@ export function setupProjectPresence(bridge) {
       const badge = document.createElement('span'); badge.className = tab ? 'tab-presence' : 'project-presence';
       badge.textContent = tab ? '● ' + people.join(', ') : people.join(' • ');
       badge.title = people.join('\n');
+      badge.style.color = colors[0];
       host.append(badge); host.classList.add('has-presence');
     }
   }

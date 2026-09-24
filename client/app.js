@@ -214,7 +214,7 @@ class LiveProject {
     this.presenceTimer = setTimeout(() => {
       if (this.socket.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify({ type: 'presence', presence: {
         ...bridge.getLocation(), field: selector(document.activeElement), ...(this.pointer || {visible:false}),
-        cursor: normalizeCursor(document.body.dataset.sharedCursor)
+        cursor: normalizeCursor(document.body.dataset.sharedCursor), color: document.body.dataset.sharedCursorColor || ''
       } }));
     }, 50);
   }
@@ -259,7 +259,6 @@ class LiveProject {
     for (const {peer, same, cursor, field} of positions) {
       let nodes = this.peerNodes.get(peer.id);
       if (!nodes) {
-        const color = peerColor(peer.name);
         nodes = {badge:element('button', peer.name, 'server-person'), cursor:element('div', '➤ ' + peer.name, 'server-cursor'), field:element('div', '', 'server-field')};
         nodes.badge.type = 'button';
         nodes.group = document.createElement('span'); nodes.group.className = 'server-peer-actions';
@@ -277,11 +276,13 @@ class LiveProject {
           if (!bridge.openLocation(target)) { message('This collaborator?s page is no longer available.', true); return; }
           browsing = recentMode = false; syncProjectPanel(); this.sendPresence();
         };
-        nodes.badge.style.setProperty('--peer', color); nodes.cursor.style.color = color; nodes.field.style.borderColor = color;
         nodes.cursor.style.left = nodes.cursor.style.top = nodes.field.style.left = nodes.field.style.top = '0px';
         $('server-people').append(nodes.group); $('server-cursors').append(nodes.cursor, nodes.field);
         this.peerNodes.set(peer.id, nodes);
       }
+      const color = peerColor(peer.name, peer.color);
+      nodes.badge.style.setProperty('--peer', color); nodes.badge.style.borderLeft = '3px solid ' + color;
+      nodes.cursor.style.color = color; nodes.field.style.borderColor = color;
       const cursorStyle = normalizeCursor(peer.cursor);
       if (nodes.cursor.dataset.style !== cursorStyle) {
         nodes.cursor.dataset.style = cursorStyle;
@@ -485,6 +486,16 @@ document.body.classList.add('server-mode');
 workspace = setupWorkspace();
 tankDuel = setupTankDuel(() => connection, message);
 projectPresence = setupProjectPresence(bridge);
+$('workspace-cursor-color').onchange = async event => {
+  const control = event.target, previous = document.body.dataset.sharedCursorColor || '';
+  control.disabled = true;
+  try {
+    const saved = await api('/preferences', {method:'PUT',body:JSON.stringify({color:control.value})});
+    if (saved.color !== control.value) throw new Error('Restart the Node project to enable shared cursor colors.');
+    workspace.setCursorColor(saved.color);
+  } catch (error) { workspace.setCursorColor(previous); message('Color was not saved: ' + error.message, true); }
+  finally { control.disabled = false; connection?.sendPresence(); }
+};
 $('workspace-cursor').onchange = async event => {
   const control = event.target, previous = document.body.dataset.sharedCursor || 'classic';
   control.disabled = true; workspace.setCursor(control.value);
@@ -557,6 +568,7 @@ async function signedIn(name) {
     message('Server update pending: restart the Node project in aaPanel to enable account settings. Your workbooks are still available.',true);
   }
   workspace.setCursor(preferences.cursor); $('workspace-cursor').disabled = !preferencesAvailable;
+  workspace.setCursorColor(preferences.color); $('workspace-cursor-color').disabled = !preferencesAvailable;
   await refresh(); syncProjectPanel();
   let remembered;
   try { remembered = localStorage.getItem('freedom:last-workbook:' + user); } catch {}
