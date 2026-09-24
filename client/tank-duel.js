@@ -11,7 +11,7 @@ export function setupTankDuel(getConnection, notify) {
   document.body.append(panel);
   const $ = id => panel.querySelector('#duel-' + id);
   const canvas = panel.querySelector('canvas'), ctx = canvas.getContext('2d');
-  let state = null, id = null, frame = 0, timer = null, animating = false, muted = false, audio;
+  let state = null, id = null, frame = 0, timer = null, aimTimer = null, animating = false, muted = false, audio;
   const send = (action, extra = {}) => {
     const connection = getConnection();
     if (!connection?.synced || connection.socket.readyState !== WebSocket.OPEN) { notify('Reconnect before starting a duel.', true); return false; }
@@ -32,7 +32,7 @@ export function setupTankDuel(getConnection, notify) {
     } catch {}
   }
   document.addEventListener('pointerdown',()=>{ try { audio ||= new AudioContext(); audio.resume().catch(()=>{}); } catch {} },{once:true});
-  function stop() { cancelAnimationFrame(frame); clearTimeout(timer); animating=false; }
+  function stop() { cancelAnimationFrame(frame); clearTimeout(timer); clearTimeout(aimTimer); aimTimer=null; animating=false; }
   function controls() {
     const mine = state && state.turn === state.you && !state.finished && !animating;
     for (const control of ['angle','power','fire']) $(control).disabled = !mine;
@@ -68,7 +68,13 @@ export function setupTankDuel(getConnection, notify) {
     if(projectile){ctx.save();ctx.translate(...projectile);ctx.scale(1/sx,1/sy);ctx.fillStyle='#fff2af';ctx.shadowBlur=12;ctx.shadowColor='#ffc65b';ctx.beginPath();ctx.arc(0,0,4,0,Math.PI*2);ctx.fill();ctx.restore();}
   }
   new ResizeObserver(()=>draw()).observe(canvas);
-  for(const name of ['angle','power']) $(name).oninput=()=>{ $(name+'-value').textContent=$(name).value+(name==='angle'?'°':'');draw(); };
+  for(const name of ['angle','power']) $(name).oninput=()=>{
+    $(name+'-value').textContent=$(name).value+(name==='angle'?'°':'');draw();
+    if(name==='angle' && !aimTimer) aimTimer=setTimeout(()=>{
+      aimTimer=null;
+      if(state && !state.finished && !animating && state.turn===state.you) send('aim',{angle:Number($('angle').value),round:state.round});
+    },50);
+  };
   $('sound').onclick=()=>{muted=!muted;$('sound').textContent=muted?'Sound off':'Sound on';$('sound').setAttribute('aria-pressed',String(!muted));};
   $('accept').onclick=()=>{if(send('accept'))$('accept').disabled=true;};
   $('decline').onclick=()=>send('decline');
@@ -81,6 +87,12 @@ export function setupTankDuel(getConnection, notify) {
     challenge(target) { if(send('challenge',{target}))sound('invite'); },
     disconnect() { stop(); if(!panel.hidden){$('status').textContent='Connection closed. Duel ended.';$('game').hidden=true;$('invite').hidden=true;}id=null;state=null; },
     receive(message) {
+      if(message.event==='aim') {
+        if(!state || state.finished || message.id!==id || message.round!==state.round || message.player===state.you)return;
+        state.angles[message.player]=message.angle;
+        if(!animating)draw();
+        return;
+      }
       if(message.event==='error'){notify(message.reason,true);animating=false;controls();return;}
       if(message.event==='ended') {
         if(id!==message.id)return;stop();id=null;state=null;$('status').textContent=message.reason;$('game').hidden=true;$('invite').hidden=true;return;

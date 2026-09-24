@@ -34,6 +34,14 @@ test('online players accept a tank duel, trade shots and leave without changing 
     await expect(alice.locator('#duel-status')).toHaveText(/turn/);
     const first=await alice.locator('#duel-fire').isEnabled()?alice:bob,second=first===alice?bob:alice;
     await expect(second.locator('#duel-fire')).toBeDisabled();
+    const beforeAim=await second.locator('#tank-duel canvas').evaluate(canvas=>canvas.toDataURL());
+    await first.locator('#duel-angle').fill('90');
+    await expect.poll(()=>second.locator('#tank-duel canvas').evaluate(canvas=>canvas.toDataURL())).not.toBe(beforeAim);
+    const uprightAim=await second.locator('#tank-duel canvas').evaluate(canvas=>canvas.toDataURL());
+    await first.locator('#duel-angle').fill('70');
+    await expect.poll(()=>second.locator('#tank-duel canvas').evaluate(canvas=>canvas.toDataURL())).not.toBe(uprightAim);
+    await expect(first.locator('#duel-fire')).toBeEnabled();
+    await expect(second.locator('#duel-fire')).toBeDisabled();
     await first.locator('#duel-angle').fill(first===alice?'5':'175');await first.locator('#duel-power').fill('10');
     await first.locator('#duel-fire').click();
     await expect(second.locator('#duel-fire')).toBeEnabled();

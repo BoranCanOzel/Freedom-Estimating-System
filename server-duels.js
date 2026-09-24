@@ -37,6 +37,14 @@ export function createDuels() {
       game.turn = Math.random() < .5 ? 0 : 1; game.round = 0; game.angles = [45,135];
       publish(game); return;
     }
+    if (msg.action === 'aim') {
+      if (game.phase !== 'playing' || game.players[game.turn] !== ws || msg.round !== game.round || Date.now() < (game.nextShot || 0)) return;
+      if (!Number.isFinite(msg.angle) || msg.angle < 5 || msg.angle > 175) return;
+      if (game.angles[game.turn] === msg.angle) return;
+      game.angles[game.turn] = msg.angle;
+      send(game.players[1-game.turn], {event:'aim', id:game.id, round:game.round, player:game.turn, angle:msg.angle});
+      return;
+    }
     if (msg.action !== 'fire') return;
     if (game.phase !== 'playing' || game.players[game.turn] !== ws || Date.now() < (game.nextShot || 0) || msg.round !== game.round) return error('Wait for your turn.');
     if (!Number.isFinite(msg.angle) || msg.angle < 5 || msg.angle > 175 || !Number.isFinite(msg.power) || msg.power < 10 || msg.power > 100) return error('Choose a valid angle and power.');

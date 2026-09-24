@@ -35,6 +35,15 @@ test('duels require consent, enforce turns and shot validation, and end on disco
   duels.handle(b,{action:'accept',id},clients);
   const state=a.messages.at(-1), shooter=[a,b][state.turn], other=[b,a][state.turn];
   assert.deepEqual(state.ground,b.messages.at(-1).ground);
+  const count=shooter.messages.length;
+  duels.handle(other,{action:'aim',id,round:0,angle:80},clients);
+  assert.equal(shooter.messages.length,count);
+  duels.handle(shooter,{action:'aim',id,round:0,angle:80},clients);
+  assert.deepEqual(other.messages.at(-1),{type:'duel',event:'aim',id,round:0,player:state.turn,angle:80});
+  const received=other.messages.length;
+  for(const angle of [NaN,0,180,'80'])duels.handle(shooter,{action:'aim',id,round:0,angle},clients);
+  duels.handle(shooter,{action:'aim',id,round:99,angle:70},clients);
+  assert.equal(other.messages.length,received);
   duels.handle(other,{action:'fire',id,round:0,angle:45,power:60},clients);
   assert.equal(other.messages.at(-1).event,'error');
   duels.handle(shooter,{action:'fire',id,round:0,angle:NaN,power:60},clients);
