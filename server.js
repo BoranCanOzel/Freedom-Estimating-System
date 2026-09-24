@@ -11,6 +11,7 @@ import { writeBook, readBook, validateBook } from './shared/model.js';
 import { resolveLocation } from './shared/navigation.js';
 import { cursorStyles, normalizeCursor, cursorColors, normalizeCursorColor } from './shared/cursors.js';
 import { createDuels } from './server-duels.js';
+import { mountAiAccess } from './server-ai-access.js';
 import { sitePasswordHash as configuredPasswordHash } from './server-auth.js';
 
 const root = dirname(fileURLToPath(import.meta.url));
@@ -44,7 +45,8 @@ export function createApp(options = {}) {
   if (!db.prepare('PRAGMA table_info(user_preferences)').all().some(column => column.name === 'color')) db.exec("ALTER TABLE user_preferences ADD COLUMN color TEXT NOT NULL DEFAULT ''");
   db.exec('CREATE TABLE IF NOT EXISTS auth_configuration (id INTEGER PRIMARY KEY, fingerprint TEXT NOT NULL)');
   const fingerprint = createHash('sha256').update(JSON.stringify(['mandatory-password-v1',sitePasswordHash,users])).digest('hex');
-  if (db.prepare('SELECT fingerprint FROM auth_configuration WHERE id=1').get()?.fingerprint !== fingerprint) {
+  const authChanged = db.prepare('SELECT fingerprint FROM auth_configuration WHERE id=1').get()?.fingerprint !== fingerprint;
+  if (authChanged) {
     db.exec('DELETE FROM sessions');
     db.prepare('INSERT OR REPLACE INTO auth_configuration VALUES (1,?)').run(fingerprint);
   }
@@ -106,6 +108,7 @@ export function createApp(options = {}) {
     }
     return rooms.get(id);
   }
+  mountAiAccess({app,db,session,project,rooms,snapshot,authChanged});
   app.get('/api/session', (req, res) => res.json({ user: session(req)?.name || null, passwordRequired: true }));
   app.post('/api/login', (req, res) => {
     const ip = req.ip, recent = (loginAttempts.get(ip) || []).filter(t => Date.now() - t < 60000);

@@ -19,6 +19,32 @@ Website login always requires a password. Its scrypt hash is shipped in the serv
 
 ## aaPanel deployment
 
+### AI takeoff access
+
+Inside a takeoff, use **AI access → Generate access**. The connection package
+contains a temporary Bearer key, REST endpoint, MCP endpoint, and OpenAPI schema
+URL. Configure these in a tool-capable AI client; simply pasting the URL into a
+chat does not create a connection. The hosted endpoint must be reachable over
+HTTPS. This implementation provides Bearer authentication, not an OAuth flow;
+clients that require OAuth need a separate integration. The MCP endpoint supports
+the 2025-03-26, 2025-06-18, and 2025-11-25 Streamable HTTP versions.
+
+Each key is bound to one takeoff and all of its option pages, expires after 30
+minutes, and permits one successful save. Read/validate requests do not consume
+it. Keys are stored hashed, displayed only when generated, and can be revoked
+from the same panel. Changing the website password also revokes outstanding keys.
+
+AI changes appear live in the estimate. The panel lists the changes and offers
+**Undo AI change** when the takeoff has not changed since that save. Other
+takeoffs can change independently. Undo never reactivates the key. AI access and
+change history persist in the existing SQLite database; schema migration runs
+automatically on server startup. Deploy all files, build, then restart Node.
+
+See [the AI JSON editing guide](docs/ai-takeoff.md) for the request shapes, ID
+rules, numeric inputs, sections, revision conflicts, and retry behavior.
+
+### Server setup
+
 The site now needs a running Node process. Serving `index.html` as a static site does not provide shared storage or collaboration.
 
 1. Install/select **Node.js 24 LTS** in aaPanel's Node project manager.

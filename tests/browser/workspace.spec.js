@@ -29,6 +29,38 @@ async function openWorkbook(page, data = workbook(), name = 'Workspace tester') 
   await expect(page.locator('#server-status')).toHaveText('All changes saved', {timeout:20000});
 }
 
+test('takeoff AI access generates a scoped package, updates live, and offers undo', async ({page}) => {
+  await openWorkbook(page,workbook(),'AI browser '+Date.now());
+  await page.locator('#takeoff-ai-access').click();
+  await expect(page.locator('#ai-access-scope')).toContainText('North takeoff');
+  await page.locator('#ai-access-generate').click();
+  await expect(page.locator('#ai-access-connection')).toHaveValue(/Authorization: Bearer/);
+  const connection=await page.locator('#ai-access-connection').inputValue();
+  const key=/Authorization: Bearer ([a-f0-9]+)/.exec(connection)[1];
+  const headers={Authorization:'Bearer '+key};
+  const read=await (await page.request.get('/api/ai/v1/takeoff',{headers})).json();
+  expect(read.takeoff.id).toBe('tn');
+  read.takeoff.sheets[0].rows[0].name='AI updated cutting';
+  const saved=await page.request.post('/api/ai/v1/save',{headers,data:{revision:read.revision,takeoff:read.takeoff,requestId:'browser-save'}});
+  expect(saved.ok()).toBe(true);
+  await page.locator('#ai-access-close').click();
+  await expect(page.locator('#body .name-in').first()).toHaveValue('AI updated cutting');
+  await page.locator('#takeoff-ai-access').click();
+  await expect(page.locator('#ai-access-connection')).toHaveValue('');
+  await page.locator('#ai-access-changes summary').click();
+  await page.getByRole('button',{name:'Undo AI change',exact:true}).click();
+  await expect(page.locator('#ai-access-message')).toHaveText('AI change undone.');
+  await page.locator('#ai-access-close').click();
+  await expect(page.locator('#body .name-in').first()).toHaveValue('Concrete cutting');
+  await page.locator('#takeoff-ai-access').click();
+  await page.locator('#ai-access-generate').click();
+  await expect(page.locator('#ai-access-connection')).toHaveValue(/Authorization: Bearer/);
+  const secondKey=/Authorization: Bearer ([a-f0-9]+)/.exec(await page.locator('#ai-access-connection').inputValue())[1];
+  await page.getByRole('button',{name:'Revoke',exact:true}).click();
+  await expect(page.locator('#ai-access-grants')).toContainText('Revoked');
+  expect((await page.request.get('/api/ai/v1/takeoff',{headers:{Authorization:'Bearer '+secondKey}})).status()).toBe(403);
+});
+
 test('Ctrl selection edits multiple fields and drags nonadjacent items together', async ({page}) => {
   const data=workbook();
   data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0].rows=['a','b','c','d'].map(id=>({id,kind:'labor',name:id,count:1,time:1,days:1,cost:10}));

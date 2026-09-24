@@ -7,6 +7,7 @@ import { resolveLocation } from '../shared/navigation.js';
 import { setupHistory } from './history.js';
 import { normalizeCursor } from '../shared/cursors.js';
 import { setupTankDuel } from './tank-duel.js';
+import { setupAiAccess } from './ai-access.js';
 
 const $ = id => document.getElementById(id);
 const clone = value => structuredClone(value);
@@ -485,6 +486,11 @@ document.body.insertAdjacentHTML('afterbegin', `
 document.body.classList.add('server-mode');
 workspace = setupWorkspace();
 tankDuel = setupTankDuel(() => connection, message);
+setupAiAccess(api,()=>{
+  const location=bridge.getLocation();
+  const takeoff=bridge.getProjectLists().flatMap(list=>list.companies||[]).flatMap(company=>company.projects||[]).flatMap(project=>project.takeoffs||[]).find(value=>value.id===location.takeoff);
+  return {...location,workbook:current?.id,name:takeoff?.name||'Current takeoff'};
+});
 projectPresence = setupProjectPresence(bridge);
 $('workspace-cursor-color').onchange = async event => {
   const control = event.target, previous = document.body.dataset.sharedCursorColor || '';
