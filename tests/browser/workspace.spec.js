@@ -36,6 +36,21 @@ test('takeoff AI access generates a scoped package, updates live, and offers und
   await page.locator('#ai-access-generate').click();
   await expect(page.locator('#ai-access-connection')).toHaveValue(/Authorization: Bearer/);
   const connection=await page.locator('#ai-access-connection').inputValue();
+  // Restricted browsers may omit the Clipboard API entirely.
+  await page.evaluate(()=>{
+    Object.defineProperty(navigator,'clipboard',{configurable:true,value:undefined});
+    document.execCommand=()=>false;
+  });
+  await page.locator('#ai-access-copy').click();
+  await expect(page.locator('#ai-access-message')).toContainText('press Ctrl+C');
+  expect(await page.locator('#ai-access-connection').evaluate(el=>el.value.slice(el.selectionStart,el.selectionEnd))).toBe(connection);
+  // Permission rejection should also fall back, and report successful fallback copying.
+  await page.evaluate(()=>{
+    Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw new Error('Permission denied');}}});
+    document.execCommand=command=>command==='copy';
+  });
+  await page.locator('#ai-access-copy').click();
+  await expect(page.locator('#ai-access-message')).toHaveText('Connection package copied.');
   const key=/Authorization: Bearer ([a-f0-9]+)/.exec(connection)[1];
   const headers={Authorization:'Bearer '+key};
   const read=await (await page.request.get('/api/ai/v1/takeoff',{headers})).json();

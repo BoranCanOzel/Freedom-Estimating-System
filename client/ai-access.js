@@ -49,7 +49,20 @@ export function setupAiAccess(api,getContext) {
       $('package').hidden=false;await refresh();
     }finally{$('generate').disabled=false;}
   });
-  $('copy').onclick=action(async()=>{await navigator.clipboard.writeText($('connection').value);$('message').textContent='Connection package copied.';});
+  $('copy').onclick=action(async()=>{
+    const field=$('connection');
+    let copied=false;
+    try {
+      if(typeof navigator.clipboard?.writeText==='function'){
+        await navigator.clipboard.writeText(field.value);copied=true;
+      }
+    } catch {}
+    if(!copied){
+      field.focus();field.select();field.setSelectionRange(0,field.value.length);
+      try { copied=document.execCommand('copy'); } catch {}
+    }
+    $('message').textContent=copied?'Connection package copied.':'Automatic copy is unavailable. The connection text is selected—press Ctrl+C (Command+C on Mac) to copy it.';
+  });
   for(const event of ['estimator:view','estimator:projects'])document.addEventListener(event,sync);
   sync();
 }
