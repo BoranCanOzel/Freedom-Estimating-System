@@ -1,16 +1,17 @@
-#tank-duel{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);width:min(1000px,calc(100vw - 24px));max-height:70vh;overflow:auto;z-index:650;background:#202b33;color:#f6ead5;border:1px solid #b99362;border-radius:10px;box-shadow:0 12px 50px #0009;font:13px system-ui,sans-serif}
-#tank-duel header{display:flex;align-items:center;gap:12px;padding:10px 14px;flex-wrap:wrap}
+#tank-duel{position:fixed;inset:auto 0 0;display:flex;flex-direction:column;width:100%;max-height:75vh;z-index:650;pointer-events:none;color:#f6ead5;font:13px system-ui,sans-serif}
+#tank-duel header{order:2;display:flex;align-items:center;gap:12px;padding:8px 16px;flex-wrap:wrap;background:#202b33f5;pointer-events:auto}
+#duel-game{display:contents}
 #tank-duel header strong{color:#ffcf87;letter-spacing:.12em}
 #duel-status{flex:1;min-width:150px}
 #tank-duel button{padding:7px 12px;border:1px solid #9e855f;border-radius:5px;background:#34434c;color:#fff1db;font:600 12px system-ui;cursor:pointer}
 #tank-duel button:disabled{opacity:.45;cursor:default}
 #tank-duel button:focus-visible,#tank-duel input:focus-visible{outline:2px solid #ffcf87;outline-offset:3px}
 #tank-duel #duel-fire,#tank-duel #duel-accept{background:#c58c3e;color:#171f24}
-#tank-duel canvas{display:block;width:100%;height:auto;max-height:38vh;object-fit:contain;background:#23333f}
-.duel-controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 14px}
+#tank-duel canvas{order:1;display:block;width:100%;height:clamp(160px,28vh,300px);min-height:0;object-fit:fill;background:transparent}
+.duel-controls{order:3;display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:8px 16px;background:#202b33f5;pointer-events:auto}
 .duel-controls label{display:flex;align-items:center;gap:7px}.duel-controls input{width:100px;accent-color:#e2b470}.duel-controls output{min-width:32px}
 .duel-controls>span:last-child{font-size:11px;color:#ccbea9}
-#duel-invite{padding:0 14px 16px}#duel-invite button{margin-right:8px}
+#duel-invite{order:3;padding:0 16px 14px;background:#202b33f5;pointer-events:auto}#duel-invite button{margin-right:8px}
 .server-peer-actions{display:inline-flex;align-items:center;gap:2px}
 body.server-mode #server-bar .server-duel-challenge{padding:3px 5px;min-width:24px;color:var(--amber);background:transparent;border:0;font-size:15px}
 @media print{#tank-duel{display:none!important}}

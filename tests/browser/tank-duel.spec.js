@@ -18,6 +18,14 @@ test('online players accept a tank duel, trade shots and leave without changing 
     await expect(alice.locator('#duel-status')).toHaveText('Challenge sent');
     await bob.locator('#duel-accept').click();
     for(const page of [alice,bob])await expect(page.locator('#duel-game')).toBeVisible();
+    const overlay = await alice.locator('#tank-duel').evaluate(el=>{
+      const rect=el.getBoundingClientRect(),canvas=el.querySelector('canvas'),bounds=canvas.getBoundingClientRect();
+      return {left:rect.left,right:rect.right,bottom:rect.bottom,width:innerWidth,height:innerHeight,
+        transparent:canvas.getContext('2d').getImageData(500,40,1,1).data[3]===0,
+        clickThrough:!el.contains(document.elementFromPoint(bounds.left+bounds.width/2,bounds.top+20))};
+    });
+    expect(overlay.left).toBeCloseTo(0);expect(overlay.right).toBeCloseTo(overlay.width);expect(overlay.bottom).toBeCloseTo(overlay.height);
+    expect(overlay.transparent).toBe(true);expect(overlay.clickThrough).toBe(true);
     await expect(alice.locator('#duel-status')).toHaveText(/turn/);
     const first=await alice.locator('#duel-fire').isEnabled()?alice:bob,second=first===alice?bob:alice;
     await expect(second.locator('#duel-fire')).toBeDisabled();

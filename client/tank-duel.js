@@ -40,9 +40,7 @@ export function setupTankDuel(getConnection, notify) {
   }
   function draw(ground = state?.ground, projectile = null) {
     if (!ground || !state) return;
-    const sky = ctx.createLinearGradient(0,0,0,280); sky.addColorStop(0,'#23333f');sky.addColorStop(1,'#a17b59');
-    ctx.fillStyle=sky;ctx.fillRect(0,0,1000,280);
-    ctx.fillStyle='#eed4a2';ctx.beginPath();ctx.arc(790,46,20,0,Math.PI*2);ctx.fill();
+    ctx.clearRect(0,0,1000,280);
     ctx.fillStyle='#695f59';ctx.beginPath();ctx.moveTo(0,280);
     for(let x=0;x<=1000;x+=10)ctx.lineTo(x,Math.max(55,ground[x]-38));
     ctx.lineTo(1000,280);ctx.fill();
@@ -55,7 +53,8 @@ export function setupTankDuel(getConnection, notify) {
       ctx.fillStyle='#20282c';ctx.fillRect(x-18,y-8,36,8);
       ctx.fillStyle=color;ctx.fillRect(x-15,y-17,30,11);ctx.beginPath();ctx.arc(x,y-15,8,Math.PI,0);ctx.fill();
       ctx.strokeStyle=color;ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(x,y-12);ctx.lineTo(x+Math.cos(angle)*25,y-12-Math.sin(angle)*25);ctx.stroke();
-      ctx.font='bold 12px system-ui';ctx.textAlign=index===0?'left':'right';ctx.fillText(state.names[index].slice(0,24),index===0?16:984,22);
+      ctx.font='bold 12px system-ui';ctx.textAlign=index===0?'left':'right';
+      ctx.shadowColor='#172129';ctx.shadowBlur=4;ctx.fillText(state.names[index].slice(0,24),index===0?16:984,22);ctx.shadowBlur=0;
       if(index===state.turn&&!state.finished){ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(x,y-43);ctx.lineTo(x-5,y-50);ctx.lineTo(x+5,y-50);ctx.fill();}
     }
     if(projectile){ctx.fillStyle='#fff2af';ctx.shadowBlur=12;ctx.shadowColor='#ffc65b';ctx.beginPath();ctx.arc(projectile[0],projectile[1],4,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;}

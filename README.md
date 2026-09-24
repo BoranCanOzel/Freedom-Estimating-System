@@ -64,7 +64,7 @@ Use **Ctrl+Z** to undo and **Ctrl+Y** or **Ctrl+Shift+Z** to redo (Command short
 
 Project settings save automatically. Renaming a custom field retains existing detail values and its filter configuration. Theme and zoom are personal browser preferences that persist across workbook changes. The Scopes tab replaces the former gear icon for the option overview. Destructive actions that require confirmation use a modal dialog with Cancel and an action button; Escape cancels.
 
-View → Cursor style offers system default, large dark/light arrows, and crosshair. This setting is stored per signed-in account in SQLite and loaded on sign-in across browsers; it does not change shared workbooks. Text fields and resize handles retain their functional cursors.
+View → Shared cursor offers Classic (original), Pointer arrow, Crosshair, and Ring. It controls the cursor other collaborators see, leaving your local mouse pointer unchanged. This setting is stored per signed-in account in SQLite and loaded on sign-in across browsers; it does not change shared workbooks. After deploying this change, restart the Node project as well as building the client. An older running server rejects the new cursor options with “Choose a supported cursor style.”
 
 Scrolling reuses collaborator markers and batches their position updates once per animation frame. Medieval theme textures are pre-rendered PNGs with the same appearance as the original SVG filters. They are committed in `client/textures/` and bundled by `npm run build`; deployment does not require a browser. To regenerate them after editing the original texture definitions, run `node scripts/rasterize-textures.mjs` on a development machine with Microsoft Edge installed.
 

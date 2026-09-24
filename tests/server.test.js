@@ -39,7 +39,12 @@ test('authenticated projects, real-time changes, access dates, snapshots, and re
     assert.equal(missing.status,404);assert.match(missing.headers.get('content-type'),/application\/json/);
     assert.match((await missing.json()).error,/API route not found/);
     assert.deepEqual(await (await request('/api/preferences',alice)).json(), {cursor:'classic',lastWorkbook:null});
-    assert.equal((await request('/api/preferences',alice,'PUT',{cursor:'arrow'})).status,200);
+    for (const cursor of ['classic','crosshair','ring','arrow']) {
+      const saved = await request('/api/preferences',alice,'PUT',{cursor});
+      assert.equal(saved.status,200,`Save shared cursor: ${cursor}`);
+      assert.deepEqual(await saved.json(),{cursor});
+      assert.equal((await (await request('/api/preferences',alice)).json()).cursor,cursor);
+    }
     assert.equal((await request('/api/preferences',alice,'PUT',{cursor:'invalid'})).status,400);
     assert.deepEqual(await (await request('/api/preferences',bob)).json(), {cursor:'classic',lastWorkbook:null});
     const rejected=await request('/api/projects',alice,'POST',{name:'bad',book:{random:true}}); assert.equal(rejected.status,400);
