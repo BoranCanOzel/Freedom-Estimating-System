@@ -1,6 +1,7 @@
 import { renderProjectSettings } from './project-settings.js';
 import './workspace.css';
 import './textures.css';
+import { normalizeCursor } from '../shared/cursors.js';
 
 const $ = id => document.getElementById(id);
 
@@ -33,12 +34,12 @@ export function setupWorkspace() {
           <button id="medievalMode" type="button" data-theme="medieval">Medieval</button>
         </div>
         <div id="workspace-zoom"></div>
-        <div class="workspace-cursor-setting"><label for="workspace-cursor">Cursor style</label>
+        <div class="workspace-cursor-setting"><label for="workspace-cursor">Shared cursor</label>
           <select id="workspace-cursor" disabled>
-            <option value="system">System default</option><option value="large-dark">Large dark arrow</option>
-            <option value="large-light">Large light arrow</option><option value="crosshair">Crosshair</option>
+            <option value="classic">Classic (original)</option><option value="arrow">Pointer arrow</option>
+            <option value="crosshair">Crosshair</option><option value="ring">Ring</option>
           </select>
-        </div><p class="workspace-preference-hint">Saved to your account.</p>
+        </div><p class="workspace-preference-hint">How others see your cursor on the same page. Saved to your account.</p>
         <div data-for-view="sheet" class="menu-context"><div class="menu-divider"></div>
           <p class="menu-label">Sheet display</p><div id="workspace-pictures"></div><div id="workspace-detail"></div>
         </div>
@@ -87,7 +88,7 @@ export function setupWorkspace() {
   map.id = 'workspace-map'; map.className = 'summary-map-link';
   map.target = '_blank'; map.rel = 'noopener noreferrer';
   map.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg><span>Map</span>';
-  pageActions.after(map);
+  detailCopy.after(map);
   move('reset', 'workspace-option-actions');
   const excel = document.querySelector('.js-export');
   excel.textContent = 'Export estimate to Excel'; excel.dataset.ready = ''; $('workspace-excel').append(excel);
@@ -154,6 +155,8 @@ export function setupWorkspace() {
   $('workspace-flat-add').addEventListener('change', event => { bridge.setFlatAddEnabled(event.target.checked); sync(); });
   function sync() {
     const ready = document.body.classList.contains('server-active'), view = bridge.getLocation().view || 'sheet';
+    const mapHost = document.querySelector(`#${view}Card .eyebrow-row`);
+    if (mapHost && map.parentElement !== mapHost) mapHost.append(map);
     const address = ready ? bridge.getMapAddress() : '';
     map.title = address || (ready ? 'Add a job or customer address to open the map.' : 'Open a workbook to view its project map.');
     map.setAttribute('aria-label', address ? 'Open ' + address + ' in Google Maps' : map.title);
@@ -178,14 +181,9 @@ export function setupWorkspace() {
   document.addEventListener('estimator:projects', sync);
   sync();
   function setCursor(style) {
-    if (!['system','large-dark','large-light','crosshair'].includes(style)) style = 'system';
-    document.body.dataset.cursor = style;
+    style = normalizeCursor(style);
+    document.body.dataset.sharedCursor = style;
     $('workspace-cursor').value = style;
-    if (style.startsWith('large-')) {
-      const light = style === 'large-light';
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M3 2 L3 26 L10 19 L15 30 L20 28 L15 17 L25 17 Z" fill="${light ? '#fff' : '#141414'}" stroke="${light ? '#141414' : '#fff'}" stroke-width="2" stroke-linejoin="round"/></svg>`;
-      document.body.style.setProperty('--workspace-cursor', `url("data:image/svg+xml,${encodeURIComponent(svg)}") 3 2, default`);
-    } else document.body.style.setProperty('--workspace-cursor', style === 'crosshair' ? 'crosshair' : 'auto');
   }
   return { sync, closeMenus, setCursor };
 }

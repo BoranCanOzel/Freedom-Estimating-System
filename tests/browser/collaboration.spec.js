@@ -24,6 +24,20 @@ test('two estimators share edits, cursors, reconnects and projects', async ({ br
     await alice.locator('#body input[aria-label="Item name"]').first().hover();
     await expect(bob.locator('.server-cursor')).toContainText('Alice');
     await expect(bob.locator('.server-field')).toHaveCount(1);
+    await expect(bob.locator('.server-cursor')).toHaveAttribute('data-style','classic');
+    await expect(bob.locator('.server-cursor')).toContainText('➤');
+    for (const style of ['arrow','crosshair','ring','classic']) {
+      await alice.locator('#workspace-view').evaluate(el=>{el.open=true;});
+      const saved=alice.waitForResponse(r=>r.url().endsWith('/api/preferences') && r.request().method()==='PUT');
+      await alice.locator('#workspace-cursor').selectOption(style);
+      expect((await saved).ok()).toBe(true);
+      await alice.locator('#workspace-view').evaluate(el=>{el.open=false;});
+      await alice.locator('#body input[aria-label="Item name"]').first().hover();
+      await expect(bob.locator('.server-cursor')).toHaveAttribute('data-style',style);
+      await expect(bob.locator('.server-cursor')).toBeVisible();
+      await expect(bob.locator('.server-cursor')).toContainText('Alice');
+      await expect(bob.locator('#workspace-cursor')).toHaveValue('classic');
+    }
     // Scrolling must reuse collaborator nodes rather than rebuilding the header.
     const retained = await bob.evaluate(async () => {
       const badge = document.querySelector('.server-person'), cursor = document.querySelector('.server-cursor');

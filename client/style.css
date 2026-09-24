@@ -27,4 +27,12 @@ body.server-active #server-welcome{display:none}
 dialog{border:1px solid var(--rule);border-radius:8px;padding:26px;background:var(--card);color:var(--ink);width:min(420px,90vw);box-shadow:0 20px 70px #0006;font-family:var(--f-sans)}
 dialog::backdrop{background:#101a24b8}dialog h2{margin:0 0 12px}dialog label{display:grid;gap:7px;margin:16px 0;font-size:13px}dialog label[hidden]{display:none}dialog p{font-size:13px;color:var(--muted);line-height:1.5}.server-dialog-actions{display:flex;justify-content:flex-end;gap:8px}dialog button[type=submit]{background:#1f3b4d;color:white;border-color:#1f3b4d}
 @media(max-width:750px){#server-bar{gap:7px}#server-title{max-width:25vw;font-size:11px}#server-status{max-width:130px;overflow:hidden;text-overflow:ellipsis}#server-people{display:none}#server-drawer{left:10px;width:min(330px,calc(100vw - 20px))}#server-welcome{padding:30px}#server-signout{max-width:100px;overflow:hidden;white-space:nowrap}}
+.server-cursor:not([data-style=classic]){display:flex;align-items:flex-start;gap:5px}
+.server-cursor-icon{display:inline-block;position:relative;flex:none;width:20px;height:20px}
+.server-cursor[data-style=arrow] .server-cursor-icon{width:22px;height:26px}
+.server-cursor[data-style=crosshair] .server-cursor-icon{margin:-10px 0 0 -10px}
+.server-cursor[data-style=crosshair] .server-cursor-icon::before,.server-cursor[data-style=crosshair] .server-cursor-icon::after{content:'';position:absolute;background:currentColor;box-shadow:0 0 1px 1px white}
+.server-cursor[data-style=crosshair] .server-cursor-icon::before{left:9px;top:0;width:2px;height:20px}
+.server-cursor[data-style=crosshair] .server-cursor-icon::after{left:0;top:9px;width:20px;height:2px}
+.server-cursor[data-style=ring] .server-cursor-icon{margin:-9px 0 0 -9px;width:18px;height:18px;border:3px solid currentColor;border-radius:50%;box-shadow:0 0 0 1px white,inset 0 0 0 1px white}
 @media print{#server-bar,#server-drawer,#server-welcome,#server-message,#server-cursors,dialog{display:none!important}}

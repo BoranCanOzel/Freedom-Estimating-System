@@ -5,6 +5,8 @@ import { setupWorkspace } from './workspace.js';
 import { setupProjectPresence, peerColor } from './project-presence.js';
 import { resolveLocation } from '../shared/navigation.js';
 import { setupHistory } from './history.js';
+import { normalizeCursor } from '../shared/cursors.js';
+import { setupTankDuel } from './tank-duel.js';
 
 const $ = id => document.getElementById(id);
 const clone = value => structuredClone(value);
@@ -12,6 +14,7 @@ const encode = data => { let s = ''; for (let i = 0; i < data.length; i += 8192)
 const decode = data => Uint8Array.from(atob(data), c => c.charCodeAt(0));
 let user, current, connection, projects = [], filter = '', busy = false, browsing = true;
 let workspace, projectPresence, recentMode = false, recentRequest = 0, preferencesAvailable = true;
+let tankDuel;
 const bridge = window.estimator;
 const cacheDB = new Promise((resolve, reject) => {
   const request = indexedDB.open('freedom-collaboration', 1);
@@ -145,12 +148,14 @@ class LiveProject {
         } else if (msg.type === 'ack') {
           this.acked = Math.max(this.acked, msg.seq); this.paintStatus();
         } else if (msg.type === 'presence') { this.peers = msg.peers; this.paintPeers(); projectPresence.update(this.peers,this.peerId); }
+        else if (msg.type === 'duel') tankDuel.receive(msg);
         else if (msg.type === 'error') { this.failed = true; status(msg.error, true); message('Your changes are still in this browser. Export JSON before closing if the error persists.', true); }
       } catch (e) { status('Could not apply a shared update. Export your work before reloading.', true); console.error(e); }
     };
     this.socket.onclose = event => {
       if (this.closed) return;
       this.synced = false; this.peers = []; this.paintPeers(); projectPresence.clear();
+      tankDuel.disconnect();
       if (event.code === 4001) { status('Session expired — export pending changes and sign in again', true); return; }
       this.paintStatus();
       this.retryTimer = setTimeout(() => this.connect(), Math.min(1000 * 2 ** this.retry++, 10000));
@@ -208,7 +213,8 @@ class LiveProject {
     clearTimeout(this.presenceTimer);
     this.presenceTimer = setTimeout(() => {
       if (this.socket.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify({ type: 'presence', presence: {
-        ...bridge.getLocation(), field: selector(document.activeElement), ...(this.pointer || {visible:false})
+        ...bridge.getLocation(), field: selector(document.activeElement), ...(this.pointer || {visible:false}),
+        cursor: normalizeCursor(document.body.dataset.sharedCursor)
       } }));
     }, 50);
   }
@@ -248,7 +254,7 @@ class LiveProject {
     });
     const active = new Set(peers.map(peer => peer.id));
     for (const [id, nodes] of this.peerNodes) if (!active.has(id)) {
-      nodes.badge.remove(); nodes.cursor.remove(); nodes.field.remove(); this.peerNodes.delete(id);
+      nodes.group.remove(); nodes.cursor.remove(); nodes.field.remove(); this.peerNodes.delete(id);
     }
     for (const {peer, same, cursor, field} of positions) {
       let nodes = this.peerNodes.get(peer.id);
@@ -256,6 +262,13 @@ class LiveProject {
         const color = peerColor(peer.name);
         nodes = {badge:element('button', peer.name, 'server-person'), cursor:element('div', '➤ ' + peer.name, 'server-cursor'), field:element('div', '', 'server-field')};
         nodes.badge.type = 'button';
+        nodes.group = document.createElement('span'); nodes.group.className = 'server-peer-actions';
+        const challenge = document.createElement('button'); challenge.type = 'button'; challenge.className = 'server-duel-challenge';
+        challenge.textContent = '⚔'; challenge.title = 'Challenge ' + peer.name + ' to a tank duel';
+        challenge.setAttribute('aria-label', challenge.title);
+        challenge.onclick = () => tankDuel.challenge(peer.id);
+        challenge.hidden = peer.name === user;
+        nodes.group.append(nodes.badge, challenge);
         nodes.badge.onclick = () => {
           const latest = this.peers.find(candidate => candidate.id === peer.id);
           const target = latest && resolveLocation({lists:bridge.getProjectLists()}, latest);
@@ -266,8 +279,20 @@ class LiveProject {
         };
         nodes.badge.style.setProperty('--peer', color); nodes.cursor.style.color = color; nodes.field.style.borderColor = color;
         nodes.cursor.style.left = nodes.cursor.style.top = nodes.field.style.left = nodes.field.style.top = '0px';
-        $('server-people').append(nodes.badge); $('server-cursors').append(nodes.cursor, nodes.field);
+        $('server-people').append(nodes.group); $('server-cursors').append(nodes.cursor, nodes.field);
         this.peerNodes.set(peer.id, nodes);
+      }
+      const cursorStyle = normalizeCursor(peer.cursor);
+      if (nodes.cursor.dataset.style !== cursorStyle) {
+        nodes.cursor.dataset.style = cursorStyle;
+        nodes.cursor.replaceChildren();
+        if (cursorStyle === 'classic') nodes.cursor.textContent = '➤ ' + peer.name;
+        else {
+          const icon = document.createElement('span');
+          icon.className = 'server-cursor-icon';
+          if (cursorStyle === 'arrow') icon.innerHTML = '<svg width="22" height="26" viewBox="0 0 22 26"><path d="M1 1v21l6-6 5 9 4-2-5-9h9Z" fill="currentColor" stroke="white" stroke-width="1.5" stroke-linejoin="round"/></svg>';
+          nodes.cursor.append(icon, document.createTextNode(peer.name));
+        }
       }
       const location = resolveLocation({lists:bridge.getProjectLists()},peer);
       const title = location ? `${location.companyName} → ${location.projectName} → ${location.takeoffName} → ${location.tab}` : 'Opening a project';
@@ -290,6 +315,7 @@ class LiveProject {
     this.changed();
     await this.persisting;
     this.closed = true; clearTimeout(this.retryTimer); clearTimeout(this.presenceTimer);
+    tankDuel.disconnect();
     cancelAnimationFrame(this.peerFrame);
     this.socket?.close(); this.doc.destroy();
     document.dispatchEvent(new Event('estimator:history'));
@@ -457,13 +483,14 @@ document.body.insertAdjacentHTML('afterbegin', `
   </form></dialog>`);
 document.body.classList.add('server-mode');
 workspace = setupWorkspace();
+tankDuel = setupTankDuel(() => connection, message);
 projectPresence = setupProjectPresence(bridge);
 $('workspace-cursor').onchange = async event => {
-  const control = event.target, previous = document.body.dataset.cursor || 'system';
+  const control = event.target, previous = document.body.dataset.sharedCursor || 'classic';
   control.disabled = true; workspace.setCursor(control.value);
   try { await api('/preferences', {method:'PUT',body:JSON.stringify({cursor:control.value})}); }
   catch (error) { workspace.setCursor(previous); message('Cursor setting was not saved: ' + error.message, true); }
-  finally { control.disabled = false; }
+  finally { control.disabled = false; connection?.sendPresence(); }
 };
 syncProjectPanel();
 $('server-projects').onclick = () => { if (current && ($('server-drawer').hidden || browsing)) { browsing = recentMode = false; panel(); } else panel($('server-drawer').hidden); };
@@ -522,7 +549,7 @@ window.addEventListener('resize', () => connection?.paintPeers());
 document.addEventListener('visibilitychange', () => { if (document.hidden) connection?.sendPresence({ visible: false }); });
 async function signedIn(name) {
   user = name; $('server-signout').textContent = name + ' · Sign out';
-  let preferences = {cursor:'system',lastWorkbook:null};
+  let preferences = {cursor:'classic',lastWorkbook:null};
   try { preferences = await api('/preferences'); }
   catch (error) {
     if (error.status !== 404) throw error;

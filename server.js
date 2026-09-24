@@ -9,6 +9,8 @@ import { WebSocketServer, WebSocket } from 'ws';
 import * as Y from 'yjs';
 import { writeBook, readBook, validateBook } from './shared/model.js';
 import { resolveLocation } from './shared/navigation.js';
+import { cursorStyles, normalizeCursor } from './shared/cursors.js';
+import { createDuels } from './server-duels.js';
 import { sitePasswordHash as configuredPasswordHash } from './server-auth.js';
 
 const root = dirname(fileURLToPath(import.meta.url));
@@ -46,6 +48,7 @@ export function createApp(options = {}) {
     db.prepare('INSERT OR REPLACE INTO auth_configuration VALUES (1,?)').run(fingerprint);
   }
   const rooms = new Map(), loginAttempts = new Map();
+  const duels = createDuels();
   const app = express(), server = createServer(app);
   app.disable('x-powered-by');
   if (process.env.TRUST_PROXY === 'true') app.set('trust proxy', 1);
@@ -133,12 +136,12 @@ export function createApp(options = {}) {
   app.get('/api/preferences', (req, res) => {
     const last = db.prepare(`SELECT a.project_id FROM access a JOIN projects p ON p.id=a.project_id
       WHERE a.name=? ORDER BY a.opened_at DESC, a.project_id LIMIT 1`).get(req.user.name);
-    res.json({cursor:db.prepare('SELECT cursor FROM user_preferences WHERE name=?').get(req.user.name)?.cursor || 'system',
+    res.json({cursor:normalizeCursor(db.prepare('SELECT cursor FROM user_preferences WHERE name=?').get(req.user.name)?.cursor),
       lastWorkbook:last?.project_id || null});
   });
   app.put('/api/preferences', (req, res) => {
     const cursor = req.body?.cursor;
-    if (!['system','large-dark','large-light','crosshair'].includes(cursor)) return res.status(400).json({error:'Choose a supported cursor style.'});
+    if (!cursorStyles.includes(cursor)) return res.status(400).json({error:'Choose a supported cursor style.'});
     db.prepare('INSERT INTO user_preferences(name,cursor) VALUES (?,?) ON CONFLICT(name) DO UPDATE SET cursor=excluded.cursor').run(req.user.name, cursor);
     res.json({cursor});
   });
@@ -239,6 +242,7 @@ export function createApp(options = {}) {
         if (!session(req)) { ws.close(4001, 'Session expired'); return; }
         try {
           const msg = JSON.parse(bytes.toString());
+          if (msg.type === 'duel') { duels.handle(ws, msg, room.clients); return; }
           if (msg.type === 'presence') {
             if (Date.now() - (ws.lastPresence || 0) < 35) return;
             ws.lastPresence = Date.now();
@@ -260,6 +264,7 @@ export function createApp(options = {}) {
               view: String(p.view || '').slice(0, 100), sheet: String(p.sheet || '').slice(0, 100),
               takeoff: String(p.takeoff || '').slice(0, 100), field: String(p.field || '').slice(0, 500),
               anchor: String(p.anchor || '').slice(0, 500),
+              cursor: normalizeCursor(p.cursor),
               x: Math.max(0, Math.min(1, Number(p.x) || 0)), y: Math.max(0, Math.min(1, Number(p.y) || 0)),
               visible: p.visible === true
             }; presence(); return;
@@ -284,6 +289,7 @@ export function createApp(options = {}) {
         } catch (e) { send(ws, { type: 'error', error: 'Edit was not saved: ' + e.message }); }
       });
       ws.on('close', () => {
+        duels.disconnect(ws);
         room.clients.delete(ws); presence();
         if (!room.clients.size) {
           if (room.timer) { clearTimeout(room.timer); try { snapshot(id); } catch (e) { console.error(e.message); } }

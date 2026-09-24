@@ -6,8 +6,6 @@ body.server-mode #server-bar{gap:10px;min-height:46px;height:auto;flex-wrap:wrap
 #workspace-menus{display:flex;align-items:center;gap:2px;flex:none}
 #workspace-history{display:flex;gap:4px;flex:none}
 #workspace-history button:disabled{opacity:.4;cursor:default}
-body.server-mode[data-cursor]:not([data-cursor=system]),body.server-mode[data-cursor]:not([data-cursor=system]) :is(button,a,summary,select){cursor:var(--workspace-cursor)}
-body.server-mode[data-cursor] :is(input,textarea,[contenteditable=true]){cursor:text}
 body.server-mode .workspace-cursor-setting{display:flex;align-items:center;gap:10px;padding:8px 10px;font-size:12px}
 body.server-mode .workspace-menu-content .workspace-cursor-setting select{max-width:160px;flex:1;min-width:0}
 .workspace-preference-hint{margin:0 10px 8px;font-size:11px;color:var(--muted)}
@@ -148,6 +146,8 @@ body.server-mode .summary-map-link{
 }
 body.server-mode .summary-map-link:hover{background:linear-gradient(color-mix(in srgb,var(--slate-bg) 70%,white),var(--slate-bg));color:#fff;border-color:var(--amber)}
 body.server-mode #workspace-map{margin:0;flex:none;white-space:nowrap}
+body.server-mode .eyebrow-row > #workspace-map{margin-left:auto}
+body.server-mode #workspace-toggle-notes + #workspace-map{margin-left:0}
 body.server-mode .summary-map-link[aria-disabled="true"]{opacity:.55;cursor:not-allowed}
 body.server-mode.medieval .summary-map-link{background:linear-gradient(#4E5A63,#3A444C 60%,#323B42);border-color:var(--gold);color:var(--gold-hi);text-shadow:0 1px 0 #0009}
 body.server-mode.medieval .summary-map-link:hover{background:linear-gradient(#5B6871,#46515A 60%,#3C464E);border-color:var(--gold-hi);color:#F2EBDD}

@@ -493,23 +493,24 @@ test('last selected workbook survives sign-out and opens in a fresh browser',asy
   } finally {await context.close();}
 });
 
-test('cursor style persists on the account while text and resize cursors remain usable', async ({page}) => {
+test('shared cursor style persists without changing local mouse cursors', async ({page}) => {
   await openWorkbook(page,workbook(),'Cursor tester '+Date.now());
   await page.locator('#workspace-view > summary').click();
   const saved = page.waitForResponse(r=>r.url().endsWith('/api/preferences') && r.request().method()==='PUT');
-  await page.locator('#workspace-cursor').selectOption('large-dark');
+  await page.locator('#workspace-cursor').selectOption('arrow');
   expect((await saved).ok()).toBe(true);
-  await expect(page.locator('body')).toHaveAttribute('data-cursor','large-dark');
-  expect(await page.locator('#add').evaluate(el=>getComputedStyle(el).cursor)).toContain('data:image/svg+xml');
+  await expect(page.locator('body')).toHaveAttribute('data-shared-cursor','arrow');
+  await expect(page.locator('#add')).toHaveCSS('cursor','pointer');
   await expect(page.locator('#title')).toHaveCSS('cursor','text');
   await expect(page.locator('#sheetTable .col-resizer').first()).toHaveCSS('cursor','col-resize');
   await page.reload();
   await page.locator('#workspace-view > summary').click();
-  await expect(page.locator('#workspace-cursor')).toHaveValue('large-dark');
+  await expect(page.locator('#workspace-cursor')).toHaveValue('arrow');
   const savedCrosshair = page.waitForResponse(r=>r.url().endsWith('/api/preferences') && r.request().method()==='PUT');
   await page.locator('#workspace-cursor').selectOption('crosshair');
   expect((await savedCrosshair).ok()).toBe(true);
-  await expect(page.locator('body')).toHaveCSS('cursor','crosshair');
+  await expect(page.locator('body')).toHaveAttribute('data-shared-cursor','crosshair');
+  await expect(page.locator('body')).not.toHaveCSS('cursor','crosshair');
 });
 
 test('large estimate scrolls without changing rows or totals', async ({page}) => {
@@ -858,11 +859,13 @@ test('summary shows customer, job address maps and the active takeoff', async ({
   company.projects[0].takeoffs[0].note='Sawcut and removal';
   data.sumProjOpen=false; data.sumTkOpen=false;
   await openWorkbook(page,data);
-  const globalMap=page.locator('#workspace-map');
+  const pageMap=page.locator('#workspace-map');
   for (const view of ['sheet','summary','scopes','load','wage']) {
     await page.evaluate(view=>window.estimator.openLocation({list:'list',takeoff:'tn',sheet:'sn',view}),view);
-    await expect(globalMap).toBeInViewport();
-    await expect(globalMap).toHaveAttribute('href','https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(company.projects[0].address));
+    await expect(page.locator('#server-bar #workspace-map')).toHaveCount(0);
+    await expect(page.locator(`#${view}Card .eyebrow-row #workspace-map`)).toBeInViewport();
+    if (view === 'sheet') await expect(page.locator('#workspace-toggle-notes + #workspace-map')).toBeVisible();
+    await expect(pageMap).toHaveAttribute('href','https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(company.projects[0].address));
   }
   await page.locator('#rail .tab-summary').click();
   const details=page.locator('#sumBlocks');
