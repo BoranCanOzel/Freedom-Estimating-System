@@ -53,6 +53,8 @@ export function setupWorkspace() {
     <details class="workspace-menu" id="workspace-estimate" data-for-view="sheet">
       <summary>Estimate</summary><div class="workspace-menu-content">
         <p class="menu-label">Current option</p><div id="workspace-rounding"></div><div id="workspace-load-toggle"></div>
+        <label class="workspace-flat-add"><input id="workspace-flat-add" type="checkbox"> Flat add $ column</label>
+        <p class="workspace-preference-hint">Adds once per row after markup, before fees. Off removes it from totals; entered amounts are kept.</p>
         <div class="menu-divider"></div><p class="menu-label">Restore hidden columns</p><div id="workspace-columns"></div>
         <div class="menu-divider"></div><p class="menu-label">Manage option</p><div id="workspace-option-actions"></div>
       </div>
@@ -81,6 +83,11 @@ export function setupWorkspace() {
   pageActions.setAttribute('aria-label', 'Current page actions');
   $('workspace-menus').after(pageActions);
   move('duplicateSheet', 'workspace-page-actions');
+  const map = document.createElement('a');
+  map.id = 'workspace-map'; map.className = 'summary-map-link';
+  map.target = '_blank'; map.rel = 'noopener noreferrer';
+  map.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg><span>Map</span>';
+  pageActions.after(map);
   move('reset', 'workspace-option-actions');
   const excel = document.querySelector('.js-export');
   excel.textContent = 'Export estimate to Excel'; excel.dataset.ready = ''; $('workspace-excel').append(excel);
@@ -144,9 +151,22 @@ export function setupWorkspace() {
     button.onclick = () => { bridge.setTheme(button.dataset.theme); rememberAppearance(); sync(); };
   });
   $('zoomPick').addEventListener('change', rememberAppearance);
+  $('workspace-flat-add').addEventListener('change', event => { bridge.setFlatAddEnabled(event.target.checked); sync(); });
   function sync() {
     const ready = document.body.classList.contains('server-active'), view = bridge.getLocation().view || 'sheet';
+    const address = ready ? bridge.getMapAddress() : '';
+    map.title = address || (ready ? 'Add a job or customer address to open the map.' : 'Open a workbook to view its project map.');
+    map.setAttribute('aria-label', address ? 'Open ' + address + ' in Google Maps' : map.title);
+    if (address) {
+      map.href = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(address);
+      map.removeAttribute('aria-disabled');
+    } else {
+      map.removeAttribute('href');
+      map.setAttribute('aria-disabled', 'true');
+    }
     document.body.dataset.workspaceView = view;
+    $('workspace-flat-add').checked = ready && bridge.flatAddEnabled();
+    $('workspace-flat-add').disabled = !ready;
     for (const part of document.querySelectorAll('[data-for-view]')) {
       part.hidden = !ready || part.dataset.forView !== view;
       if (part.hidden && part.tagName === 'DETAILS') part.open = false;
@@ -155,6 +175,7 @@ export function setupWorkspace() {
     for (const button of document.querySelectorAll('[data-theme]')) button.setAttribute('aria-pressed', String(button.dataset.theme === bridge.themeName()));
   }
   document.addEventListener('estimator:view', sync);
+  document.addEventListener('estimator:projects', sync);
   sync();
   function setCursor(style) {
     if (!['system','large-dark','large-light','crosshair'].includes(style)) style = 'system';

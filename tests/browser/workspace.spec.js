@@ -33,6 +33,7 @@ test('Ctrl selection edits multiple fields and drags nonadjacent items together'
   const data=workbook();
   data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0].rows=['a','b','c','d'].map(id=>({id,kind:'labor',name:id,count:1,time:1,days:1,cost:10}));
   await openWorkbook(page,data);
+
   const row=id=>page.locator('#body tr[data-id="'+id+'"]');
   const first=row('a').locator('.name-in'), third=row('c').locator('.name-in');
   await first.click({modifiers:['Control']});
@@ -857,6 +858,12 @@ test('summary shows customer, job address maps and the active takeoff', async ({
   company.projects[0].takeoffs[0].note='Sawcut and removal';
   data.sumProjOpen=false; data.sumTkOpen=false;
   await openWorkbook(page,data);
+  const globalMap=page.locator('#workspace-map');
+  for (const view of ['sheet','summary','scopes','load','wage']) {
+    await page.evaluate(view=>window.estimator.openLocation({list:'list',takeoff:'tn',sheet:'sn',view}),view);
+    await expect(globalMap).toBeInViewport();
+    await expect(globalMap).toHaveAttribute('href','https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(company.projects[0].address));
+  }
   await page.locator('#rail .tab-summary').click();
   const details=page.locator('#sumBlocks');
   const headerMap=page.locator('#summaryMap');
@@ -892,12 +899,16 @@ test('summary shows customer, job address maps and the active takeoff', async ({
   await expect(details.locator('.summary-project')).toContainText('Customer address');
   await expect(map).toHaveAttribute('href','https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(company.address));
   await expect(headerMap).toHaveAttribute('href','https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(company.address));
+  await expect(page.locator('#workspace-map')).toHaveAttribute('href','https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(company.address));
   await expect(details).not.toContainText('100 Main St');
   await openWorkbook(page,workbook());
   await page.locator('#rail .tab-summary').click();
   await expect(details.locator('.summary-map-link')).toHaveCount(0);
   await expect(headerMap).toBeVisible();
   await expect(headerMap).toHaveAttribute('aria-disabled','true');
+  await expect(page.locator('#workspace-map')).toBeVisible();
+  await expect(page.locator('#workspace-map')).toHaveAttribute('aria-disabled','true');
+  await expect(page.locator('#workspace-map')).not.toHaveAttribute('href',/.+/);
   await expect(headerMap).not.toHaveAttribute('href',/.+/);
   await expect(page.locator('#summaryMapHint')).toBeVisible();
   await expect(context).not.toContainText('12 Office Road');
@@ -1243,4 +1254,53 @@ test('section drop ghost matches committed rows after subtotals and cancels with
   }
   await expect(page.locator('#tSub .v')).toHaveText('100.00');
   expect(errors).toEqual([]);
+});
+
+
+test('row Tab navigation skips actions and selects cost for replacement',async({page})=>{
+  const data=workbook(), sh=data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0];
+  sh.rows.push({...sh.rows[0],id:'second',name:'Second row'});
+  await openWorkbook(page,data);
+  const row=page.locator('#body tr[data-id="row-sn"]');
+  await row.locator('.name-in').focus();
+  for(const field of ['count','time','days','cost']){await page.keyboard.press('Tab');await expect(row.locator('input[aria-label="'+field+'"]')).toBeFocused();}
+  expect(await row.locator('[aria-label="cost"]').evaluate(el=>el.value.slice(el.selectionStart,el.selectionEnd))).toBe('125');
+  await page.keyboard.type('250');
+  await page.keyboard.press('Tab');await expect(row.locator('[aria-label="Markup percent"]')).toBeFocused();
+  await page.keyboard.press('Tab');await expect(page.locator('#body tr[data-id="second"] .name-in')).toBeFocused();
+  await page.keyboard.press('Shift+Tab');await expect(row.locator('[aria-label="Markup percent"]')).toBeFocused();
+  await page.keyboard.press('Shift+Tab');await expect(row.locator('[aria-label="cost"]')).toBeFocused();
+  expect(await row.locator('[aria-label="cost"]').inputValue()).toBe('250');
+});
+
+test('optional flat add applies once after markup and persists with its toggle',async({page})=>{
+  const data=workbook(), sh=data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0];
+  Object.assign(sh.rows[0],{count:2,time:3,days:2,cost:100,markup:10});
+  await openWorkbook(page,data);
+  const column=page.locator('th[data-w="flatAdd"]');
+  await expect(column).toBeHidden();await expect(page.locator('#tSub .v')).toHaveText('1,320.00');
+  const toggle=async enabled=>{await page.locator('#workspace-estimate > summary').click();await page.locator('#workspace-flat-add').setChecked(enabled);await page.locator('#workspace-estimate > summary').press('Escape');};
+  await toggle(true);await expect(column).toBeVisible();
+  await page.locator('#body [aria-label="flatAdd"]').fill('400');
+  await expect(page.locator('#tSub .v')).toHaveText('1,720.00');
+  await expect(page.locator('#tMk .v')).toHaveText('120.00');
+  await expect(page.locator('#tGrand .v')).toHaveText('1,771.60');
+  await page.locator('#rail .tab-summary').click();await expect(page.locator('#sumTable')).toContainText('1,720.00');
+  await page.locator('#rail .tab[data-sheet]').first().click();
+  await page.evaluate(()=>{window.print=()=>{window.printCapture={text:document.getElementById('printAll').textContent};};});
+  await page.locator('#workspace-file > summary').click();await page.locator('#workspace-print').click();
+  expect(await page.evaluate(()=>window.printCapture.text)).toContain('Flat add $');
+  expect(await page.evaluate(()=>window.printCapture.text)).toContain('400.00');
+  await page.locator('#workspace-file > summary').click();
+  const downloaded=page.waitForEvent('download');await page.locator('#workspace-excel button').click();
+  const stream=await (await downloaded).createReadStream(), chunks=[];
+  for await(const chunk of stream)chunks.push(chunk);
+  const xlsx=Buffer.concat(chunks).toString('utf8');
+  expect(xlsx).toContain('Flat add $');expect(xlsx).toContain('B2*C2*D2*E2*(1+F2/100)+G2');
+  expect(xlsx).toContain('<c r="G2" s="4"><v>400</v>');
+
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();await expect(column).toBeVisible();await expect(page.locator('#body [aria-label="flatAdd"]')).toHaveValue('400.00');
+  await toggle(false);await expect(column).toBeHidden();await expect(page.locator('#tSub .v')).toHaveText('1,320.00');
+  await toggle(true);await expect(page.locator('#body [aria-label="flatAdd"]')).toHaveValue('400.00');
 });

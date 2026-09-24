@@ -58,6 +58,7 @@ export function createApp(options = {}) {
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !sameOrigin(req)) return res.status(403).json({ error: 'Cross-origin request refused.' });
     next();
   });
+  app.get('/favicon.svg', (req, res) => res.sendFile(join(root, 'favicon.svg')));
   app.use(express.json({ limit: '25mb' }));
   function sameOrigin(req) {
     if (!req.headers.origin) return true;

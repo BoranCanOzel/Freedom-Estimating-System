@@ -254,7 +254,16 @@ class LiveProject {
       let nodes = this.peerNodes.get(peer.id);
       if (!nodes) {
         const color = peerColor(peer.name);
-        nodes = {badge:element('span', peer.name, 'server-person'), cursor:element('div', '➤ ' + peer.name, 'server-cursor'), field:element('div', '', 'server-field')};
+        nodes = {badge:element('button', peer.name, 'server-person'), cursor:element('div', '➤ ' + peer.name, 'server-cursor'), field:element('div', '', 'server-field')};
+        nodes.badge.type = 'button';
+        nodes.badge.onclick = () => {
+          const latest = this.peers.find(candidate => candidate.id === peer.id);
+          const target = latest && resolveLocation({lists:bridge.getProjectLists()}, latest);
+          if (this.closed || !target) { message('This collaborator?s page is no longer available.', true); return; }
+          this.changed();
+          if (!bridge.openLocation(target)) { message('This collaborator?s page is no longer available.', true); return; }
+          browsing = recentMode = false; syncProjectPanel(); this.sendPresence();
+        };
         nodes.badge.style.setProperty('--peer', color); nodes.cursor.style.color = color; nodes.field.style.borderColor = color;
         nodes.cursor.style.left = nodes.cursor.style.top = nodes.field.style.left = nodes.field.style.top = '0px';
         $('server-people').append(nodes.badge); $('server-cursors').append(nodes.cursor, nodes.field);
@@ -264,7 +273,10 @@ class LiveProject {
       const title = location ? `${location.companyName} → ${location.projectName} → ${location.takeoffName} → ${location.tab}` : 'Opening a project';
       const label = location ? `${peer.name} · ${location.projectName}` : peer.name;
       if (nodes.badge.textContent !== label) nodes.badge.textContent = label;
-      if (nodes.badge.title !== title) nodes.badge.title = title;
+      const actionTitle = location ? 'Go to ' + title : title;
+      if (nodes.badge.title !== actionTitle) nodes.badge.title = actionTitle;
+      nodes.badge.disabled = !location;
+      nodes.badge.setAttribute('aria-label', location ? 'Go to ' + peer.name + ': ' + title : peer.name + ' is opening a project');
       if (nodes.cursor.hidden !== !cursor) nodes.cursor.hidden = !cursor;
       if (nodes.field.hidden !== !field) nodes.field.hidden = !field;
       if (cursor) nodes.cursor.style.transform = `translate3d(${(cursor.left + peer.x * cursor.width) / zoom}px,${(cursor.top + peer.y * cursor.height) / zoom}px,0)`;

@@ -36,6 +36,15 @@ test('two estimators share edits, cursors, reconnects and projects', async ({ br
     // Selecting another view must remain personal.
     await alice.locator('#rail .tab-summary').click();
     await expect(alice.locator('#summaryCard')).toBeVisible();await expect(bob.locator('#sheetCard')).toBeVisible();
+    const aliceBadge=bob.getByRole('button',{name:/Go to Alice.*Summary/});
+    await expect(aliceBadge).toBeEnabled();await aliceBadge.click();
+    await expect(bob.locator('#summaryCard')).toBeVisible();
+    // A jump is a one-time navigation, not continuous following.
+    await alice.locator('#rail .tab[data-sheet]').first().click();
+    await expect(bob.locator('#summaryCard')).toBeVisible();
+    const sheetBadge=bob.getByRole('button',{name:/Go to Alice.*Tab 1/});
+    await expect(sheetBadge).toBeEnabled();await sheetBadge.focus();await sheetBadge.press('Enter');
+    await expect(bob.locator('#sheetCard')).toBeVisible();
     // Edits made during a network outage merge with the other user's work.
     await a.setOffline(true);
     await alice.locator('#rail .tab[data-sheet]').first().click();

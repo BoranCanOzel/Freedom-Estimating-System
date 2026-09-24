@@ -1,6 +1,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Project Breakdown</title>
+<link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg">
 <link rel="stylesheet" href="/assets/app.css">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=Fira+Sans:wght@400;500;600;700&family=Fira+Sans+Condensed:wght@500;600;700&display=swap');
@@ -2811,6 +2812,7 @@
             <th class="num" data-w="time" style="width:64px"><span class="fee-name"><span class="h-lab">Time</span><button type="button" class="fee-x" data-hide="time" aria-label="Hide the Time column">&times;</button></span><span class="tip">Time — hours for an hourly item, or any multiplier</span></th>
             <th class="num" data-w="days" style="width:64px"><span class="fee-name"><span class="h-lab">Days</span><button type="button" class="fee-x" data-hide="days" aria-label="Hide the Days column">&times;</button></span><span class="tip">Days — how many days on the project</span></th>
             <th class="num" data-w="cost" style="width:100px"><span class="h-lab">Cost</span><span class="tip">Price of one of this item</span></th>
+            <th class="num" data-w="flatAdd" hidden style="width:110px"><span class="h-lab">Flat add $</span><span class="tip">Added once per row after markup, before fees. Enable in Estimate.</span></th>
             <th class="num" data-w="markup" style="width:88px"><span class="h-lab">Markup</span><span class="tip">Percent added to this line · set per item</span></th>
             <th class="num" data-w="sub" style="width:118px"><span class="h-lab">Subtotal</span><span class="tip">count × time × days × cost, plus markup</span></th>
             <th class="num col-grand" id="thGrand" data-w="grand" style="width:120px"><span class="h-lab">Grand</span><span class="tip">subtotal plus every fee</span></th>
@@ -2827,7 +2829,7 @@
         <tfoot>
           <tr>
             <td class="c-item"><div class="tot-label">Total</div></td>
-            <td data-c="count"></td><td data-c="time"></td><td data-c="days"></td><td data-c="cost"></td>
+            <td data-c="count"></td><td data-c="time"></td><td data-c="days"></td><td data-c="cost"></td><td data-c="flatAdd" hidden></td>
             <td class="mk-total"><div class="money" id="tMk"><span class="s">$</span><span class="v">0.00</span></div></td>
             <td><div class="money" id="tSub"><span class="s">$</span><span class="v">0.00</span></div></td>
             <td class="grand" id="tdGrandTotal">
@@ -3250,19 +3252,21 @@
   function calc(r, sh){
     sh = sh || state;
     const base = num(r.count) * mult(r,'time',sh) * mult(r,'days',sh) * derivedCost(r);
-    const sub = base * (1 + num(r.markup)/100);
+    const markup = base * num(r.markup)/100;
+    const flat = sh.flatAddEnabled ? num(r.flatAdd) : 0;
+    const sub = base + markup + flat;
     const fees  = sh.fees.map(f => sub * (num(f.pct)/100));
     const grand = sub + fees.reduce((a,b) => a + b, 0);
-    return {base, sub, fees, grand};
+    return {base, markup, flat, sub, fees, grand};
   }
 
   // only shown when markup is actually doing something
   function subText(c){
-    return '$' + fmt.format(c.base) + ' + $' + fmt.format(c.sub - c.base) + ' markup';
+    return '$' + fmt.format(c.base) + ' + $' + fmt.format(c.markup) + ' markup' + (c.flat ? ' + $' + fmt.format(c.flat) + ' flat add' : '');
   }
 
   function mkText(c){
-    return '+ $' + fmt.format(c.sub - c.base);
+    return '+ $' + fmt.format(c.markup);
   }
 
   function money(el, n, dash){
@@ -3296,7 +3300,7 @@
 
     if (currency){
       // strip the formatting while editing, put it back on the way out
-      inp.addEventListener('focus', () => { inp.value = raw() === '' ? '' : String(num(raw())); });
+      inp.addEventListener('focus', () => { inp.value = raw() === '' ? '' : String(num(raw())); inp.select(); });
       inp.addEventListener('blur',  () => { inp.value = raw() === '' ? '' : fmt.format(num(raw())); });
       const wrap = document.createElement('div');
       wrap.className = 'cur-wrap';
@@ -3869,6 +3873,7 @@
     tr.append(
       tdItem,
       ...leadKeys().map(k => {
+        if (k === 'flatAdd') return numCell(row,k,'0.00',true);
         if (k !== 'cost') return numCell(row,k,'0');
         if (tdCost) return tdCost;   // summed, not typed
         return numCell(row,'cost','0.00',true);
@@ -4503,12 +4508,13 @@
 
   const HIDEABLE = {time:'Time', days:'Days', round:'Round'};
   function colHidden(k, sh){ return ((sh || state).hiddenCols || []).includes(k); }
-  function leadKeys(){ return ['count','time','days','cost'].filter(k => !colHidden(k)); }
+  function leadKeys(){ return ['count','time','days','cost'].filter(k => !colHidden(k)).concat(state.flatAddEnabled ? ['flatAdd'] : []); }
 
   // a hidden multiplier drops out of the math entirely rather than zeroing it
   function mult(r, k, sh){ return colHidden(k, sh) ? 1 : num(r[k]); }
 
   function applyHiddenCols(){
+    document.querySelectorAll('#sheetTable [data-w=flatAdd],#sheetTable [data-c=flatAdd]').forEach(el => { el.hidden = !state.flatAddEnabled; });
     // the body cells stay in place so every row builder keeps the same column count;
     // one class takes the whole column out of view
     document.getElementById('sheetTable').classList.toggle('round-off', colHidden('round'));
@@ -5849,7 +5855,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       if (r.type === 'section' || r.type === 'sectionEnd') return;
       if (r.kind === 'none') return;
       const c = calc(r, sh);
-      mk += c.sub - c.base;
+      mk += c.markup;
       sub += c.sub;
       grand += c.grand;
       c.fees.forEach((v, i) => { fees[i] += v; });
@@ -5954,7 +5960,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       if (r.kind === 'none') return;
       const c = calc(r, sh);
       stack.forEach(open => {
-        open.mk += c.sub - c.base; open.sub += c.sub; open.grand += c.grand;
+        open.mk += c.markup; open.sub += c.sub; open.grand += c.grand;
         c.fees.forEach((v, i) => { open.fees[i] += v; });
       });
     });
@@ -6265,7 +6271,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       if (r.kind === 'none') return;
 
       const c = calc(r);
-      const mkAmt = c.sub - c.base;
+      const mkAmt = c.markup;
       if (ref && ref.costOut) money(ref.costOut, derivedCost(r));
       if (ref && ref.sub){
         money(ref.sub, c.sub);
@@ -6277,9 +6283,10 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         });
         // no markup, nothing to explain — leave the cells quiet
         const tipped = !!mkAmt;
-        ref.subTip.textContent = tipped ? subText(c) : '';
+        const subTipped = tipped || !!c.flat;
+        ref.subTip.textContent = subTipped ? subText(c) : '';
         ref.mkTip.textContent  = tipped ? mkText(c)  : '';
-        ref.subTip.parentElement.classList.toggle('has-tip', tipped);
+        ref.subTip.parentElement.classList.toggle('has-tip', subTipped);
         ref.mkTip.parentElement.classList.toggle('has-tip', tipped);
         ref.mkCash.textContent = mkAmt ? '$' + fmt.format(mkAmt) : '—';
         ref.mkCash.classList.toggle('zero', !mkAmt);
@@ -6347,6 +6354,16 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       }
     } else if (!(input && selectedInputs.has(input)) && !selectedLineIds.has(row?.dataset.id)) clearMultiSelection();
   }, true);
+  body.addEventListener('keydown', event => {
+    if (event.key !== 'Tab' || event.ctrlKey || event.altKey || event.metaKey) return;
+    const fields = [...body.querySelectorAll('input.cell-in,input.name-in,textarea.cell-in')]
+      .filter(el => !el.disabled && !el.readOnly && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden');
+    const at = fields.indexOf(event.target);
+    if (at < 0) return;
+    body.querySelectorAll('button,a,[tabindex]').forEach(el => { if (!el.matches('input,textarea')) el.tabIndex = -1; });
+    const next = fields[at + (event.shiftKey ? -1 : 1)];
+    if (next) { event.preventDefault(); next.focus(); next.select(); }
+  });
   body.addEventListener('input', event => {
     if (copyingSelectedInput || event.isComposing || !selectedInputs.has(event.target)) return;
     copyingSelectedInput = true;
@@ -7004,7 +7021,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       if (row.type && row.type !== 'item') return true;
       if (row.kind && row.kind !== 'labor') return true;
       if ([row.name,row.note,row.cost,row.pics,row.img,row.parts,row.items,row.meta,row.units].some(filled)) return true;
-      return ['count','time','days'].some(key => row[key] != null && num(row[key]) !== 1) || num(row.markup) !== 0;
+      return ['count','time','days'].some(key => row[key] != null && num(row[key]) !== 1) || num(row.markup) !== 0 || num(row.flatAdd) !== 0;
     });
   }
 
@@ -10253,13 +10270,14 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     (isFinite(v) ? Math.round(v * 10000) / 10000 : 0) + '</v></c>';
 
   function sheetXml(sh){
-    const heads = ['Item','Count','Time','Days','Cost','Markup %','Subtotal']
+    const extra = sh.flatAddEnabled ? 1 : 0;
+    const heads = ['Item','Count','Time','Days','Cost','Markup %'].concat(extra ? ['Flat add $'] : [], ['Subtotal'])
       .concat(sh.fees.map(f => f.label || 'Fee'), ['Grand'], sh.units.map(u => 'U/P ' + (u.label || '')));
     const width = heads.length;
     const nF = sh.fees.length;
-    const SUB = colRef(6);                      // G
-    const FEE1 = colRef(7), FEEN = colRef(6 + nF);
-    const GRAND = colRef(7 + nF);
+    const SUB = colRef(6 + extra);
+    const FEE1 = colRef(7 + extra), FEEN = colRef(6 + extra + nF);
+    const GRAND = colRef(7 + extra + nF);
     const rows = [rowXml(heads.map(h => cS(h, 1)), 1)];
     const dataRows = [];
     let r = 2, depth = 0;
@@ -10276,9 +10294,10 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       }
       const c = calc(x, sh);
       const cells = [cS('  '.repeat(depth) + (x.name || ''), 2), cN(num(x.count), 3), cN(num(x.time), 3), cN(num(x.days), 3),
-                     cN(num(x.cost), 4), cN(num(x.markup), 5)];
+                     cN(derivedCost(x), 4), cN(num(x.markup), 5)];
+      if (extra) cells.push(cN(num(x.flatAdd), 4));
       // Subtotal = count × time × days × cost, plus markup
-      cells.push(cF('B' + r + '*C' + r + '*D' + r + '*E' + r + '*(1+F' + r + '/100)', c.sub, 4));
+      cells.push(cF('B' + r + '*' + (colHidden('time',sh) ? '1' : 'C'+r) + '*' + (colHidden('days',sh) ? '1' : 'D'+r) + '*E' + r + '*(1+F' + r + '/100)' + (extra ? '+G'+r : ''), c.sub, 4));
       sh.fees.forEach((f, i) => {
         cells.push(cF(SUB + r + '*' + (num(f.pct) / 100), c.fees[i], 4));
       });
@@ -10295,8 +10314,8 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     const first = dataRows.length ? dataRows[0] : 2;
     const last = dataRows.length ? dataRows[dataRows.length - 1] : 2;
     const sumOf = (col, val) => cF('SUM(' + col + first + ':' + col + last + ')', val, 7);
-    const tot = [cS('TOTAL', 8), cS('', 8), cS('', 8), cS('', 8), cS('', 8), cS('', 8), sumOf(SUB, t.sub)];
-    sh.fees.forEach((f, i) => tot.push(sumOf(colRef(7 + i), t.fees[i])));
+    const tot = [cS('TOTAL', 8), cS('', 8), cS('', 8), cS('', 8), cS('', 8), cS('', 8)].concat(extra ? [cS('',8)] : [], [sumOf(SUB, t.sub)]);
+    sh.fees.forEach((f, i) => tot.push(sumOf(colRef(7 + extra + i), t.fees[i])));
     tot.push(sumOf(GRAND, t.grand));
     sh.units.forEach((u, i) => {
       const q = num(u.qty);
@@ -10437,7 +10456,8 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   function money$(v){ return v ? '$' + fmt.format(v) : '—'; }
 
   function printSheetHtml(sh){
-    const heads = ['Item','Ct','T','D','Cost','Mk %','Subtotal']
+    const extra = sh.flatAddEnabled ? 1 : 0;
+    const heads = ['Item','Ct','T','D','Cost','Mk %'].concat(extra ? ['Flat add $'] : [], ['Subtotal'])
       .concat(sh.fees.map(f => f.label || 'Fee'), ['Grand'], sh.units.map(u => 'U/P ' + (u.label || '')));
     const span = heads.length;
     let html = '<section class="psheet">';
@@ -10458,7 +10478,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
                   const ov = secUnit(open.row, u), q = num(ov.qty);
                   return '<td class="pnum">' + (q ? '$' + fmt.format(open.grand / q) : '—') + '</td>';
                 }));
-      const out = '<tr class="psub"><td colspan="6">Section subtotal</td>' + cells.join('') + '</tr>';
+      const out = '<tr class="psub"><td colspan="' + (6 + extra) + '">Section subtotal</td>' + cells.join('') + '</tr>';
 
       return out;
     };
@@ -10487,6 +10507,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         '<td class="pmid">' + (colHidden('days', sh) ? '' : num(x.days)) + '</td>' +
         '<td class="pnum">' + money$(num(x.cost)) + '</td>' +
         '<td class="pmid">' + (num(x.markup) ? num(x.markup) + '%' : '') + '</td>' +
+        (extra ? '<td class="pnum">' + money$(c.flat) + '</td>' : '') +
         '<td class="pnum">' + money$(c.sub) + '</td>' +
         c.fees.map(v => '<td class="pnum">' + money$(v) + '</td>').join('') +
         '<td class="pnum pgrand">' + money$(c.grand) + '</td>' +
@@ -10498,7 +10519,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     while (stack.length) html += closeSec();
 
     const t = sheetTotals(sh);
-    html += '</tbody><tfoot><tr><td colspan="6">Total</td>' +
+    html += '</tbody><tfoot><tr><td colspan="' + (6 + extra) + '">Total</td>' +
       '<td class="pnum">' + money$(t.sub) + '</td>' +
       t.fees.map(v => '<td class="pnum">' + money$(v) + '</td>').join('') +
       '<td class="pnum pgrand">' + money$(t.grand) + '</td>' +
@@ -11904,7 +11925,13 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     },
     getShared(){ projectTree(); templates(); return separate(book); },
     getLocation(){ return {list:book.activeList,view:book.view, sheet:book.active, takeoff:book.activeTakeoff}; },
+    flatAddEnabled(){ return !!state.flatAddEnabled; },
+    setFlatAddEnabled(enabled){ state.flatAddEnabled = !!enabled; renderAll(); save(); },
     getProjectLists(){ return book.lists || []; },
+    getMapAddress(){
+      const hit = findTakeoff(book.activeTakeoff);
+      return hit ? String(hit.pr.address || '').trim() || String(hit.co.address || '').trim() : '';
+    },
     getEditorHistory(){
       if (document.getElementById('editor').hidden) return null;
       const draft = ({item:itemDraft, section:secDraft, scope:scopeDraft, part:partDraft,
