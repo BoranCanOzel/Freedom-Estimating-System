@@ -216,6 +216,22 @@ export function createApp(options = {}) {
     res.attachment('project-' + row.id + '.json').json({ _app: 'project-breakdown', _v: 3, ...readBook(doc) });
     doc.destroy();
   });
+  app.delete('/api/projects/:id', (req,res)=>{
+    const row=project(req.params.id);
+    if(!row)return res.status(404).json({error:'Workbook not found.'});
+    if(req.body?.confirmation!=='DELETE')return res.status(400).json({error:'Type DELETE exactly to delete this workbook.'});
+    db.exec('BEGIN');
+    try{
+      db.prepare('DELETE FROM ai_changes WHERE workbook=?').run(row.id);
+      db.prepare('DELETE FROM ai_grants WHERE workbook=?').run(row.id);
+      db.prepare('DELETE FROM access WHERE project_id=?').run(row.id);
+      db.prepare('DELETE FROM projects WHERE id=?').run(row.id);
+      db.exec('COMMIT');
+    }catch(error){db.exec('ROLLBACK');throw error;}
+    const room=rooms.get(row.id);
+    if(room){room.deleted=true;clearTimeout(room.timer);room.timer=null;for(const ws of room.clients)ws.close(4004,'Workbook deleted');}
+    res.json({deleted:true});
+  });
   app.use('/api', (_req, res) => res.status(404).json({error:'API route not found. Restart the Node project after deployment.'}));
   app.get('/', (req, res) => {
     res.set('Cache-Control','no-store');
@@ -247,6 +263,7 @@ export function createApp(options = {}) {
       ws.on('pong', () => { ws.alive = true; });
       ws.on('error', () => {});
       ws.on('message', bytes => {
+        if(room.deleted){ws.close(4004,'Workbook deleted');return;}
         if (!session(req)) { ws.close(4001, 'Session expired'); return; }
         try {
           const msg = JSON.parse(bytes.toString());

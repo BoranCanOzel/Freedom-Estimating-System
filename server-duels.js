@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { terrain, fireShot } from './shared/tank-game.js';
+import { terrain, fireShot, moveTank, MOVE_FUEL } from './shared/tank-game.js';
 
 export function createDuels() {
   const active = new Map();
@@ -10,7 +10,7 @@ export function createDuels() {
   }
   function publish(game, extra = {}) {
     game.players.forEach((ws, index) => send(ws, {event:'state', id:game.id, you:index,
-      names:game.players.map(p=>p.name), ground:game.ground, angles:game.angles, turn:game.turn, round:game.round, ...extra}));
+      names:game.players.map(p=>p.name), ground:game.ground, angles:game.angles, positions:game.positions, fuel:game.fuel, turn:game.turn, round:game.round, ...extra}));
   }
   function handle(ws, msg, clients) {
     const error = reason => send(ws, {event:'error', reason});
@@ -35,7 +35,16 @@ export function createDuels() {
       if (game.phase !== 'invited' || ws !== game.players[1]) return error('This invitation cannot be accepted.');
       clearTimeout(game.timer); game.phase = 'playing'; game.ground = terrain();
       game.turn = Math.random() < .5 ? 0 : 1; game.round = 0; game.angles = [45,135];
+      game.positions = [85,915]; game.fuel = MOVE_FUEL;
       publish(game); return;
+    }
+    if (msg.action === 'move') {
+      if (game.phase !== 'playing' || game.players[game.turn] !== ws || msg.round !== game.round || Date.now() < (game.nextShot || 0)) return;
+      if (msg.direction !== -1 && msg.direction !== 1) return;
+      const moved = moveTank(game.ground, game.positions, game.turn, msg.direction, game.fuel);
+      game.positions[game.turn] = moved.x; game.fuel = moved.fuel;
+      for (const player of game.players) send(player, {event:'moved',id:game.id,round:game.round,positions:game.positions,fuel:game.fuel});
+      return;
     }
     if (msg.action === 'aim') {
       if (game.phase !== 'playing' || game.players[game.turn] !== ws || msg.round !== game.round || Date.now() < (game.nextShot || 0)) return;
@@ -48,9 +57,10 @@ export function createDuels() {
     if (msg.action !== 'fire') return;
     if (game.phase !== 'playing' || game.players[game.turn] !== ws || Date.now() < (game.nextShot || 0) || msg.round !== game.round) return error('Wait for your turn.');
     if (!Number.isFinite(msg.angle) || msg.angle < 5 || msg.angle > 175 || !Number.isFinite(msg.power) || msg.power < 10 || msg.power > 100) return error('Choose a valid angle and power.');
-    const shot = fireShot(game.ground, game.turn, msg.angle, msg.power);
+    const shot = fireShot(game.ground, game.turn, msg.angle, msg.power, game.positions);
     game.angles[game.turn] = msg.angle;
     game.ground = shot.ground; game.round++; game.turn = 1 - game.turn; game.nextShot = Date.now() + 1700;
+    game.fuel = MOVE_FUEL;
     const winner = shot.hit === null ? null : 1 - shot.hit;
     const finished = winner !== null || game.round >= 60;
     publish(game, {shot:{path:shot.path,impact:shot.impact}, winner, finished});

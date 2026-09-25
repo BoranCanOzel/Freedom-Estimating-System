@@ -8,6 +8,8 @@ import { setupHistory } from './history.js';
 import { normalizeCursor } from '../shared/cursors.js';
 import { setupTankDuel } from './tank-duel.js';
 import { setupAiAccess } from './ai-access.js';
+import { setupTransfers } from './transfers.js';
+import { detectTransfer, transferChoices } from '../shared/transfers.js';
 
 const $ = id => document.getElementById(id);
 const clone = value => structuredClone(value);
@@ -157,6 +159,12 @@ class LiveProject {
       if (this.closed) return;
       this.synced = false; this.peers = []; this.paintPeers(); projectPresence.clear();
       tankDuel.disconnect();
+      if(event.code===4004){
+        this.closed=true;clearTimeout(this.retryTimer);clearTimeout(this.presenceTimer);cancelAnimationFrame(this.peerFrame);
+        this.doc.destroy();
+        if(connection===this){connection=null;current=null;document.body.classList.remove('server-active');$('server-title').textContent='Freedom Estimating';browsing=true;bridge.closeEditor();syncProjectPanel();status('Workbook deleted');refresh().catch(()=>{});message('This workbook was deleted.');}
+        return;
+      }
       if (event.code === 4001) { status('Session expired — export pending changes and sign in again', true); return; }
       this.paintStatus();
       this.retryTimer = setTimeout(() => this.connect(), Math.min(1000 * 2 ** this.retry++, 10000));
@@ -364,6 +372,7 @@ function renderProjects() {
     for (const visitor of project.locations || []) item.append(element('span', '● ' + visitor.name +
       (visitor.projectName ? ' · ' + visitor.companyName + ' → ' + visitor.projectName + ' → ' + visitor.takeoffName + ' · ' + visitor.tab : ''), 'server-online'));
     item.onclick = () => run(() => openProject(project)); host.append(item);
+    const remove=element('button','Delete workbook','server-delete-workbook');remove.type='button';remove.setAttribute('aria-label','Delete workbook '+project.name);remove.onclick=()=>confirmDelete(project);host.append(remove);
   }
 }
 async function refreshRecent() {
@@ -485,6 +494,28 @@ document.body.insertAdjacentHTML('afterbegin', `
   </form></dialog>`);
 document.body.classList.add('server-mode');
 workspace = setupWorkspace();
+const transfers=setupTransfers(bridge,()=>connection,message);
+const importDialog=document.createElement('dialog');importDialog.id='import-preview';
+importDialog.innerHTML='<form><h2>Import JSON</h2><p id="import-detected"></p><label>Import as <select id="import-kind"></select></label><p>A workbook creates a new saved workbook. Individual records are added as copies to a destination you select.</p><div class="server-dialog-actions"><button type="button">Cancel</button><button type="submit">Continue</button></div></form>';
+document.body.append(importDialog);importDialog.querySelector('button[type=button]').onclick=()=>importDialog.close();
+const exportDialog=document.createElement('dialog');exportDialog.id='export-options';
+exportDialog.innerHTML='<form><h2>Export JSON</h2><label>Export type <select id="export-kind"><option value="workbook">Workbook</option><option value="project">Project</option><option value="takeoff">Takeoff / estimate</option><option value="customer">Customer</option></select></label><div class="server-dialog-actions"><button type="button">Cancel</button><button type="submit">Continue</button></div></form>';
+document.body.append(exportDialog);exportDialog.querySelector('button[type=button]').onclick=()=>exportDialog.close();
+exportDialog.querySelector('form').onsubmit=event=>{event.preventDefault();const kind=$('export-kind').value;exportDialog.close();run(()=>kind==='workbook'?exportLocal():transfers.export(kind));};
+const deleteDialog=document.createElement('dialog');deleteDialog.id='delete-workbook-dialog';
+deleteDialog.innerHTML='<form><h2>Delete workbook</h2><p id="delete-workbook-name"></p><p>This removes all customers, projects and estimates in this workbook for everyone. Server backup snapshots are retained.</p><label>Type DELETE to confirm <input id="delete-workbook-confirm" autocomplete="off" spellcheck="false"></label><p id="delete-workbook-error" role="alert"></p><div class="server-dialog-actions"><button type="button">Cancel</button><button type="submit" disabled>Delete workbook</button></div></form>';
+document.body.append(deleteDialog);deleteDialog.querySelector('button[type=button]').onclick=()=>deleteDialog.close();
+function confirmDelete(project){
+  $('delete-workbook-name').textContent=project.name;$('delete-workbook-confirm').value='';$('delete-workbook-error').textContent='';
+  const submit=deleteDialog.querySelector('button[type=submit]');submit.disabled=true;
+  $('delete-workbook-confirm').oninput=()=>{submit.disabled=$('delete-workbook-confirm').value!=='DELETE';};
+  deleteDialog.querySelector('form').onsubmit=async event=>{
+    event.preventDefault();if($('delete-workbook-confirm').value!=='DELETE'||submit.disabled)return;submit.disabled=true;
+    try{await api('/projects/'+project.id,{method:'DELETE',body:JSON.stringify({confirmation:'DELETE'})});deleteDialog.close();if(current?.id===project.id)await closeProject();await refresh();message('Workbook deleted.');}
+    catch(error){$('delete-workbook-error').textContent=error.message;submit.disabled=false;}
+  };
+  deleteDialog.showModal();$('delete-workbook-confirm').focus();
+}
 tankDuel = setupTankDuel(() => connection, message);
 setupAiAccess(api,()=>{
   const location=bridge.getLocation();
@@ -526,24 +557,30 @@ $('server-edit').onclick = () => nameDialog('Rename workbook', current.name, asy
 });
 $('server-name-cancel').onclick = () => $('server-name-dialog').close();
 $('server-close').onclick = () => { $('server-workbook-actions').open = false; run(closeProject); };
-$('server-export').onclick = exportLocal;
-$('server-import').onclick = () => $('server-import-file').click();
+$('server-export').onclick = () => exportDialog.showModal();
+$('server-import').onclick = () => {$('server-import-file').multiple=false;$('server-import-file').click();};
 $('server-import-file').onchange = event => run(async () => {
   const files = [...event.target.files]; event.target.value = '';
   for (const file of files) {
     if (file.size > 25 * 1024 * 1024) throw new Error(file.name + ' exceeds the 25 MB limit.');
-    const raw = validateBook(JSON.parse(await file.text()));
-    await createProject(file.name.replace(/\.json$/i, ''), bridge.prepare(raw));
+    const raw = JSON.parse(await file.text());
+    const inferred=detectTransfer(raw),name=file.name.replace(/\.json$/i,'');
+    const labels={workbook:'Workbook',customer:'Customer',project:'Project',takeoff:'Takeoff / estimate'};
+    $('import-detected').textContent=`Detected: ${labels[inferred]} — ${file.name}. You are about to import this as a ${labels[inferred].toLowerCase()}.`;
+    const kinds=[inferred,...['customer','project','takeoff'].filter(k=>k!==inferred&&transferChoices(raw,k,name).length)];
+    $('import-kind').replaceChildren(...kinds.map(k=>new Option(labels[k],k)));
+    importDialog.querySelector('form').onsubmit=e=>{e.preventDefault();const kind=$('import-kind').value;importDialog.close();run(async()=>{if(kind==='workbook'){validateBook(raw);await createProject(name,bridge.prepare(raw));}else transfers.import(raw,kind,name);});};
+    importDialog.showModal();break;
   }
 });
 // Existing file controls use the server project workflow as well.
 for (const id of ['loadFile', 'loadFile2']) {
   $(id).textContent = 'Import project';
-  $(id).addEventListener('click', event => { event.stopImmediatePropagation(); $('server-import-file').click(); }, true);
+  $(id).addEventListener('click', event => { event.stopImmediatePropagation(); $('server-import').click(); }, true);
 }
 for (const id of ['saveFile', 'saveFile2']) {
   $(id).textContent = 'Export JSON';
-  $(id).addEventListener('click', event => { event.stopImmediatePropagation(); exportLocal(); }, true);
+  $(id).addEventListener('click', event => { event.stopImmediatePropagation(); $('server-export').click(); }, true);
 }
 $('server-signout').onclick = () => run(async () => { await closeProject(); await api('/logout', { method: 'POST' }); location.reload(); });
 window.freedomSession = { changed: () => connection?.changed(), notify: text => message(text) };

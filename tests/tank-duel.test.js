@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { terrain, fireShot } from '../shared/tank-game.js';
+import { terrain, fireShot, moveTank, MOVE_FUEL } from '../shared/tank-game.js';
 import { createDuels } from '../server-duels.js';
 
 test('random terrain stays in bounds and tanks can hit each other', () => {
@@ -35,6 +35,14 @@ test('duels require consent, enforce turns and shot validation, and end on disco
   duels.handle(b,{action:'accept',id},clients);
   const state=a.messages.at(-1), shooter=[a,b][state.turn], other=[b,a][state.turn];
   assert.deepEqual(state.ground,b.messages.at(-1).ground);
+  const initial=shooter.messages.length;
+  for(const [client,round,direction] of [[other,0,1],[shooter,99,1],[shooter,0,100]])duels.handle(client,{action:'move',id,round,direction},clients);
+  assert.equal(shooter.messages.length,initial);
+  duels.handle(shooter,{action:'move',id,round:0,direction:1},clients);
+  assert.equal(shooter.messages.at(-1).event,'moved');
+  assert.equal(shooter.messages.at(-1).positions[state.turn],state.positions[state.turn]+6);
+  assert.equal(shooter.messages.at(-1).fuel,MOVE_FUEL-6);
+  assert.deepEqual(shooter.messages.at(-1),other.messages.at(-1));
   const count=shooter.messages.length;
   duels.handle(other,{action:'aim',id,round:0,angle:80},clients);
   assert.equal(shooter.messages.length,count);
@@ -50,7 +58,11 @@ test('duels require consent, enforce turns and shot validation, and end on disco
   assert.equal(shooter.messages.at(-1).event,'error');
   duels.handle(shooter,{action:'fire',id,round:0,angle:state.turn===0?5:175,power:10},clients);
   assert.equal(a.messages.at(-1).round,1);
+  assert.equal(a.messages.at(-1).fuel,MOVE_FUEL);
   assert.deepEqual(a.messages.at(-1).shot,b.messages.at(-1).shot);
+  const afterShot=other.messages.length;
+  duels.handle(other,{action:'move',id,round:1,direction:1},clients);
+  assert.equal(other.messages.length,afterShot);
   duels.handle(other,{action:'fire',id,round:1,angle:45,power:60},clients);
   assert.equal(other.messages.at(-1).event,'error');
   duels.disconnect(a);
@@ -59,6 +71,24 @@ test('duels require consent, enforce turns and shot validation, and end on disco
   assert.equal(a.messages.at(-1).event,'invited');
   duels.handle(a,{action:'decline',id:a.messages.at(-1).id},clients);
   assert.equal(b.messages.at(-1).event,'ended');
+});
+
+test('movement spends limited fuel, respects terrain, boundaries and tank separation',()=>{
+  const ground=Array(1001).fill(200),positions=[85,915];
+  let fuel=MOVE_FUEL;
+  for(let i=0;i<20;i++){const result=moveTank(ground,positions,0,1,fuel);positions[0]=result.x;fuel=result.fuel;}
+  assert.equal(positions[0],145);assert.equal(fuel,0);
+  assert.deepEqual(moveTank(ground,[24,915],0,-1,60),{x:24,fuel:60});
+  assert.deepEqual(moveTank(ground,[873,915],0,1,60),{x:873,fuel:60});
+  ground[86]=220;
+  assert.deepEqual(moveTank(ground,[85,915],0,1,60),{x:85,fuel:60});
+  const gentle=ground.map((_,x)=>200+Math.floor(x/4));
+  assert.equal(moveTank(gentle,[85,915],0,1,60).x,91);
+  const moved=[200,800], shot=fireShot(Array(1001).fill(200),0,5,10,moved);
+  assert.ok(shot.path[0][0]>200&&shot.path[0][0]<225);
+  let hit=false;
+  for(let angle=25;angle<80&&!hit;angle++)for(let power=40;power<=100&&!hit;power++)hit=fireShot(Array(1001).fill(200),0,angle,power,moved).hit===1;
+  assert.ok(hit,'Shots can hit the relocated opponent');
 });
 
 test('a direct hit ends the match and a new accepted match gets fresh terrain', () => {

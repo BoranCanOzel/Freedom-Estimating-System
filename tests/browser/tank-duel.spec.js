@@ -20,11 +20,12 @@ test('online players accept a tank duel, trade shots and leave without changing 
     for(const page of [alice,bob])await expect(page.locator('#duel-game')).toBeVisible();
     const overlay = await alice.locator('#tank-duel').evaluate(el=>{
       const rect=el.getBoundingClientRect(),canvas=el.querySelector('canvas'),bounds=canvas.getBoundingClientRect();
-      return {left:rect.left,right:rect.right,bottom:rect.bottom,width:innerWidth,height:innerHeight,
+      return {left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom,width:innerWidth,height:innerHeight,
         transparent:canvas.getContext('2d').getImageData(500,40,1,1).data[3]===0,
         clickThrough:!el.contains(document.elementFromPoint(bounds.left+bounds.width/2,bounds.top+20))};
     });
     expect(overlay.left).toBeCloseTo(0);expect(overlay.right).toBeCloseTo(overlay.width);expect(overlay.bottom).toBeCloseTo(overlay.height);
+    expect(overlay.top).toBeCloseTo(0);
     expect(overlay.transparent).toBe(true);expect(overlay.clickThrough).toBe(true);
     for (const width of [1920,1100]) {
       await alice.setViewportSize({width,height:1000});
@@ -34,6 +35,11 @@ test('online players accept a tank duel, trade shots and leave without changing 
     await expect(alice.locator('#duel-status')).toHaveText(/turn/);
     const first=await alice.locator('#duel-fire').isEnabled()?alice:bob,second=first===alice?bob:alice;
     await expect(second.locator('#duel-fire')).toBeDisabled();
+    await expect(second.locator('#duel-right')).toBeDisabled();
+    await first.locator('#duel-right').click();
+    for(const page of [first,second])await expect(page.locator('#duel-fuel')).toHaveText('Turn fuel: 54/60');
+    await first.locator('#duel-right').focus();await first.keyboard.press('a');
+    for(const page of [first,second])await expect(page.locator('#duel-fuel')).toHaveText('Turn fuel: 48/60');
     const beforeAim=await second.locator('#tank-duel canvas').evaluate(canvas=>canvas.toDataURL());
     await first.locator('#duel-angle').fill('90');
     await expect.poll(()=>second.locator('#tank-duel canvas').evaluate(canvas=>canvas.toDataURL())).not.toBe(beforeAim);
@@ -45,6 +51,7 @@ test('online players accept a tank duel, trade shots and leave without changing 
     await first.locator('#duel-angle').fill(first===alice?'5':'175');await first.locator('#duel-power').fill('10');
     await first.locator('#duel-fire').click();
     await expect(second.locator('#duel-fire')).toBeEnabled();
+    await expect(second.locator('#duel-fuel')).toHaveText('Turn fuel: 60/60');
     await expect(first.locator('#duel-fire')).toBeDisabled();
     await second.locator('#duel-angle').fill(second===alice?'5':'175');await second.locator('#duel-power').fill('10');
     await second.locator('#duel-fire').click();await expect(first.locator('#duel-fire')).toBeEnabled();

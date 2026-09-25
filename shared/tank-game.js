@@ -1,4 +1,17 @@
 export const WIDTH = 1000, HEIGHT = 280;
+export const MOVE_FUEL = 60, MOVE_STEP = 6;
+
+export function moveTank(ground, positions, player, direction, fuel) {
+  let x = positions[player], used = 0;
+  for (let step = 0; step < Math.min(MOVE_STEP, fuel); step++) {
+    const next = x + direction;
+    if (next < 24 || next > WIDTH - 24 || Math.abs(next - positions[1-player]) < 42) break;
+    // Reject sharp crater edges and slopes steeper than the tank can climb.
+    if (Math.abs(ground[next] - ground[x]) > 1 || Math.abs(ground[next+12] - ground[next-12]) > 12) break;
+    x = next; used++;
+  }
+  return {x, fuel: fuel - used};
+}
 
 export function terrain(random = Math.random) {
   const phase = random() * 6.28, phase2 = random() * 6.28;
@@ -8,8 +21,8 @@ export function terrain(random = Math.random) {
   return ground;
 }
 
-export function fireShot(ground, player, angle, power) {
-  const x0 = player === 0 ? 85 : 915, y0 = ground[x0] - 12;
+export function fireShot(ground, player, angle, power, positions = [85,915]) {
+  const x0 = positions[player], y0 = ground[x0] - 12;
   const radians = angle * Math.PI / 180;
   let x = x0 + Math.cos(radians) * 24, y = y0 - Math.sin(radians) * 24;
   const vx = Math.cos(radians) * power * 5;
@@ -20,13 +33,13 @@ export function fireShot(ground, player, angle, power) {
     x += vx * .025; y += vy * .025; vy += 200 * .025;
     path.push([Math.round(x * 10) / 10, Math.round(y * 10) / 10]);
     if (x < 0 || x > WIDTH || y > HEIGHT) break;
-    for (const [index, tx] of [85, 915].entries()) {
+    for (const [index, tx] of positions.entries()) {
       if (Math.hypot(x - tx, y - (ground[tx] - 8)) < 18) { hit = index; impact = [x, y]; break; }
     }
     if (impact) break;
     if (y >= ground[Math.round(x)]) {
       impact = [x, y];
-      for (const [index, tx] of [85, 915].entries()) if (Math.hypot(x - tx, y - ground[tx]) < 28) hit = index;
+      for (const [index, tx] of positions.entries()) if (Math.hypot(x - tx, y - ground[tx]) < 28) hit = index;
       break;
     }
   }

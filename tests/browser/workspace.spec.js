@@ -24,10 +24,52 @@ async function openWorkbook(page, data = workbook(), name = 'Workspace tester') 
   const workbookName='Organized '+Date.now();
   const refreshed=page.waitForResponse(r=>r.url().endsWith('/api/projects') && r.request().method()==='GET');
   await (await chooser).setFiles({name:workbookName+'.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(data))});
+  await page.locator('#import-preview button[type=submit]').click();
   await refreshed;
   await expect(page.locator('#server-title')).toHaveText(workbookName);
   await expect(page.locator('#server-status')).toHaveText('All changes saved', {timeout:20000});
 }
+
+test('delete workbook requires DELETE and removes the active workbook',async({page})=>{
+  await openWorkbook(page);
+  const name=await page.locator('#server-title').innerText();
+  await page.locator('#server-projects').click();await page.locator('#server-tab-workbooks').click();
+  await page.locator('#server-open').click();
+  await page.getByRole('button',{name:'Delete workbook '+name,exact:true}).click();
+  const submit=page.locator('#delete-workbook-dialog button[type=submit]');
+  await expect(submit).toBeDisabled();
+  await page.locator('#delete-workbook-confirm').fill('delete');await expect(submit).toBeDisabled();
+  await page.locator('#delete-workbook-confirm').fill('DELETE');await expect(submit).toBeEnabled();
+  await submit.click();await expect(page.locator('#delete-workbook-dialog')).not.toBeVisible();
+  await expect(page.locator('#server-title')).toHaveText('Freedom Estimating');
+  await expect(page.getByRole('button',{name:'Delete workbook '+name,exact:true})).toHaveCount(0);
+});
+
+test('scoped imports append projects and export just the selected customer',async({page})=>{
+  await openWorkbook(page);
+  await page.locator('#workspace-file').evaluate(el=>el.open=true);
+  const chooser=page.waitForEvent('filechooser');await page.locator('#server-import').click();
+  await (await chooser).setFiles({name:'legacy.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(workbook()))});
+  await expect(page.locator('#import-detected')).toContainText('Detected: Workbook');
+  await page.locator('#import-kind').selectOption('project');await page.locator('#import-preview button[type=submit]').click();
+  await expect(page.locator('#transfer-dialog')).toBeVisible();
+  await page.locator('#transfer-source').selectOption('1');
+  await page.locator('#transfer-dialog button[type=submit]').click();
+  await expect(page.locator('#transfer-dialog')).not.toBeVisible();
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  const data=await page.evaluate(()=>window.estimator.getShared());
+  const projects=data.lists[0].companies[0].projects;
+  expect(projects).toHaveLength(3);expect(projects[2].name).toBe('South job');expect(projects[2].id).not.toBe('south');
+  expect(projects[2].takeoffs[0].sheets[0].rows[0].cost).toBe(125);
+  await page.locator('#workspace-file').evaluate(el=>el.open=true);
+  await page.locator('#server-export').click();await page.locator('#export-kind').selectOption('customer');await page.locator('#export-options button[type=submit]').click();
+  const download=page.waitForEvent('download');await page.locator('#transfer-dialog button[type=submit]').click();
+  const stream=await (await download).createReadStream(),chunks=[];for await(const chunk of stream)chunks.push(chunk);
+  const exported=JSON.parse(Buffer.concat(chunks).toString());
+  expect(exported._scope).toBe('customer');expect(exported.data.projects).toHaveLength(3);expect(exported.lists).toBeUndefined();
+  await page.reload();await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  expect(await page.evaluate(()=>window.estimator.getShared().lists[0].companies[0].projects.length)).toBe(3);
+});
 
 test('takeoff AI access generates a scoped package, updates live, and offers undo', async ({page}) => {
   await openWorkbook(page,workbook(),'AI browser '+Date.now());
@@ -813,7 +855,7 @@ test('one project drawer retains hierarchy, custom details and filters', async (
   await expect(page.locator('#projBody')).toContainText('South job');
   await page.locator('#server-title').click();
   await page.locator('#workspace-file > summary').click();
-  const downloaded = page.waitForEvent('download'); await page.locator('#server-export').click();
+  const downloaded = page.waitForEvent('download'); await page.locator('#server-export').click();await page.locator('#export-options button[type=submit]').click();
   const download = await downloaded;
   const stream = await download.createReadStream(); let text=''; for await(const chunk of stream) text += chunk.toString();
   const saved = JSON.parse(text), projects = saved.lists[0].companies[0].projects;

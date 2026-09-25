@@ -102,12 +102,14 @@ test('imports legacy JSON and server snapshots without losing hierarchy or libra
     companies:[{id:'co1',name:'Customer',projects:[{id:'pr1',name:'Job',takeoffs:[{id:'tk1',name:'Takeoff',sheets:[{id:'s1',title:'Original scope',rows:[{id:'r1',kind:'labor',name:'Legacy item',cost:50,count:1,time:1,days:1}]}]}]}]}],
     templates:{items:[{id:'tpl1',name:'Library item',kind:'labor',cost:25}],sections:[],scopes:[]}};
   await page.locator('#server-import-file').setInputFiles({name:'legacy.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(book))});
+  await page.locator('#import-preview button[type=submit]').click();
   await expect(page.locator('#title')).toHaveValue('Original scope');
   await expect(page.locator('#server-status')).toHaveText('All changes saved');
   const canonical=await page.evaluate(()=>window.estimator.getShared());
   expect(canonical.lists[0].companies[0].name).toBe('Customer');
   expect(canonical.libs[0].templates.items[0].name).toBe('Library item');
   await page.locator('#server-import-file').setInputFiles({name:'snapshot.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({_app:'project-breakdown',_v:3,...canonical}))});
+  await page.locator('#import-preview button[type=submit]').click();
   await expect(page.locator('#server-title')).toHaveText('snapshot');
   await expect(page.locator('#body input[aria-label="Item name"]').first()).toHaveValue('Legacy item');
   await page.locator('#server-projects').click();

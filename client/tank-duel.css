@@ -8,6 +8,9 @@
 #tank-duel button:focus-visible,#tank-duel input:focus-visible{outline:2px solid #ffcf87;outline-offset:3px}
 #tank-duel #duel-fire,#tank-duel #duel-accept{background:#c58c3e;color:#171f24}
 #tank-duel canvas{order:1;display:block;width:100%;height:clamp(160px,28vh,300px);min-height:0;object-fit:fill;background:transparent}
+#tank-duel:has(#duel-game:not([hidden])){height:100dvh;max-height:100dvh}
+#tank-duel:has(#duel-game:not([hidden])) canvas{height:0;flex:1 1 0}
+#tank-duel header,.duel-controls{flex-shrink:0}
 .duel-controls{order:3;display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:8px 16px;background:#202b33f5;pointer-events:auto}
 .duel-controls label{display:flex;align-items:center;gap:7px}.duel-controls input{width:100px;accent-color:#e2b470}.duel-controls output{min-width:32px}
 .duel-controls>span:last-child{font-size:11px;color:#ccbea9}
