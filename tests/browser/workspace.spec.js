@@ -71,6 +71,17 @@ test('scoped imports append projects and export just the selected customer',asyn
   expect(await page.evaluate(()=>window.estimator.getShared().lists[0].companies[0].projects.length)).toBe(3);
 });
 
+test('takeoff Share creates selectable access links and revokes them',async({page})=>{
+  await openWorkbook(page);
+  await page.locator('#takeoff-share').click();await expect(page.locator('#share-name')).toHaveText('North takeoff');
+  await expect(page.locator('#share-permission')).toHaveValue('read');await page.locator('#share-create').click();await expect(page.locator('#share-url')).toHaveValue(/\/share#[a-f0-9]{64}$/);
+  await page.locator('#share-permission').selectOption('write');await page.locator('#share-create').click();
+  const url=await page.locator('#share-url').inputValue();expect(url).toMatch(/\/share#[a-f0-9]{64}$/);
+  await expect(page.locator('#share-links')).toContainText('View and edit');await expect(page.locator('#share-links')).toContainText('View only');
+  await page.locator('#share-links p').filter({hasText:'View and edit'}).getByRole('button',{name:'Revoke'}).click();
+  await expect(page.locator('#share-links p').filter({hasText:'View and edit'})).toContainText('Revoked');
+});
+
 test('takeoff AI access generates a scoped package, updates live, and offers undo', async ({page}) => {
   await openWorkbook(page,workbook(),'AI browser '+Date.now());
   await page.locator('#takeoff-ai-access').click();

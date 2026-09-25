@@ -19,6 +19,25 @@ Website login always requires a password. Its scrypt hash is shipped in the serv
 
 ## aaPanel deployment
 
+### Takeoff share links
+
+Open a saved takeoff and choose **Share**. Select **View only** (default) or
+**View and edit**, then **Create link** and **Copy link**. Anyone holding the link
+can open that takeoff and its option pages, including prices and notes, without
+signing in. Links remain active until revoked in the same dialog. Copy the link
+when creating it; the server stores only its hash. Changing the site password
+revokes existing links, and deleting the workbook removes its links.
+
+Guests use the existing takeoff view. Edit links offer an explicit **Save changes**
+button; stale revisions are rejected without discarding the local draft. Use
+**Reload latest** to load current data. Guest saves update the saved workbook and
+are broadcast to signed-in collaborators. Links never grant workbook, customer,
+project, library, or WebSocket access. The shared-view shell and its limited
+static assets are public; takeoff data requires the link key.
+
+Run `npm run build` and restart Node after deploying this feature. The build now
+includes both `app.js` and `shared-view.js`.
+
 ### AI takeoff access
 
 Inside a takeoff, use **AI access → Generate access**. The connection package

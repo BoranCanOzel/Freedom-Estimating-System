@@ -8,6 +8,7 @@ import { setupHistory } from './history.js';
 import { normalizeCursor } from '../shared/cursors.js';
 import { setupTankDuel } from './tank-duel.js';
 import { setupAiAccess } from './ai-access.js';
+import { setupShareAccess } from './share-access.js';
 import { setupTransfers } from './transfers.js';
 import { detectTransfer, transferChoices } from '../shared/transfers.js';
 
@@ -517,11 +518,13 @@ function confirmDelete(project){
   deleteDialog.showModal();$('delete-workbook-confirm').focus();
 }
 tankDuel = setupTankDuel(() => connection, message);
-setupAiAccess(api,()=>{
+const takeoffAccessContext=()=>{
   const location=bridge.getLocation();
   const takeoff=bridge.getProjectLists().flatMap(list=>list.companies||[]).flatMap(company=>company.projects||[]).flatMap(project=>project.takeoffs||[]).find(value=>value.id===location.takeoff);
   return {...location,workbook:current?.id,name:takeoff?.name||'Current takeoff'};
-});
+};
+setupAiAccess(api,takeoffAccessContext);
+setupShareAccess(api,takeoffAccessContext);
 projectPresence = setupProjectPresence(bridge);
 $('workspace-cursor-color').onchange = async event => {
   const control = event.target, previous = document.body.dataset.sharedCursorColor || '';

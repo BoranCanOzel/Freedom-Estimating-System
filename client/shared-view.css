@@ -1,0 +1,9 @@
+body.shared-view{padding:12px;}
+#shared-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px;background:var(--card);border:1px solid var(--rule);margin-bottom:10px;font:13px var(--f-sans);flex:none}
+#shared-toolbar select{max-width:36vw}#shared-toolbar button,#shared-toolbar select{font:inherit;padding:6px}#shared-status{flex-basis:100%;color:var(--muted)}
+#shared-notes{max-width:100%}#shared-note-text{white-space:pre-wrap;max-height:30vh;overflow:auto;padding:10px;line-height:1.5}
+.shared-view #projects,.shared-view #library,.shared-view .proj-tab,.shared-view .lib-tab,.shared-view .rail,.shared-view .lib{display:none!important}
+.shared-loading>.sheet{visibility:hidden}
+.shared-readonly .sheet button,.shared-readonly .col-resizer,.shared-readonly .grip{visibility:hidden!important}
+.shared-readonly .sheet input,.shared-readonly .sheet textarea{cursor:text}
+@media print{#shared-toolbar{display:none}}
