@@ -11963,6 +11963,13 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     rebaseEditorHistory(snapshot, before, after){
       return {...snapshot, value:rebaseDraft(snapshot.value, before.value, after.value)};
     },
+    openTakeoffPage({sheet,view}){
+      const sh = book.sheets.find(s => s.id === sheet);
+      if (!sh || !['sheet','summary'].includes(view)) return false;
+      if (book.active === sh.id && book.view === view) return true;
+      book.active = sh.id; state = sh; book.view = view;
+      showView(); save(); return true;
+    },
     openLocation(location){
       const list = (book.lists || []).find(l => l.id === location.list);
       if (!list) return false;
