@@ -65,6 +65,8 @@ test('guests view all pages, save edits, and see conflicts without a login',asyn
   await page.screenshot({path:'test-results/shared-summary-mobile.png'});
   await page.setViewportSize({width:1440,height:1000});
   await page.screenshot({path:'test-results/shared-summary-desktop.png'});
+  await page.evaluate(()=>window.estimator.setTheme('light'));
+  await page.screenshot({path:'test-results/shared-summary-light.png'});
   await page.goto('http://127.0.0.1:3100'+write.path);await expect(page.locator('#shared-permission')).toHaveText('View and edit');await expect(page.locator('#shared-status')).toHaveText('Latest version loaded.');
   await expect(page.locator('#summaryCard')).toBeVisible();
   await page.locator('#shared-page').selectOption('a');

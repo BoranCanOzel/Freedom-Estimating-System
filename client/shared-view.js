@@ -6,6 +6,11 @@ const bridge=window.estimator,key=location.hash.slice(1);
 const bar=document.createElement('header');bar.id='shared-toolbar';
 bar.innerHTML='<div class="shared-heading"><strong id="shared-name">Shared takeoff</strong><span id="shared-permission"></span></div><nav class="shared-navigation" aria-label="Estimate pages"><button id="shared-summary" aria-pressed="true">Summary · All pages</button><label for="shared-page">View detailed page<select id="shared-page"></select></label></nav><p id="shared-guide">Review the totals in Summary, or choose a page for its detailed breakdown.</p><div class="shared-actions"><button id="shared-reload">Reload latest</button><button id="shared-save" hidden>Save changes</button><details id="shared-notes"><summary>Scope notes</summary><div id="shared-note-text"></div></details><span id="shared-status" role="status">Loading…</span></div>';
 document.body.prepend(bar);
+// Keep navigation prominent and secondary actions quiet.
+bar.append(document.getElementById('shared-status'));
+document.getElementById('shared-summary').textContent='Summary';
+document.getElementById('shared-page').setAttribute('aria-label','Choose estimate page');
+document.querySelector('.shared-navigation label').firstChild.textContent='Pages';
 const pager=document.createElement('nav');pager.id='shared-pagination';pager.setAttribute('aria-label','Page navigation');pager.innerHTML='<button id="shared-prev" aria-label="Previous page">‹</button><span id="shared-page-position" aria-live="polite">Summary</span><button id="shared-next" aria-label="Next page">›</button>';document.body.append(pager);
 const $=id=>document.getElementById('shared-'+id);
 let data,baseline,dirty=false,applying=false,saving=false;

@@ -1575,3 +1575,32 @@ test('refresh displays cached estimate before live sync and preserves early edit
   await expect(input).toHaveValue('151.00');
   await page.reload();await expect(input).toHaveValue('151.00');
 });
+
+test('joining a collaborator on another estimate preserves their rows even with delayed updates',async({browser})=>{
+ const a=await browser.newContext(),b=await browser.newContext();const alice=await a.newPage(),bob=await b.newPage();
+ let hold=false;const pending=[];let forward;
+ await alice.routeWebSocket('**/live/**',ws=>{const server=ws.connectToServer();forward=()=>{hold=false;for(const m of pending.splice(0))ws.send(m);};server.onMessage(m=>{if(hold&&JSON.parse(m).type==='update')pending.push(m);else ws.send(m);});});
+ try{
+  await openWorkbook(alice,workbook(),'Switch observer '+Date.now());
+  const name=await alice.locator('#server-title').innerText();
+  await bob.goto('/');await bob.locator('#server-login-name').fill('Switch editor '+Date.now());await bob.locator('#server-login-password').fill('1313');await bob.locator('#server-login-form button').click();
+  await expect(bob.locator('#server-status')).toHaveText(/^(All changes saved|No project open)$/);
+  await bob.locator('#server-open').click();await bob.getByRole('button').filter({has:bob.getByText(name,{exact:true})}).click();
+  await expect(bob.locator('#server-status')).toHaveText('All changes saved');
+  await alice.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'tn',sheet:'sn',view:'sheet'}));
+  await bob.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'ts',sheet:'ss',view:'sheet'}));
+  hold=true;
+  await bob.locator('#title').fill('Friend current scope');await bob.locator('#body input[aria-label="cost"]').first().fill('987');await bob.locator('#add').click();
+  await expect(bob.locator('#server-status')).toHaveText('All changes saved');
+  const before=await bob.evaluate(()=>window.estimator.getShared());
+  for(const t of before.lists[0].companies[0].projects[1].takeoffs)for(const s of t.sheets)for(const r of s.rows)r.type ||= 'item';
+  await alice.locator('#body input[aria-label="cost"]').first().fill('222');
+  await expect(alice.locator('#server-status')).toHaveText('All changes saved');
+  const friend=alice.getByRole('button',{name:/Go to Switch editor.*South job/});await expect(friend).toBeEnabled();await friend.click();
+  await expect(bob.locator('#title')).toHaveValue('Friend current scope');
+  expect((await bob.evaluate(()=>window.estimator.getShared())).lists[0].companies[0].projects[1]).toEqual(before.lists[0].companies[0].projects[1]);
+  forward();await expect(alice.locator('#title')).toHaveValue('Friend current scope');await expect(alice.locator('#body input[aria-label="cost"]').first()).toHaveValue('987.00');
+  await alice.reload();await expect(alice.locator('#title')).toHaveValue('Friend current scope');
+  expect((await alice.evaluate(()=>window.estimator.getShared())).lists[0].companies[0].projects[1]).toEqual(before.lists[0].companies[0].projects[1]);
+ }finally{await a.close();await b.close();}
+});
