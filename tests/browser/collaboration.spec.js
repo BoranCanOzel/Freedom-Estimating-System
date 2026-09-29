@@ -98,11 +98,14 @@ test('two estimators share edits, cursors, reconnects and projects', async ({ br
 
 test('imports legacy JSON and server snapshots without losing hierarchy or libraries', async ({page}) => {
   await page.goto('/');await page.locator('#server-login-name').fill('Importer');await page.locator('#server-login-password').fill('1313');await page.locator('#server-login-form button').click();
+  await expect(page.locator('#server-status')).toHaveText(/^(All changes saved|No project open)$/);
   const book={sheets:[{id:'s1',title:'Original scope',rows:[{id:'r1',kind:'labor',name:'Legacy item',cost:50,count:1,time:1,days:1}]}],
     companies:[{id:'co1',name:'Customer',projects:[{id:'pr1',name:'Job',takeoffs:[{id:'tk1',name:'Takeoff',sheets:[{id:'s1',title:'Original scope',rows:[{id:'r1',kind:'labor',name:'Legacy item',cost:50,count:1,time:1,days:1}]}]}]}]}],
     templates:{items:[{id:'tpl1',name:'Library item',kind:'labor',cost:25}],sections:[],scopes:[]}};
   await page.locator('#server-import-file').setInputFiles({name:'legacy.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(book))});
+  const importFinished=page.waitForResponse(r=>r.url().endsWith('/api/projects') && r.request().method()==='GET');
   await page.locator('#import-preview button[type=submit]').click();
+  await importFinished;
   await expect(page.locator('#title')).toHaveValue('Original scope');
   await expect(page.locator('#server-status')).toHaveText('All changes saved');
   const canonical=await page.evaluate(()=>window.estimator.getShared());

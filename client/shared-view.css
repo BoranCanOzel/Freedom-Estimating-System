@@ -13,3 +13,23 @@ body.shared-view{padding:12px;}
 .shared-readonly #sheetTable,.shared-readonly .sum-table{box-shadow:none}
 .shared-readonly .scroll{isolation:isolate;transform:translateZ(0)}
 @media print{#shared-toolbar{display:none}}
+
+#shared-toolbar{display:block;border-radius:12px;border-top:4px solid var(--amber);padding:18px 20px;box-shadow:0 3px 14px #1f3b4d10}
+.shared-heading{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+#shared-name{font-size:19px;line-height:1.3;overflow-wrap:anywhere}
+#shared-permission{flex:none;padding:4px 9px;border-radius:20px;background:var(--calc);color:var(--muted);font-size:11px;font-weight:600}
+.shared-navigation{display:flex;align-items:stretch;gap:14px}
+#shared-toolbar .shared-navigation button{border:2px solid var(--slate);border-radius:8px;background:var(--card);color:var(--ink);padding:12px 20px;font-weight:700;font-size:15px;cursor:pointer}
+#shared-toolbar #shared-summary[aria-pressed="true"]{background:var(--slate-bg);border-color:var(--amber);color:#fff;box-shadow:inset 0 -3px var(--amber)}
+.shared-navigation label{display:flex;align-items:center;gap:12px;padding:8px 12px;background:var(--fill);border:1px solid var(--amber);border-radius:8px;color:var(--ink);font-weight:600;min-width:0;flex:1}
+#shared-toolbar #shared-page{width:100%;max-width:none;min-width:0;flex:1;border:1px solid var(--rule);border-radius:6px;padding:10px 30px 10px 12px;background:var(--card);color:var(--ink);cursor:pointer;font-weight:600}
+#shared-toolbar button:focus-visible,#shared-toolbar select:focus-visible,#shared-notes summary:focus-visible{outline:3px solid var(--amber);outline-offset:3px}
+#shared-toolbar .shared-navigation button:hover{border-color:var(--amber)}
+#shared-guide{margin:10px 0 14px;color:var(--muted);font-size:12px}
+.shared-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;border-top:1px solid var(--rule-hair);padding-top:12px}
+#shared-toolbar .shared-actions button{padding:8px 12px;border:1px solid var(--rule);border-radius:6px;background:var(--calc);color:var(--ink);cursor:pointer}
+#shared-toolbar #shared-save{background:var(--slate-bg);color:#fff;border-color:var(--slate)}
+#shared-toolbar button:disabled{opacity:.5;cursor:default}
+#shared-notes summary{cursor:pointer;color:var(--ink);font-weight:600;padding:6px}
+#shared-status{margin-left:auto;flex-basis:auto;font-size:12px}
+@media(max-width:650px){#shared-toolbar{padding:14px}.shared-heading{align-items:flex-start}.shared-navigation{flex-direction:column;gap:10px}.shared-navigation label{flex-direction:column;align-items:stretch;gap:6px}#shared-status{flex-basis:100%;margin-left:0}#shared-name{font-size:17px}}

@@ -1,4 +1,5 @@
 import './ai-access.css';
+import {publicUrl} from './public-url.js';
 
 export function setupAiAccess(api,getContext) {
   const button=document.createElement('button');button.id='takeoff-ai-access';button.type='button';button.textContent='AI access';button.className='btn ghost';
@@ -44,8 +45,9 @@ export function setupAiAccess(api,getContext) {
     try{
       const grant=await api(path(),{method:'POST',body:JSON.stringify({list:context.list,takeoff:context.takeoff})});
       if(!dialog.open||context!==requested)return;
-      const url=value=>new URL(value,location.origin).href;
-      $('connection').value=`Freedom Estimating — authorized takeoff: ${grant.takeoffName}\nExpires: ${grant.expiresAt}\nOne successful save only.\n\nWebsite URL: ${location.origin}\nREST endpoint: ${url(grant.endpoint)}\nMCP endpoint: ${url(grant.mcp)}\nAuthorization: Bearer ${grant.key}\nOpenAPI schema: ${url(grant.openapi)}\n\nFirst call get_instructions (MCP) or GET ${url(grant.instructions)} with the Authorization header. Then read_takeoff, validate_changes, and save_takeoff. Preserve the read revision and use a unique requestId when saving. Do not attempt to edit any other takeoff. A 409 means reread and reapply your intended changes. The server returns a receipt after saving.\n\nUse these full URLs for REST requests:\nGET ${url(grant.instructions)}\nGET ${url(grant.endpoint + "/takeoff")}\nPOST ${url(grant.endpoint + "/validate")} with {revision,takeoff}\nPOST ${url(grant.endpoint + "/save")} with {revision,takeoff,requestId}\nInclude the Authorization header above on every request. Configure the Bearer key in the tool client; never put it in a URL.`;
+      const origin=new URL(publicUrl('/',location.origin)).origin;
+      const url=value=>publicUrl(value,origin);
+      $('connection').value=`Freedom Estimating — authorized takeoff: ${grant.takeoffName}\nExpires: ${grant.expiresAt}\nOne successful save only.\n\nWebsite URL: ${origin}\nREST endpoint: ${url(grant.endpoint)}\nMCP endpoint: ${url(grant.mcp)}\nAuthorization: Bearer ${grant.key}\nOpenAPI schema: ${url(grant.openapi)}\n\nFirst call get_instructions (MCP) or GET ${url(grant.instructions)} with the Authorization header. Then read_takeoff, validate_changes, and save_takeoff. Preserve the read revision and use a unique requestId when saving. Do not attempt to edit any other takeoff. A 409 means reread and reapply your intended changes. The server returns a receipt after saving.\n\nUse these full URLs for REST requests:\nGET ${url(grant.instructions)}\nGET ${url(grant.endpoint + "/takeoff")}\nPOST ${url(grant.endpoint + "/validate")} with {revision,takeoff}\nPOST ${url(grant.endpoint + "/save")} with {revision,takeoff,requestId}\nInclude the Authorization header above on every request. Configure the Bearer key in the tool client; never put it in a URL.`;
       $('package').hidden=false;await refresh();
     }finally{$('generate').disabled=false;}
   });

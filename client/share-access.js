@@ -1,4 +1,5 @@
 import './ai-access.css';
+import {publicUrl} from './public-url.js';
 export function setupShareAccess(api,getContext){
   const button=document.createElement('button');button.id='takeoff-share';button.className='btn ghost';button.textContent='Share';
   const dialog=document.createElement('dialog');dialog.id='share-access-dialog';dialog.setAttribute('aria-label','Share takeoff');
@@ -13,7 +14,7 @@ export function setupShareAccess(api,getContext){
     if(!data.links.length)$('links').textContent='No share links yet.';
   }
   button.onclick=action(async()=>{context=getContext();$('name').textContent=context.name;$('result').hidden=true;$('url').value='';$('permission').value='read';dialog.showModal();await refresh();});
-  $('create').onclick=action(async()=>{ $('create').disabled=true;try{const result=await api(path(),{method:'POST',body:JSON.stringify({list:context.list,takeoff:context.takeoff,permission:$('permission').value})});$('url').value=new URL(result.path,location.origin).href;$('result').hidden=false;await refresh();}finally{$('create').disabled=false;} });
+  $('create').onclick=action(async()=>{ $('create').disabled=true;try{const result=await api(path(),{method:'POST',body:JSON.stringify({list:context.list,takeoff:context.takeoff,permission:$('permission').value})});$('url').value=publicUrl(result.path,location.origin);$('result').hidden=false;await refresh();}finally{$('create').disabled=false;} });
   $('copy').onclick=action(async()=>{let copied=false;try{if(navigator.clipboard?.writeText){await navigator.clipboard.writeText($('url').value);copied=true;}}catch{}if(!copied){$('url').select();try{copied=document.execCommand('copy');}catch{}}$('message').textContent=copied?'Link copied.':'Link selected. Press Ctrl+C or Command+C to copy.';});
   $('close').onclick=()=>dialog.close();dialog.addEventListener('close',()=>{$('url').value='';});
   function sync(){const here=getContext(),host=document.querySelector(`#${here.view||'sheet'}Card .eyebrow-row`);if(host&&button.parentElement!==host)host.append(button);button.disabled=!here.workbook||!here.takeoff;}

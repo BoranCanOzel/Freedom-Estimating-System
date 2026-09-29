@@ -199,3 +199,13 @@ body.server-mode.medieval #sheetTable .h-adds .btn:hover{
 .workspace-ai-data input{width:auto;margin:0;accent-color:var(--teal)}
 @media print{.workspace-ai-data{display:none!important}}
 @media print{body.server-mode .workspace-actions,body.server-mode #workspace-menus,body.server-mode #workspace-toggle-notes{display:none!important}body.server-mode.workspace-projects-open.server-active>.sheet{margin-left:0}}
+
+#sumCostBreakdown{padding:18px 0 24px;border-top:1px solid var(--rule-hair);margin-top:18px}
+#sumCostBreakdown h3{margin:0 0 6px;font-size:16px}
+#sumCostBreakdown p{font-size:12px;color:var(--muted);margin:0 0 14px}
+.cost-breakdown-row{display:flex;overflow-x:auto;border:1px solid var(--rule-hair);border-radius:8px}
+.cost-category{flex:1 0 125px;padding:12px;border-right:1px solid var(--rule-hair);display:flex;flex-direction:column;gap:6px}
+.cost-category:last-child{border-right:0;background:var(--s3)}
+.cost-category span{font-size:12px;white-space:nowrap}.cost-category strong{font-size:16px;font-variant-numeric:tabular-nums}.cost-category small{color:var(--muted)}
+.cost-category i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
+.cost-pie{display:block;width:220px;max-width:100%;height:auto;margin:18px auto 0}

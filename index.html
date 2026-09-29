@@ -1,11 +1,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Project Breakdown</title>
+<script>document.documentElement.classList.add('workspace-starting');</script>
 <link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg">
 <link rel="stylesheet" href="/assets/app.css">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=Fira+Sans:wght@400;500;600;700&family=Fira+Sans+Condensed:wght@500;600;700&display=swap');
 
+  html.workspace-starting body:not(.server-active)>.sheet,
+  html.workspace-starting body:not(.server-active)>.proj-tab,
+  html.workspace-starting body:not(.server-active)>.lib-tab,
+  html.workspace-starting #server-welcome{visibility:hidden}
   :root{
     --f-sans:"IBM Plex Sans",system-ui,sans-serif;
     --f-cond:"IBM Plex Sans Condensed",sans-serif;
@@ -2946,6 +2951,7 @@
         <div class="eyebrow">Notes</div>
         <textarea id="sumNotes" rows="3" placeholder="Notes for this set of options"></textarea>
       </div>
+      <section id="sumCostBreakdown" aria-label="Cost breakdown"></section>
     </div>
     <div class="bar">
       <button class="btn alt" id="sumSections">Expand sections</button>
@@ -6061,7 +6067,35 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     wrap.appendChild(sumBlock('tk', 'Takeoff', take));
   }
 
+  function renderCostBreakdown(){
+    const labels = {labor:'Labor',material:'Materials',equip:'Equipment',part:'Parts',service:'Services',construct:'Assemblies',hybrid:'Mixed',other:'Other',markup:'Markup / flat adds',fees:'Fees'};
+    const colors = ['#2563eb','#0d9488','#d97706','#9333ea','#db2777','#64748b','#0891b2','#78716c','#65a30d','#ea580c'];
+    const amounts = Object.fromEntries(Object.keys(labels).map(k => [k,0]));
+    book.sheets.forEach(sh => sh.rows.forEach(r => {
+      if (r.type === 'section' || r.type === 'sectionEnd' || r.kind === 'none') return;
+      const c = calc(r,sh);
+      amounts[Object.hasOwn(labels,r.kind) ? r.kind : 'other'] += c.base;
+      amounts.markup += c.markup + c.flat;
+      amounts.fees += c.fees.reduce((a,b) => a+b,0);
+    }));
+    const entries = Object.keys(labels).map((k,i) => ({label:labels[k],value:amounts[k],color:colors[i]})).filter(x => Math.abs(x.value)>0.000001);
+    const total = entries.reduce((s,x) => s+x.value,0);
+    const negative = entries.some(x => x.value<0);
+    let angle = -Math.PI/2;
+    const slices = total>0 && !negative ? entries.map(x => {
+      const fraction = x.value/total, next=angle+fraction*Math.PI*2;
+      const title=esc(x.label+': $'+fmt.format(x.value)+' ('+(fraction*100).toFixed(1)+'%)');
+      const shape = fraction>0.999999 ? '<circle cx="100" cy="100" r="90"' : '<path d="M100 100 L'+(100+90*Math.cos(angle))+' '+(100+90*Math.sin(angle))+' A90 90 0 '+(fraction>0.5?1:0)+' 1 '+(100+90*Math.cos(next))+' '+(100+90*Math.sin(next))+' Z"';
+      angle=next;
+      return shape+' fill="'+x.color+'"><title>'+title+'</title></'+(fraction>0.999999?'circle':'path')+'>';
+    }).join('') : '';
+    document.getElementById('sumCostBreakdown').innerHTML = '<h3>Cost breakdown</h3><p>All options combined, by line item type. Services and assemblies include their components. Markup and fees are shown separately; excludes rounding.</p>'+
+      '<div class="cost-breakdown-row">'+entries.map(x => '<div class="cost-category"><span><i style="background:'+x.color+'"></i>'+x.label+'</span><strong>$'+fmt.format(x.value)+'</strong><small>'+(total>0&&!negative?(x.value/total*100).toFixed(1)+'%':'')+'</small></div>').join('')+'<div class="cost-category"><span>Total</span><strong>$'+fmt.format(total)+'</strong></div></div>'+
+      (slices?'<svg class="cost-pie" viewBox="0 0 200 200" role="img" aria-label="Cost distribution by category"><title>Cost distribution by category; amounts and percentages listed above</title>'+slices+'</svg>':'<p>'+(negative?'Pie chart unavailable when categories include credits. Signed amounts are shown above.':'Add priced items to see the cost distribution.')+'</p>');
+  }
+
   function renderSummary(){
+    renderCostBreakdown();
     const t = document.getElementById('sumTable');
     renderSummaryBlocks();
     document.getElementById('sumNotes').value = book.summaryNotes || '';

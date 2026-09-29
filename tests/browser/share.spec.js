@@ -10,6 +10,12 @@ test('guests view all pages, save edits, and see conflicts without a login',asyn
  const ctx=await browser.newContext(),page=await ctx.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
  try{
   await page.goto('http://127.0.0.1:3100'+read.path);await expect(page.locator('#shared-status')).toHaveText('Latest version loaded.');
+  await expect(page.locator('#summaryCard')).toBeVisible();
+  await expect(page.locator('#shared-summary')).toHaveAttribute('aria-pressed','true');
+  await expect(page.locator('#shared-page')).toHaveValue('');
+  await page.locator('#shared-page').selectOption('a');
+  await expect(page.locator('#sheetCard')).toBeVisible();
+  await expect(page.locator('#shared-summary')).toHaveAttribute('aria-pressed','false');
   await expect(page.locator('#title')).toHaveValue('Scope a');await expect(page.locator('#title')).toHaveAttribute('readonly','');
   await expect(page.locator('#sheetTable tbody td.c-item').first()).toHaveCSS('position','static');
   await expect(page.locator('#sheetTable thead th').first()).toHaveCSS('position','sticky');
@@ -28,10 +34,24 @@ test('guests view all pages, save edits, and see conflicts without a login',asyn
   });expect(scans).toBe(0);
   await page.evaluate(()=>{const input=document.createElement('input');input.id='late-readonly-control';document.querySelector('.sheet').append(input);});
   await expect(page.locator('#late-readonly-control')).toHaveAttribute('readonly','');
+  await page.locator('#shared-summary').click();
+  await expect(page.locator('#summaryCard')).toBeVisible();
+  await expect(page.locator('#shared-page')).toHaveValue('');
+  await page.setViewportSize({width:390,height:844});
+  await expect(page.locator('#shared-summary')).toBeInViewport();
+  await expect(page.locator('#shared-page')).toBeInViewport();
+  await page.screenshot({path:'test-results/shared-summary-mobile.png'});
+  await page.setViewportSize({width:1440,height:1000});
+  await page.screenshot({path:'test-results/shared-summary-desktop.png'});
   await page.goto('http://127.0.0.1:3100'+write.path);await expect(page.locator('#shared-permission')).toHaveText('View and edit');await expect(page.locator('#shared-status')).toHaveText('Latest version loaded.');
+  await expect(page.locator('#summaryCard')).toBeVisible();
+  await page.locator('#shared-page').selectOption('a');
   await expect(page.locator('#sheetTable tbody td.c-item').first()).toHaveCSS('position','sticky');
   await page.locator('#title').fill('Guest scope');await page.locator('#title').blur();await expect(page.locator('#shared-save')).toBeEnabled();await page.locator('#shared-save').click();await expect(page.locator('#shared-status')).toHaveText('Changes saved.');
-  await page.reload();await expect(page.locator('#title')).toHaveValue('Guest scope');
+  await page.reload();
+  await expect(page.locator('#summaryCard')).toBeVisible();
+  await page.locator('#shared-page').selectOption('a');
+  await expect(page.locator('#title')).toHaveValue('Guest scope');
   const headers={Authorization:'Bearer '+write.path.split('#')[1]};const remote=await(await request.get('/api/shared-takeoff',{headers})).json();remote.takeoff.name='Owner updated';await request.put('/api/shared-takeoff',{headers,data:{revision:remote.revision,takeoff:remote.takeoff}});
   await page.locator('#title').fill('Conflicting draft');await page.locator('#title').blur();await page.locator('#shared-save').click();await expect(page.locator('#shared-status')).toContainText('changed since you loaded');await expect(page.locator('#title')).toHaveValue('Conflicting draft');
   await request.delete(admin+'/'+write.id);page.once('dialog',d=>d.accept());await page.locator('#shared-reload').click();await expect(page.locator('#shared-status')).toContainText('revoked');

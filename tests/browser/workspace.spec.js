@@ -1538,3 +1538,40 @@ test('service costs edit inline and preserve add-ons after reload',async({page})
   expect(saved[1].cost).toBe(265);
   expect(saved[1].parts[0].cost).toBe(35);
 });
+
+test('summary cost breakdown reconciles categories, fees and pie',async({page})=>{
+  const data=workbook();
+  const sh=data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0];
+  sh.rows[0].cost=100;sh.rows[0].markup=10;
+  sh.rows.push({id:'mat',kind:'material',name:'Concrete',count:2,time:1,days:1,cost:50,markup:0});
+  await openWorkbook(page,data);
+  await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'tn',sheet:'sn',view:'summary'}));
+  const breakdown=page.locator('#sumCostBreakdown');
+  await expect(breakdown).toContainText('Labor');await expect(breakdown).toContainText('Materials');
+  await expect(breakdown).toContainText('$216.30');
+  await expect(breakdown.locator('.cost-category').filter({hasText:'Fees'})).toContainText('$6.30');
+  await expect(breakdown.locator('svg path')).toHaveCount(4);
+});
+
+test('refresh displays cached estimate before live sync and preserves early edits',async({page})=>{
+  await openWorkbook(page);
+  await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'tn',sheet:'sn',view:'sheet'}));
+  const input=page.locator('#sheetTable tbody input[aria-label="cost"]').first();
+  await input.fill('143');await input.press('Tab');
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  let release;let released=false;
+  await page.routeWebSocket('**/live/**',ws=>{
+    const server=ws.connectToServer();const queued=[];
+    server.onMessage(message=>{if(released)ws.send(message);else queued.push(message);});
+    release=()=>{released=true;for(const message of queued)ws.send(message);};
+  });
+  await page.reload();
+  await expect(input).toBeVisible();
+  await expect(input).toHaveValue('143.00');
+  await expect(page.locator('#server-status')).not.toHaveText('All changes saved');
+  await input.fill('151');await input.press('Tab');
+  await expect.poll(()=>typeof release).toBe('function');release();
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await expect(input).toHaveValue('151.00');
+  await page.reload();await expect(input).toHaveValue('151.00');
+});

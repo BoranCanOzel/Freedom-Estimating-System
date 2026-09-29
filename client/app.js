@@ -110,7 +110,7 @@ class LiveProject {
     try { this.resumeLocation = JSON.parse(localStorage.getItem(this.locationKey)) || this.resumeLocation; } catch {}
   }
   async start() {
-    const previous = await cache(this.cacheKey);
+    const previous = await cache(this.cacheKey).catch(() => null);
     if (previous) Y.applyUpdate(this.doc, previous, 'cache');
     this.doc.on('update', (_update, origin) => {
       const state = Y.encodeStateAsUpdate(this.doc);
@@ -122,6 +122,18 @@ class LiveProject {
         this.paintStatus();
       }
     });
+    if (previous) {
+      // openProject has already checked server access. Show the device copy
+      // immediately; local edits still merge through the normal Yjs sync.
+      this.applying = true;
+      try { renderRemote(readBook(this.doc), true, this.resumeLocation); this.baseline = clone(bridge.getShared()); }
+      finally { this.applying = false; }
+      this.historyLocation = clone(bridge.getLocation());
+      this.resumeLocation = undefined;
+      this.ready = true;
+      document.body.classList.add('server-active');
+      workspace.sync(); syncProjectPanel();
+    }
     this.connect();
   }
   connect() {
@@ -135,9 +147,14 @@ class LiveProject {
         const msg = JSON.parse(event.data);
         if (msg.type === 'sync' || msg.type === 'update') {
           if (this.ready) this.changed();
+          const before = this.ready ? JSON.stringify(readBook(this.doc)) : null;
           Y.applyUpdate(this.doc, decode(msg.state || msg.update), 'remote');
           this.applying = true;
-          try { renderRemote(readBook(this.doc), !this.ready, this.resumeLocation); this.baseline = clone(bridge.getShared()); }
+          try {
+            const next = readBook(this.doc);
+            if (before !== JSON.stringify(next)) renderRemote(next, !this.ready, this.resumeLocation);
+            this.baseline = clone(bridge.getShared());
+          }
           finally { this.applying = false; }
           this.historyLocation = clone(bridge.getLocation());
           if (msg.type === 'sync') {
@@ -608,15 +625,16 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) conne
 async function signedIn(name) {
   user = name; $('server-signout').textContent = name + ' · Sign out';
   let preferences = {cursor:'classic',lastWorkbook:null};
-  try { preferences = await api('/preferences'); }
-  catch (error) {
+  const preferenceRequest = api('/preferences').catch(error => {
     if (error.status !== 404) throw error;
     preferencesAvailable = false;
     message('Server update pending: restart the Node project in aaPanel to enable account settings. Your workbooks are still available.',true);
-  }
+    return preferences;
+  });
+  [preferences] = await Promise.all([preferenceRequest, refresh()]);
   workspace.setCursor(preferences.cursor); $('workspace-cursor').disabled = !preferencesAvailable;
   workspace.setCursorColor(preferences.color); $('workspace-cursor-color').disabled = !preferencesAvailable;
-  await refresh(); syncProjectPanel();
+  syncProjectPanel();
   let remembered;
   try { remembered = localStorage.getItem('freedom:last-workbook:' + user); } catch {}
   const last = projects.find(p=>p.id===preferences.lastWorkbook) || projects.find(p=>p.id===remembered)
@@ -644,4 +662,5 @@ async function boot() {
   }
   setInterval(() => { if (user && !$('server-drawer').hidden) { refresh().catch(() => {}); if (recentMode && !browsing) refreshRecent(); } }, 10000);
 }
-boot().catch(e => { status('Could not open the workspace', true); message(e.message, true); });
+boot().catch(e => { status('Could not open the workspace', true); message(e.message, true); })
+  .finally(() => document.documentElement.classList.remove('workspace-starting'));
