@@ -11,6 +11,9 @@ test('guests view all pages, save edits, and see conflicts without a login',asyn
  try{
   await page.goto('http://127.0.0.1:3100'+read.path);await expect(page.locator('#shared-status')).toHaveText('Latest version loaded.');
   await expect(page.locator('#title')).toHaveValue('Scope a');await expect(page.locator('#title')).toHaveAttribute('readonly','');
+  await expect(page.locator('#sheetTable tbody td.c-item').first()).toHaveCSS('position','static');
+  await expect(page.locator('#sheetTable thead th').first()).toHaveCSS('position','sticky');
+  await expect(page.locator('#sheetCard .scroll')).not.toHaveCSS('transform','none');
   await expect(page.locator('#shared-save')).toBeHidden();
   await page.evaluate(()=>{window.shareRenders=0;window.shareSerializations=0;document.addEventListener('estimator:view',()=>window.shareRenders++);const original=window.estimator.getShared;window.estimator.getShared=function(...args){window.shareSerializations++;return original.apply(this,args);};});
   await page.locator('#shared-page').selectOption('b');await expect(page.locator('#title')).toHaveValue('Scope b');
@@ -26,6 +29,7 @@ test('guests view all pages, save edits, and see conflicts without a login',asyn
   await page.evaluate(()=>{const input=document.createElement('input');input.id='late-readonly-control';document.querySelector('.sheet').append(input);});
   await expect(page.locator('#late-readonly-control')).toHaveAttribute('readonly','');
   await page.goto('http://127.0.0.1:3100'+write.path);await expect(page.locator('#shared-permission')).toHaveText('View and edit');await expect(page.locator('#shared-status')).toHaveText('Latest version loaded.');
+  await expect(page.locator('#sheetTable tbody td.c-item').first()).toHaveCSS('position','sticky');
   await page.locator('#title').fill('Guest scope');await page.locator('#title').blur();await expect(page.locator('#shared-save')).toBeEnabled();await page.locator('#shared-save').click();await expect(page.locator('#shared-status')).toHaveText('Changes saved.');
   await page.reload();await expect(page.locator('#title')).toHaveValue('Guest scope');
   const headers={Authorization:'Bearer '+write.path.split('#')[1]};const remote=await(await request.get('/api/shared-takeoff',{headers})).json();remote.takeoff.name='Owner updated';await request.put('/api/shared-takeoff',{headers,data:{revision:remote.revision,takeoff:remote.takeoff}});

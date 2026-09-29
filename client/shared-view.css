@@ -6,4 +6,10 @@ body.shared-view{padding:12px;}
 .shared-loading>.sheet{visibility:hidden}
 .shared-readonly .sheet button,.shared-readonly .col-resizer,.shared-readonly .grip{visibility:hidden!important}
 .shared-readonly .sheet input,.shared-readonly .sheet textarea{cursor:text}
+/* A pinned cell in every row makes a long editor table expensive to repaint.
+   Keep the column headers pinned; let read-only body cells scroll as one surface. */
+.shared-readonly #sheetTable tbody td.c-item{position:static;z-index:auto}
+.shared-readonly #sheetTable thead th.c-item{left:auto;z-index:30}
+.shared-readonly #sheetTable,.shared-readonly .sum-table{box-shadow:none}
+.shared-readonly .scroll{isolation:isolate;transform:translateZ(0)}
 @media print{#shared-toolbar{display:none}}

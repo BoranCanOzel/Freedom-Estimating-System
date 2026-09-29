@@ -42,6 +42,7 @@ export function setupWorkspace() {
         </div><div class="workspace-cursor-setting"><label for="workspace-cursor-color">Your color</label>
           <select id="workspace-cursor-color" disabled>${Object.entries(cursorColors).map(([value,label])=>`<option value="${value}">${label}</option>`).join('')}</select>
         </div><p class="workspace-preference-hint">Your shared cursor and online color. Saved to your account.</p>
+        <button id="workspace-tank-solo" type="button">Tank game: single player</button>
         <div data-for-view="sheet" class="menu-context"><div class="menu-divider"></div>
           <p class="menu-label">Sheet display</p><div id="workspace-pictures"></div><div id="workspace-detail"></div>
         </div>

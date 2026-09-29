@@ -2739,6 +2739,8 @@
     .btn.ghost{margin-left:auto}
   }
   @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+  .rounded-total{margin-top:5px;padding-top:4px;border-top:1px solid var(--rule);font-size:10px}
+  .rounded-total>span{display:block;color:var(--muted);font-weight:400}
   @page{size:landscape;margin:10mm}
   @media print{
     body{background:var(--card);padding:0;display:block;overflow:visible;height:auto}
@@ -3149,18 +3151,11 @@
 
   const seed = (n) => ({
     id: id(), num: n || 1,
-    title: (n || 1) === 1
-      ? 'Option 1: Sawcut/remove (E) asphalt up to 1600 SF x 4" thick'
-      : '',
+    title: '',
     fees:[{id:id(), label:'Fee', pct:3}],
-    units:[{id:id(), label:'SF', qty:(n || 1) === 1 ? 1600 : ''}],
+    units:[{id:id(), label:'SF', qty:''}],
     widths:{}, hiddenCols:[],
-    rows: (n || 1) === 1 ? [
-      {id:id(), kind:'equip',    name:'Flatsaw', count:1, time:4, days:1, cost:160, markup:0},
-      {id:id(), kind:'material', name:'Slurry',  count:1, time:1, days:1, cost:75,  markup:0},
-      {id:id(), kind:'labor',    name:'Travel',  count:1, time:1, days:1, cost:260, markup:0},
-      {id:id(), kind:'labor',    name:'OT',      count:1, time:4, days:1, cost:35,  markup:0}
-    ] : [
+    rows: [
       {id:id(), kind:'labor', name:'', count:1, time:1, days:1, cost:'', markup:0}
     ]
   });
@@ -5880,6 +5875,10 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
            '<span class="v">' + (zero ? '—' : fmt.format(v)) + '</span></div>';
   }
 
+  function roundedTotalHTML(value){
+    return '<div class="rounded-total"><span>Rounded total</span>' + moneyHTML(value) + '</div>';
+  }
+
   const SUM_COLS = [
     {k:'num',   label:'#',             w:56,  min:44},
     {k:'scope', label:'Scope of work', w:560, min:220, flex:true},
@@ -6064,11 +6063,12 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     document.getElementById('sumNotes').value = book.summaryNotes || '';
     const detail = !!book.sumDetail;
     book.sumOpen = book.sumOpen || {};
-    let tot = {sub:0, fee:0, grand:0};
+    let tot = {sub:0, fee:0, grand:0, rounded:0};
+    const hasRounding = book.sheets.some(sh => num(sh.roundTotal));
 
     const rows = book.sheets.map(sh => {
       const s = sheetTotals(sh);
-      tot.sub += s.sub; tot.fee += s.feeSum; tot.grand += s.grand;
+      tot.sub += s.sub; tot.fee += s.feeSum; tot.grand += s.grand; tot.rounded += s.grandRounded;
 
       const secs = sheetSections(sh);
       const isOpen = !!book.sumOpen[sh.id];
@@ -6092,7 +6092,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         '</td>' +
         '<td>' + moneyHTML(s.sub) + '</td>' +
         '<td>' + moneyHTML(s.feeSum) + '</td>' +
-        '<td class="s-grand">' + moneyHTML(s.grand) + '</td>' +
+        '<td class="s-grand">' + moneyHTML(s.grand) + (num(sh.roundTotal) ? roundedTotalHTML(s.grandRounded) : '') + '</td>' +
         '<td class="s-ups"><div class="ups-wrap">' + upChips(s.ups) + '</div></td>' +
       '</tr>';
 
@@ -6135,7 +6135,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         '<td class="s-num"></td><td><div class="tot-label">All options</div></td>' +
         '<td>' + moneyHTML(tot.sub) + '</td>' +
         '<td>' + moneyHTML(tot.fee) + '</td>' +
-        '<td class="grand">' + moneyHTML(tot.grand) + '</td>' +
+        '<td class="grand">' + moneyHTML(tot.grand) + (hasRounding ? roundedTotalHTML(tot.rounded) : '') + '</td>' +
         '<td></td>' +
       '</tr></tfoot>';
 
@@ -7111,6 +7111,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   document.getElementById('roundTotal').addEventListener('change', e => {
     state.roundTotal = e.target.value;
     recalc();
+    if (book.view === 'summary') renderSummary();
   });
 
   document.getElementById('sheetNotes').addEventListener('input', e => {
@@ -10467,9 +10468,11 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   function money$(v){ return v ? '$' + fmt.format(v) : '—'; }
 
   function printSheetHtml(sh){
+    const showRound = !colHidden('round', sh);
+    let roundSum = 0;
     const extra = sh.flatAddEnabled ? 1 : 0;
     const heads = ['Item','Ct','T','D','Cost','Mk %'].concat(extra ? ['Flat add $'] : [], ['Subtotal'])
-      .concat(sh.fees.map(f => f.label || 'Fee'), ['Grand'], sh.units.map(u => 'U/P ' + (u.label || '')));
+      .concat(sh.fees.map(f => f.label || 'Fee'), ['Grand'], showRound ? ['Round'] : [], sh.units.map(u => 'U/P ' + (u.label || '')));
     const span = heads.length;
     let html = '<section class="psheet">';
     const scope = (sh.title || '').trim();
@@ -10485,6 +10488,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       const cells = ['<td class="pnum">' + money$(open.sub) + '</td>']
         .concat(open.fees.map(v => '<td class="pnum">' + money$(v) + '</td>'),
                 ['<td class="pnum">' + money$(open.grand) + '</td>'],
+                showRound ? ['<td class="pnum">' + money$(open.round) + '</td>'] : [],
                 sh.units.map(u => {
                   const ov = secUnit(open.row, u), q = num(ov.qty);
                   return '<td class="pnum">' + (q ? '$' + fmt.format(open.grand / q) : '—') + '</td>';
@@ -10496,7 +10500,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
     sh.rows.forEach(x => {
       if (x.type === 'section'){
-        stack.push({row:x, sub:0, grand:0, fees:sh.fees.map(() => 0)});
+        stack.push({row:x, sub:0, grand:0, round:0, fees:sh.fees.map(() => 0)});
         html += '<tr class="psec"><td colspan="' + span + '">' + '&nbsp;'.repeat((stack.length - 1) * 4) + esc(x.name || 'Section') + '</td></tr>';
         return;
       }
@@ -10506,8 +10510,10 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         return;
       }
       const c = calc(x, sh);
+      const rounded = roundTo(c.grand, num(sh.roundStep) || 1);
+      roundSum += rounded;
       stack.forEach(open => {
-        open.sub += c.sub; open.grand += c.grand;
+        open.sub += c.sub; open.grand += c.grand; open.round += rounded;
         c.fees.forEach((v, i) => { open.fees[i] += v; });
       });
       const nm = esc(x.name || '') +
@@ -10522,6 +10528,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         '<td class="pnum">' + money$(c.sub) + '</td>' +
         c.fees.map(v => '<td class="pnum">' + money$(v) + '</td>').join('') +
         '<td class="pnum pgrand">' + money$(c.grand) + '</td>' +
+        (showRound ? '<td class="pnum">' + money$(rounded) + '</td>' : '') +
         sh.units.map(u => {
           const q = num(u.qty);
           return '<td class="pnum">' + (q ? '$' + fmt.format(c.grand / q) : '—') + '</td>';
@@ -10533,28 +10540,25 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     html += '</tbody><tfoot><tr><td colspan="' + (6 + extra) + '">Total</td>' +
       '<td class="pnum">' + money$(t.sub) + '</td>' +
       t.fees.map(v => '<td class="pnum">' + money$(v) + '</td>').join('') +
-      '<td class="pnum pgrand">' + money$(t.grand) + '</td>' +
+      '<td class="pnum pgrand">' + money$(t.grand) + (num(sh.roundTotal) ? roundedTotalHTML(t.grandRounded) : '') + '</td>' +
+      (showRound ? '<td class="pnum">' + money$(roundSum) + '</td>' : '') +
       t.ups.map(u => '<td class="pnum">' + (u.qty ? '$' + fmt.format(u.price) : '—') + '</td>').join('') +
       '</tr></tfoot></table></section>';
     return html;
   }
 
   function printSummaryHtml(){
-    let g = 0;
-    let html = '<section class="psheet"><h2>Summary</h2><table class="ptab"><thead><tr>' +
-      ['#','Scope of work','Subtotal','Fees','Grand','Unit price'].map(h => '<th>' + h + '</th>').join('') +
-      '</tr></thead><tbody>';
-    book.sheets.forEach(sh => {
-      const t = sheetTotals(sh);
-      g += t.grand;
-      const ups = t.ups.filter(u => u.qty)
-        .map(u => '$' + fmt.format(u.price) + '/' + u.qty.toLocaleString('en-US') + ' ' + (u.label || '')).join('<br>');
-      html += '<tr><td class="pmid">' + sh.num + '</td><td>' + esc((sh.title || '').split('\n')[0]) + '</td>' +
-        '<td class="pnum">' + money$(t.sub) + '</td><td class="pnum">' + money$(t.feeSum) + '</td>' +
-        '<td class="pnum pgrand">' + money$(t.grand) + '</td><td>' + ups + '</td></tr>';
-    });
-    html += '</tbody><tfoot><tr><td></td><td>All options</td><td></td><td></td>' +
-      '<td class="pnum pgrand">' + money$(g) + '</td><td></td></tr></tfoot></table>';
+    // Use the same content as the summary, including its section/detail choices.
+    renderSummary();
+    const table = document.getElementById('sumTable').cloneNode(true);
+    table.removeAttribute('id');
+    table.className = 'ptab';
+    table.removeAttribute('style');
+    table.querySelectorAll('colgroup, .col-resizer, button').forEach(el => el.remove());
+    const blocks = document.getElementById('sumBlocks').cloneNode(true);
+    blocks.removeAttribute('id');
+    blocks.querySelectorAll('a').forEach(el => el.remove());
+    let html = '<section class="psheet"><h2>Summary</h2>' + blocks.outerHTML + table.outerHTML;
     if (book.summaryNotes) html += '<p class="pnote"><b>Notes:</b> ' + esc(book.summaryNotes) + '</p>';
     return html + '</section>';
   }
@@ -12021,7 +12025,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       } finally { book = previousBook; state = previousState; personal = previousPersonal; }
     },
     blank(name){
-      const sh = seed(2); sh.num = 1; sh.title = '';
+      const sh = seed(1);
       const tk = {id:id(),name:'Takeoff 1',custom:{},sheets:[sh]};
       return this.prepare({lists:[{id:id(),name:'Projects',companies:[{id:id(),name:'Company 1',custom:{},projects:[{id:id(),name,status:'Open',custom:{},takeoffs:[tk]}]}]}]});
     }

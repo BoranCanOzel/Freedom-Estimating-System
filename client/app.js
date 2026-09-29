@@ -518,6 +518,7 @@ function confirmDelete(project){
   deleteDialog.showModal();$('delete-workbook-confirm').focus();
 }
 tankDuel = setupTankDuel(() => connection, message);
+$('workspace-tank-solo').onclick = () => { $('workspace-view').open = false; tankDuel.singlePlayer(); };
 const takeoffAccessContext=()=>{
   const location=bridge.getLocation();
   const takeoff=bridge.getProjectLists().flatMap(list=>list.companies||[]).flatMap(company=>company.projects||[]).flatMap(project=>project.takeoffs||[]).find(value=>value.id===location.takeoff);

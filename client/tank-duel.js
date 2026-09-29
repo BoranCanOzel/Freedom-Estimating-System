@@ -1,11 +1,12 @@
 import './tank-duel.css';
+import { terrain, fireShot, moveTank, MOVE_FUEL } from '../shared/tank-game.js';
 import { tankCamera } from './tank-camera.js';
 
 export function setupTankDuel(getConnection, notify) {
   const panel = document.createElement('section');
   panel.id = 'tank-duel'; panel.hidden = true;
   panel.setAttribute('aria-label', 'Tank duel');
-  panel.innerHTML = `<header><strong>DESERT DUEL</strong><span id="duel-status" role="status"></span><button id="duel-sound" type="button" aria-pressed="true">Sound on</button><button id="duel-close" type="button">Close</button></header>
+  panel.innerHTML = `<header><strong>DESERT DUEL</strong><span id="duel-status" role="status"></span><button id="duel-restart" type="button" hidden>New game</button><button id="duel-sound" type="button" aria-pressed="true">Sound on</button><button id="duel-close" type="button">Close</button></header>
     <div id="duel-invite"><p id="duel-invite-text"></p><button id="duel-accept" type="button">Accept duel</button><button id="duel-decline" type="button">Decline</button></div>
     <div id="duel-game" hidden><canvas width="1000" height="280" aria-label="Random desert battlefield with two tanks"></canvas>
     <div class="duel-controls"><span id="duel-side"></span><button id="duel-left" type="button" aria-label="Move tank left">← A</button><button id="duel-right" type="button" aria-label="Move tank right">D →</button><output id="duel-fuel" aria-label="Movement fuel"></output><label>Angle <input id="duel-angle" type="range" min="5" max="175" value="45"><output id="duel-angle-value">45°</output></label><label>Power <input id="duel-power" type="range" min="10" max="100" value="65"><output id="duel-power-value">65</output></label><button id="duel-fire" type="button">Fire!</button><span>Move before firing · Fuel resets each turn · First hit wins · 90° points straight up</span></div></div>`;
@@ -14,9 +15,29 @@ export function setupTankDuel(getConnection, notify) {
   const canvas = panel.querySelector('canvas'), ctx = canvas.getContext('2d');
   let state = null, id = null, frame = 0, timer = null, aimTimer = null, animating = false, muted = false, audio;
   let shotPath = [], visibleGround = null, visibleProjectile = null;
-  let moveTimer = null;
+  let moveTimer = null, solo = false;
+  let powers = [65,65];
   const stopMoving = () => { clearInterval(moveTimer); moveTimer = null; };
   const send = (action, extra = {}) => {
+    if (solo && action !== 'challenge') {
+      if (action === 'leave') return true;
+      if (!state || state.finished || animating || extra.round !== state.round) return false;
+      const player = state.turn;
+      if (action === 'move') {
+        const moved = moveTank(state.ground, state.positions, player, extra.direction, state.fuel);
+        state.positions[player] = moved.x; state.fuel = moved.fuel; controls(); draw();
+      } else if (action === 'aim') state.angles[player] = extra.angle;
+      else if (action === 'fire') {
+        const shot = fireShot(state.ground, player, extra.angle, extra.power, state.positions);
+        state.angles[player] = extra.angle; powers[player] = extra.power;
+        const turn = 1-player, round = state.round+1;
+        const winner = shot.hit === null ? null : 1-shot.hit;
+        api.receive({...state, event:'state', ground:shot.ground, turn, you:turn, round,
+          fuel:MOVE_FUEL, winner, finished:winner !== null || round >= 60,
+          shot:{path:shot.path, impact:shot.impact}});
+      }
+      return true;
+    }
     const connection = getConnection();
     if (!connection?.synced || connection.socket.readyState !== WebSocket.OPEN) { notify('Reconnect before starting a duel.', true); return false; }
     connection.socket.send(JSON.stringify({type:'duel',action,id,...extra})); return true;
@@ -107,15 +128,30 @@ export function setupTankDuel(getConnection, notify) {
   $('sound').onclick=()=>{muted=!muted;$('sound').textContent=muted?'Sound off':'Sound on';$('sound').setAttribute('aria-pressed',String(!muted));};
   $('accept').onclick=()=>{if(send('accept'))$('accept').disabled=true;};
   $('decline').onclick=()=>send('decline');
-  $('close').onclick=()=>{if(id&&!state?.finished)send('leave');stop();id=null;state=null;panel.hidden=true;};
+  $('close').onclick=()=>{if(id&&!state?.finished)send('leave');stop();id=null;state=null;solo=false;panel.hidden=true;};
+  $('restart').onclick=()=>api.singlePlayer();
   $('fire').onclick=()=>{
     if(!state||animating||state.finished||state.turn!==state.you)return;
     if(send('fire',{angle:Number($('angle').value),power:Number($('power').value),round:state.round})){animating=true;controls();}
   };
-  return {
-    challenge(target) { if(send('challenge',{target}))sound('invite'); },
-    disconnect() { stop(); if(!panel.hidden){$('status').textContent='Connection closed. Duel ended.';$('game').hidden=true;$('invite').hidden=true;}id=null;state=null; },
+  const api = {
+    singlePlayer() {
+      if (!solo && id && !state?.finished) { notify('Close your current duel before starting single player.', true); return; }
+      stop(); state=null; id=null; solo=true; powers=[65,65];
+      api.receive({event:'state', id:'solo', you:0, turn:0, round:0, names:['Teal tank','Amber tank'],
+        ground:terrain(), angles:[45,135], positions:[85,915], fuel:MOVE_FUEL, finished:false, winner:null});
+    },
+    challenge(target) { if(solo){notify('Close single player before challenging another player.',true);return;} if(send('challenge',{target}))sound('invite'); },
+    disconnect() { if(solo)return; stop(); if(!panel.hidden){$('status').textContent='Connection closed. Duel ended.';$('game').hidden=true;$('invite').hidden=true;}id=null;state=null; },
     receive(message) {
+      if (solo && message.id !== 'solo') {
+        if (message.event === 'invited' || message.event === 'waiting') {
+          const connection = getConnection();
+          if (connection?.socket.readyState === WebSocket.OPEN) connection.socket.send(JSON.stringify({type:'duel',action:'decline',id:message.id}));
+        }
+        return;
+      }
+      $('restart').hidden = !solo;
       if(message.event==='moved') {
         if(!state || state.finished || message.id!==id || message.round!==state.round || animating)return;
         state.positions=message.positions;state.fuel=message.fuel;controls();draw();return;
@@ -140,7 +176,8 @@ export function setupTankDuel(getConnection, notify) {
       const previous=state?.ground;const fresh=id!==message.id||!state;stop();id=message.id;state=message;
       panel.hidden=false;$('invite').hidden=true;$('game').hidden=false;
       if(fresh){$('angle').value=state.you===0?45:135;$('angle-value').textContent=$('angle').value+'°';}
-      $('side').textContent=state.you===0?'You: teal tank (left)':'You: amber tank (right)';
+      if(solo){$('angle').value=state.angles[state.you];$('angle-value').textContent=$('angle').value+'\u00b0';$('power').value=powers[state.you];$('power-value').textContent=$('power').value;}
+      $('side').textContent=solo ? 'Single player: You control both tanks' : state.you===0?'You: teal tank (left)':'You: amber tank (right)';
       if(message.shot){
         animating=true;shotPath=message.shot.path;controls();sound('fire');const started=performance.now();
         const animate=now=>{
@@ -152,4 +189,5 @@ export function setupTankDuel(getConnection, notify) {
       }else{controls();draw();}
     }
   };
+  return api;
 }

@@ -1417,3 +1417,81 @@ test('optional flat add applies once after markup and persists with its toggle',
   await toggle(false);await expect(column).toBeHidden();await expect(page.locator('#tSub .v')).toHaveText('1,320.00');
   await toggle(true);await expect(page.locator('#body [aria-label="flatAdd"]')).toHaveValue('400.00');
 });
+
+test('summary and printing include rounding and summary details', async ({page}) => {
+  const data=workbook(), tk=data.lists[0].companies[0].projects[0].takeoffs[0];
+  data.summaryNotes='Summary note';
+  const sh=tk.sheets[0]; sh.roundTotal=100; sh.roundStep=10;
+  sh.note='Option detail'; sh.title='North scope\nSecond scope line';
+  sh.rows.unshift({id:'sec',type:'section',name:'Site preparation'});
+  sh.rows.push({id:'end',type:'sectionEnd'});
+  tk.sheets.push({...sheet('other','Other option'),hiddenCols:['round']});
+  await openWorkbook(page,data);
+  await page.locator('#rail .tab-summary').click();
+  const row=page.locator('#sumTable .s-row').first();
+  await expect(row.locator('.s-grand > .money .v')).toHaveText('128.75');
+  await expect(row.locator('.rounded-total .v')).toHaveText('100.00');
+  await expect(page.locator('#sumTable tfoot .rounded-total .v')).toHaveText('228.75');
+  await page.locator('#rail .tab[data-sheet]').first().click();
+  await page.locator('#workspace-estimate > summary').click();
+  await page.locator('#roundTotal').selectOption('10');
+  await page.locator('#workspace-estimate > summary').press('Escape');
+  await page.locator('#rail .tab-summary').click();
+  await expect(row.locator('.rounded-total .v')).toHaveText('130.00');
+  await row.locator('.sum-caret').click();
+  await page.locator('#workspace-view > summary').click();
+  await page.locator('#sumDetail').click();
+  await page.locator('#workspace-view > summary').press('Escape');
+  await page.evaluate(()=>{window.print=()=>{window.printCapture=document.getElementById('printAll').innerHTML;};});
+  await page.emulateMedia({media:'print'});
+  await page.evaluate(()=>window.estimator.print(false));
+  const summary=await page.evaluate(()=>window.printCapture);
+  for(const text of ['Freedom Customer','North job','North takeoff','Site preparation','Second scope line','Option detail','Summary note','Rounded total','130.00','258.75']) expect(summary).toContain(text);
+  await expect(page.locator('#printAll')).toBeVisible();
+  await page.emulateMedia({media:'screen'});
+  await page.locator('#rail .tab[data-sheet]').first().click();
+  await page.evaluate(()=>window.estimator.print(true));
+  const all=await page.evaluate(()=>window.printCapture);
+  expect(all).toContain('<th>Round</th>');
+  expect(all).toContain('Rounded total');
+  expect(all).toContain('Site preparation');
+  await page.locator('#rail .tab-summary').click();
+  await page.locator('#rail .tab[data-sheet]').first().click();
+  await page.locator('#workspace-estimate > summary').click();
+  await page.locator('#roundTotal').selectOption('0');
+  await page.locator('#workspace-estimate > summary').press('Escape');
+  await page.locator('#rail .tab-summary').click();
+  await expect(page.locator('#sumTable .rounded-total')).toHaveCount(0);
+});
+
+test('new takeoffs and option pages start without sample content', async ({page}) => {
+  await openWorkbook(page);
+  await page.locator('#server-projects').click();
+  await page.locator('[data-company="co"] > .p-head > .p-name').click();
+  await page.locator('[data-project="north"] > .p-head button[title="Add a takeoff"]').click();
+  await page.locator('#editor').getByLabel('Takeoff name',{exact:true}).fill('Blank takeoff');
+  await page.locator('#edSave').click();
+  const createdTakeoff=page.locator('.p-head[data-takeoff]').filter({hasText:'Blank takeoff'});
+  if(!await createdTakeoff.count()) await page.locator('[data-project="north"] > .p-head > .p-name').click();
+  await createdTakeoff.click();
+  await expect(page.locator('#title')).toHaveValue('');
+  await expect(page.locator('#body .name-in')).toHaveCount(1);
+  await expect(page.locator('#body .name-in')).toHaveValue('');
+  await page.locator('#rail .tab-add').click();
+  await expect(page.locator('#title')).toHaveValue('');
+  const check=async()=>{
+    const data=await page.evaluate(()=>window.estimator.getShared());
+    const takeoffs=data.lists[0].companies[0].projects[0].takeoffs;
+    const created=takeoffs.find(t=>t.name==='Blank takeoff');
+    expect(created.sheets).toHaveLength(2);
+    for(const sh of created.sheets){
+      expect(sh.title).toBe('');expect(sh.units.every(u=>!u.qty)).toBe(true);
+      expect(sh.rows).toHaveLength(1);expect(sh.rows[0].name).toBe('');expect(sh.rows[0].cost).toBe('');
+    }
+    expect(takeoffs.find(t=>t.name==='North takeoff').sheets[0].title).toBe('North scope');
+  };
+  await check();
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await check();
+});
