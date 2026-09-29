@@ -3,6 +3,7 @@ import {readFileSync,existsSync} from 'node:fs';
 import * as Y from 'yjs';
 import {readBook,writeBook,validateBook} from './shared/model.js';
 import {locateTakeoff,findTakeoff,revision,validateTakeoff} from './shared/ai-takeoff.js';
+import {createSharePresence} from './server-share-presence.js';
 
 const hash=v=>createHash('sha256').update(v).digest('hex');
 const fail=(status,message)=>{throw Object.assign(Error(message),{status});};
@@ -89,4 +90,5 @@ export function mountShareAccess({app,db,session,project,rooms,snapshot,authChan
     res.type(name.endsWith('.css')?'css':name.endsWith('.js')?'js':'png').send(name.endsWith('.css')?readFileSync(file,'utf8').replaceAll('/assets/','/share-assets/'):readFileSync(file));
   });
   app.get('/share',(_req,res)=>{res.set({'Cache-Control':'no-store','Referrer-Policy':'no-referrer','X-Robots-Tag':'noindex, nofollow'});res.type('html').send(html);});
+  return createSharePresence({access,source,findTakeoff,readBook,rooms,session,project});
 }

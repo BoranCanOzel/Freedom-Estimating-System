@@ -33,3 +33,13 @@ body.shared-view{padding:12px;}
 #shared-notes summary{cursor:pointer;color:var(--ink);font-weight:600;padding:6px}
 #shared-status{margin-left:auto;flex-basis:auto;font-size:12px}
 @media(max-width:650px){#shared-toolbar{padding:14px}.shared-heading{align-items:flex-start}.shared-navigation{flex-direction:column;gap:10px}.shared-navigation label{flex-direction:column;align-items:stretch;gap:6px}#shared-status{flex-basis:100%;margin-left:0}#shared-name{font-size:17px}}
+
+.shared-view #sheetCard>.bar,.shared-view #summaryCard>.bar{display:none!important}
+#shared-pagination{flex:none;display:flex;justify-content:center;align-items:center;gap:20px;padding:10px;margin-top:8px;border:1px solid var(--rule);border-radius:8px;background:var(--card);font:600 14px var(--f-sans)}
+#shared-pagination button{width:44px;height:38px;border:1px solid var(--amber);border-radius:6px;background:var(--slate-bg);color:white;font-size:26px;cursor:pointer}
+#shared-pagination button:disabled{opacity:.3;cursor:default}#shared-pagination button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+#shared-page-position{min-width:110px;text-align:center;color:var(--ink)}
+#shared-people{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;color:var(--muted);font-size:12px}
+#shared-people button{border:1px solid var(--rule);border-radius:5px;background:var(--calc);color:var(--ink);cursor:pointer}
+#shared-cursors{position:fixed;inset:0;pointer-events:none;z-index:700;overflow:hidden}.shared-peer-cursor{position:absolute;white-space:nowrap;font:700 12px var(--f-sans);text-shadow:0 1px 2px var(--card);transition:left 60ms linear,top 60ms linear}
+@media print{#shared-pagination,#shared-cursors{display:none}}

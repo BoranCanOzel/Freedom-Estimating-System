@@ -110,7 +110,7 @@ export function createApp(options = {}) {
     return rooms.get(id);
   }
   mountAiAccess({app,db,session,project,rooms,snapshot,authChanged});
-  mountShareAccess({app,db,session,project,rooms,snapshot,authChanged});
+  const sharePresence=mountShareAccess({app,db,session,project,rooms,snapshot,authChanged});
   app.get('/api/session', (req, res) => res.json({ user: session(req)?.name || null, passwordRequired: true }));
   app.post('/api/login', (req, res) => {
     const ip = req.ip, recent = (loginAttempts.get(ip) || []).filter(t => Date.now() - t < 60000);
@@ -252,6 +252,7 @@ export function createApp(options = {}) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: 35 * 1024 * 1024 });
   server.on('upgrade', (req, socket, head) => {
     const user = session(req), url = new URL(req.url, 'http://localhost');
+    if(url.pathname==='/share-live'&&sameOrigin(req)){sharePresence.upgrade(req,socket,head);return;}
     const id = url.pathname.startsWith('/live/') ? url.pathname.slice(6) : '';
     if (!user || !sameOrigin(req) || !project(id)) {
       socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n'); socket.destroy(); return;
@@ -260,7 +261,7 @@ export function createApp(options = {}) {
       ws.name = user.name; ws.token = user.token; ws.peerId = randomUUID(); ws.alive = true;
       const room = getRoom(id); room.clients.add(ws);
       const send = (client, value) => { if (client.readyState === WebSocket.OPEN) client.send(JSON.stringify(value)); };
-      const presence = () => { const peers = [...room.clients].map(c => ({ id: c.peerId, name: c.name, ...(c.presence || {}) })); for (const c of room.clients) send(c, { type: 'presence', peers }); };
+      const presence = () => { const peers = [...room.clients].map(c => ({ id: c.peerId, name: c.name, ...(c.presence || {}) })).concat(sharePresence.peers(id)); for (const c of room.clients) send(c, { type: 'presence', peers }); };
       send(ws, { type: 'sync', state: encode(room.doc), peerId: ws.peerId }); presence();
       ws.on('pong', () => { ws.alive = true; });
       ws.on('error', () => {});
@@ -335,6 +336,7 @@ export function createApp(options = {}) {
   }, 30000);
   heartbeat.unref();
   async function close() {
+    sharePresence.close();
     clearInterval(heartbeat);
     for (const [id, room] of rooms) { clearTimeout(room.timer); snapshot(id); for (const ws of room.clients) ws.terminate(); }
     await new Promise(done => wss.close(done));

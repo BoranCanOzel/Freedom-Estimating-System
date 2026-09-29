@@ -13,6 +13,12 @@ test('guests view all pages, save edits, and see conflicts without a login',asyn
   await expect(page.locator('#summaryCard')).toBeVisible();
   await expect(page.locator('#shared-summary')).toHaveAttribute('aria-pressed','true');
   await expect(page.locator('#shared-page')).toHaveValue('');
+  await expect(page.locator('#shared-prev')).toBeDisabled();
+  await page.locator('#shared-next').click();await expect(page.locator('#shared-page-position')).toHaveText('Page 1 of 2');
+  await page.locator('#shared-next').click();await expect(page.locator('#shared-page-position')).toHaveText('Page 2 of 2');
+  await expect(page.locator('#shared-next')).toBeDisabled();
+  await page.locator('#shared-prev').click();await page.locator('#shared-prev').click();
+  await expect(page.locator('#summaryCard')).toBeVisible();
   await page.locator('#shared-page').selectOption('a');
   await expect(page.locator('#sheetCard')).toBeVisible();
   await expect(page.locator('#shared-summary')).toHaveAttribute('aria-pressed','false');
@@ -21,6 +27,22 @@ test('guests view all pages, save edits, and see conflicts without a login',asyn
   await expect(page.locator('#sheetTable thead th').first()).toHaveCSS('position','sticky');
   await expect(page.locator('#sheetCard .scroll')).not.toHaveCSS('transform','none');
   await expect(page.locator('#shared-save')).toBeHidden();
+  await expect(page.locator('#zoomPick')).toBeHidden();await expect(page.locator('#roundTotal')).toBeHidden();
+  const guest=await ctx.newPage();
+  try{
+    await guest.goto('http://127.0.0.1:3100'+read.path);
+    await expect(page.locator('#shared-people button')).toHaveCount(1);
+    await expect(page.locator('#shared-people button')).toContainText('Summary');
+    await guest.locator('#shared-page').selectOption('a');
+    await guest.locator('#title').hover();
+    await expect(page.locator('.shared-peer-cursor')).toBeVisible();
+    await guest.locator('#shared-page').selectOption('b');
+    await expect(page.locator('#shared-people button')).toContainText('Scope b');
+    await expect(page.locator('.shared-peer-cursor')).toHaveCount(0);
+    await page.locator('#shared-people button').click();await expect(page.locator('#title')).toHaveValue('Scope b');
+    await page.locator('#shared-page').selectOption('a');
+  }finally{await guest.close();}
+  await expect(page.locator('#shared-people button')).toHaveCount(0);
   await page.evaluate(()=>{window.shareRenders=0;window.shareSerializations=0;document.addEventListener('estimator:view',()=>window.shareRenders++);const original=window.estimator.getShared;window.estimator.getShared=function(...args){window.shareSerializations++;return original.apply(this,args);};});
   await page.locator('#shared-page').selectOption('b');await expect(page.locator('#title')).toHaveValue('Scope b');
   expect(await page.evaluate(()=>({renders:window.shareRenders,serializations:window.shareSerializations}))).toEqual({renders:1,serializations:0});

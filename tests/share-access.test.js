@@ -37,3 +37,27 @@ test('share links enforce view/edit, isolated scope, revisions, revocation, live
   assert.equal((await call('/api/projects/'+project.id,'DELETE',{confirmation:'DELETE'})).status,200);assert.equal((await call('/api/shared-takeoff','GET',undefined,rk)).status,401);
  }finally{ws?.terminate();await app.close();}
 });
+
+test('shared presence is scoped, connects guests with estimators, and honors revocation',async()=>{
+ const app=createApp({dataDir:await mkdtemp(join(tmpdir(),'freedom-presence-')),production:false});app.server.listen(0,'127.0.0.1');await once(app.server,'listening');const base='http://127.0.0.1:'+app.server.address().port;const sockets=[];
+ const wait=async fn=>{for(let i=0;i<200;i++){if(fn())return;await new Promise(r=>setTimeout(r,10));}assert.fail('Presence did not arrive');};
+ try{
+  const login=await fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Owner',password:'1313'})});const cookie=login.headers.get('set-cookie').split(';')[0];
+  const call=(path,method='GET',body)=>fetch(base+path,{method,headers:{'Content-Type':'application/json',cookie},body:body&&JSON.stringify(body)});
+  const book={lists:[{id:'l',companies:[{id:'c',projects:[{id:'p',takeoffs:[takeoff('one'),takeoff('two')]}]}]}]};
+  const project=await(await call('/api/projects','POST',{name:'Presence',book})).json();
+  const admin='/api/projects/'+project.id+'/share-links';
+  const grant=await(await call(admin,'POST',{list:'l',takeoff:'one',permission:'read'})).json();
+  async function socket(path,options){const ws=new WebSocket(base.replace('http:','ws:')+path,options);sockets.push(ws);ws.messages=[];ws.on('message',m=>ws.messages.push(JSON.parse(m)));await once(ws,'open');return ws;}
+  const owner=await socket('/live/'+project.id,{headers:{cookie}});await wait(()=>owner.messages.some(m=>m.type==='sync'));
+  owner.send(JSON.stringify({type:'presence',presence:{list:'l',takeoff:'one',sheet:'sone',view:'sheet',anchor:'#title',x:.2,y:.4,visible:true}}));
+  const guest=await socket('/share-live');guest.send(JSON.stringify({type:'auth',key:grant.path.split('#')[1]}));await wait(()=>guest.messages.some(m=>m.type==='presence'&&m.peers.some(p=>p.name==='Owner')));
+  guest.send(JSON.stringify({type:'presence',presence:{list:'fake',takeoff:'two',sheet:'sone',view:'sheet',anchor:'#title',x:.5,y:.5,visible:true}}));
+  await wait(()=>owner.messages.some(m=>m.type==='presence'&&m.peers.some(p=>p.name.startsWith('Guest')&&p.visible&&p.takeoff==='one')));
+  assert(!guest.messages.some(m=>m.state||m.update||m.takeoff));
+  await new Promise(r=>setTimeout(r,50));owner.send(JSON.stringify({type:'presence',presence:{list:'l',takeoff:'two',sheet:'stwo',view:'sheet'}}));
+  await wait(()=>guest.messages.at(-1)?.type==='presence'&&!guest.messages.at(-1).peers.some(p=>p.name==='Owner'));
+  const closed=once(guest,'close');await call(admin+'/'+grant.id,'DELETE');const [code]=await closed;assert.equal(code,4003);
+  const bad=await socket('/share-live');const refused=once(bad,'close');bad.send(JSON.stringify({type:'auth',key:'0'.repeat(64)}));assert.equal((await refused)[0],4003);assert.equal(bad.messages.length,0);
+ }finally{for(const ws of sockets)ws.terminate();await app.close();}
+});
