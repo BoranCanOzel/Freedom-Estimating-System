@@ -194,4 +194,7 @@ body.server-mode.medieval #sheetTable .h-adds .btn{
 body.server-mode.medieval #sheetTable .h-adds .btn:hover{
   background:linear-gradient(#E6863E,#C26124 55%,#A74E17);border-color:#5A2507;color:#fff;
 }
+.workspace-ai-data{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;cursor:pointer}
+.workspace-ai-data input{width:auto;margin:0;accent-color:var(--teal)}
+@media print{.workspace-ai-data{display:none!important}}
 @media print{body.server-mode .workspace-actions,body.server-mode #workspace-menus,body.server-mode #workspace-toggle-notes{display:none!important}body.server-mode.workspace-projects-open.server-active>.sheet{margin-left:0}}

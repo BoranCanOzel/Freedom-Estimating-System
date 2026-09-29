@@ -1,13 +1,26 @@
 export const WIDTH = 1000, HEIGHT = 280;
 export const MOVE_FUEL = 60, MOVE_STEP = 6;
+export const MOVE_INTERVAL = 100, MAX_CLIMB_ANGLE = 50, MAX_STEP_HEIGHT = 6;
+
+export function groundHeight(ground, x) {
+  x = Math.max(0, Math.min(WIDTH, x));
+  const left = Math.floor(x), right = Math.min(WIDTH, left + 1);
+  return ground[left] + (ground[right] - ground[left]) * (x - left);
+}
+
+export function tankPose(ground, x) {
+  const left = groundHeight(ground, x - 12), right = groundHeight(ground, x + 12);
+  return {y:(left + 2 * groundHeight(ground, x) + right) / 4, angle:Math.atan2(right - left, 24)};
+}
 
 export function moveTank(ground, positions, player, direction, fuel) {
   let x = positions[player], used = 0;
   for (let step = 0; step < Math.min(MOVE_STEP, fuel); step++) {
     const next = x + direction;
     if (next < 24 || next > WIDTH - 24 || Math.abs(next - positions[1-player]) < 42) break;
-    // Reject sharp crater edges and slopes steeper than the tank can climb.
-    if (Math.abs(ground[next] - ground[x]) > 1 || Math.abs(ground[next+12] - ground[next-12]) > 12) break;
+    // Tracks bridge small ledges; steep faces and drops still stop the tank.
+    if (Math.abs(ground[next] - ground[x]) > MAX_STEP_HEIGHT ||
+        Math.abs(tankPose(ground, next).angle) > MAX_CLIMB_ANGLE * Math.PI / 180) break;
     x = next; used++;
   }
   return {x, fuel: fuel - used};
@@ -17,12 +30,18 @@ export function terrain(random = Math.random) {
   const phase = random() * 6.28, phase2 = random() * 6.28;
   const hills = 2 + random() * 2, ridges = 5 + random() * 3;
   const ground = Array.from({length: WIDTH + 1}, (_, x) => Math.round(185 + 36 * Math.sin(x / WIDTH * hills * Math.PI + phase) + 17 * Math.sin(x / WIDTH * ridges * Math.PI + phase2)));
-  for (const x of [85, 915]) for (let i = x - 23; i <= x + 23; i++) ground[i] = ground[x];
+  for (const x of [85, 915]) {
+    const height = ground[x];
+    for (let i = x - 39; i <= x + 39; i++) {
+      const blend = Math.min(1, Math.max(0, (Math.abs(i - x) - 23) / 16));
+      ground[i] = height + (ground[i] - height) * blend;
+    }
+  }
   return ground;
 }
 
 export function fireShot(ground, player, angle, power, positions = [85,915]) {
-  const x0 = positions[player], y0 = ground[x0] - 12;
+  const x0 = positions[player], y0 = tankPose(ground, x0).y - 12;
   const radians = angle * Math.PI / 180;
   let x = x0 + Math.cos(radians) * 24, y = y0 - Math.sin(radians) * 24;
   const vx = Math.cos(radians) * power * 5;
@@ -34,7 +53,7 @@ export function fireShot(ground, player, angle, power, positions = [85,915]) {
     path.push([Math.round(x * 10) / 10, Math.round(y * 10) / 10]);
     if (x < 0 || x > WIDTH || y > HEIGHT) break;
     for (const [index, tx] of positions.entries()) {
-      if (Math.hypot(x - tx, y - (ground[tx] - 8)) < 18) { hit = index; impact = [x, y]; break; }
+      if (Math.hypot(x - tx, y - (tankPose(ground, tx).y - 8)) < 18) { hit = index; impact = [x, y]; break; }
     }
     if (impact) break;
     if (y >= ground[Math.round(x)]) {

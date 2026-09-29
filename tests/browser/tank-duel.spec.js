@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { fireShot } from '../../shared/tank-game.js';
 
 test('online players accept a tank duel, trade shots and leave without changing the estimate', async ({browser,baseURL})=>{
   const a=await browser.newContext({baseURL}),b=await browser.newContext({baseURL});
@@ -84,6 +85,19 @@ test('single player controls both tanks and remembers each aim without changing 
   await expect(page.locator('#duel-status')).toContainText('Teal tank');
   await page.locator('#duel-right').focus();await page.keyboard.press('d');
   await expect(page.locator('#duel-fuel')).toHaveText('Turn fuel: 54/60');
+  await page.evaluate(()=>{
+    const ctx=document.querySelector('#tank-duel canvas').getContext('2d'),translate=ctx.translate.bind(ctx);
+    window.tankMotionSamples=[];
+    ctx.translate=(x,y)=>{window.tankMotionSamples.push(x);translate(x,y);};
+  });
+  await page.keyboard.down('d');
+  await expect.poll(()=>page.locator('#duel-fuel-meter').getAttribute('aria-valuenow').then(Number)).toBeLessThanOrEqual(36);
+  await page.keyboard.up('d');
+  await expect.poll(()=>page.evaluate(()=>window.tankMotionSamples.some(x=>x>85&&x<145&&!Number.isInteger(x)))).toBe(true);
+  const stoppedFuel=await page.locator('#duel-fuel-meter').getAttribute('aria-valuenow');
+  await expect(page.locator('#duel-fuel')).toHaveText(`Turn fuel: ${stoppedFuel}/60`);
+  await page.waitForTimeout(180);
+  await expect(page.locator('#duel-fuel-meter')).toHaveAttribute('aria-valuenow',stoppedFuel);
   await page.locator('#duel-angle').fill('5');await page.locator('#duel-power').fill('10');
   await page.locator('#duel-fire').click();
   await expect(page.locator('#duel-fire')).toBeDisabled();
@@ -111,4 +125,52 @@ test('single player controls both tanks and remembers each aim without changing 
   await expect(page.locator('#tank-duel')).toBeHidden();
   expect(await page.evaluate(()=>window.estimator.getShared())).toEqual(before);
   expect(errors).toEqual([]);
+});
+
+test('a killing shot shows each online player their result and Okay exits the game',async({browser,baseURL})=>{
+  const contexts=await Promise.all([browser.newContext({baseURL}),browser.newContext({baseURL})]);
+  const pages=await Promise.all(contexts.map(c=>c.newPage()));
+  const stamp=Date.now(),names=['Victor '+stamp,'Rival '+stamp],states=[],errors=[];
+  try{
+    for(const [i,page] of pages.entries()){
+      page.on('pageerror',e=>errors.push(e.message));
+      page.on('websocket',socket=>socket.on('framereceived',({payload})=>{
+        try{const message=JSON.parse(payload.toString());if(message.type==='duel'&&message.event==='state')states[i]=message;}catch{}
+      }));
+      await page.goto('/');await page.locator('#server-login-name').fill(names[i]);
+      await page.locator('#server-login-password').fill('1313');await page.locator('#server-login-form button').click();
+      await expect(page.locator('#server-login')).not.toBeVisible();
+    }
+    const [alice,bob]=pages,name='Result test '+stamp;
+    await alice.locator('#server-new').click();await alice.locator('#server-name-input').fill(name);await alice.locator('#server-name-form button[type=submit]').click();
+    await expect(alice.locator('#server-status')).toHaveText('All changes saved');
+    await bob.locator('#server-open').click();await bob.getByRole('button').filter({has:bob.getByText(name,{exact:true})}).click();
+    await expect(bob.locator('#server-status')).toHaveText('All changes saved');
+    const before=await alice.evaluate(()=>window.estimator.getShared());
+    await alice.getByRole('button',{name:'Challenge '+names[1]+' to a tank duel'}).click();
+    await bob.locator('#duel-accept').click();
+    await expect.poll(()=>states.length).toBe(2);
+    const state=states[0],winner=state.turn,loser=1-winner;let solution;
+    for(let angle=25;angle<=80&&!solution;angle++)for(let power=60;power<=100&&!solution;power++){
+      const aim=winner===0?angle:180-angle;
+      if(fireShot(state.ground,winner,aim,power,state.positions).hit===loser)solution={angle:aim,power};
+    }
+    expect(solution).toBeTruthy();
+    await pages[winner].locator('#duel-angle').fill(String(solution.angle));
+    await pages[winner].locator('#duel-power').fill(String(solution.power));
+    await pages[winner].locator('#duel-fire').click();
+    await expect(pages[winner].getByRole('dialog',{name:'You win!'})).toBeVisible();
+    await expect(pages[loser].getByRole('dialog',{name:'You lose',exact:true})).toBeVisible();
+    for(const page of pages){
+      await expect(page.locator('#duel-result-okay')).toBeFocused();
+      await expect(page.locator('#duel-fire')).toBeDisabled();
+    }
+    await pages[winner].getByRole('button',{name:'Okay',exact:true}).click();
+    await expect(pages[winner].locator('#tank-duel')).toBeHidden();
+    await expect(pages[loser].locator('#duel-result')).toBeVisible();
+    await pages[loser].getByRole('button',{name:'Okay',exact:true}).click();
+    await expect(pages[loser].locator('#tank-duel')).toBeHidden();
+    expect(await alice.evaluate(()=>window.estimator.getShared())).toEqual(before);
+    expect(errors).toEqual([]);
+  }finally{await Promise.all(contexts.map(c=>c.close()));}
 });

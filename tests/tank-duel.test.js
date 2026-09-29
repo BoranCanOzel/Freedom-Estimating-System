@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { terrain, fireShot, moveTank, MOVE_FUEL } from '../shared/tank-game.js';
+import { terrain, fireShot, moveTank, tankPose, MOVE_FUEL } from '../shared/tank-game.js';
 import { createDuels } from '../server-duels.js';
 
 test('random terrain stays in bounds and tanks can hit each other', () => {
@@ -113,4 +113,35 @@ test('a direct hit ends the match and a new accepted match gets fresh terrain', 
   duels.handle(a,{action:'accept',id:nextId},clients);
   assert.notDeepEqual(a.messages.at(-1).ground,state.ground);
   duels.disconnect(a);
+});
+
+test('tracks climb rounded piles and 45-degree slopes but reject excessive slopes and cliffs',()=>{
+  for(const direction of [-1,1]){
+    const slope=Array.from({length:1001},(_,x)=>600-x);
+    assert.equal(moveTank(slope,[500,915],0,direction,60).x,500+direction*6);
+    const steep=Array.from({length:1001},(_,x)=>900-x*1.5);
+    assert.deepEqual(moveTank(steep,[500,915],0,direction,60),{x:500,fuel:60});
+  }
+  const pile=Array.from({length:1001},(_,x)=>200-Math.max(0,30-Math.abs(x-120)));
+  const positions=[85,915];let fuel=60;
+  while(fuel>0){const result=moveTank(pile,positions,0,1,fuel);assert.ok(result.fuel<fuel);positions[0]=result.x;fuel=result.fuel;}
+  assert.equal(positions[0],145);
+  const ledge=Array.from({length:1001},(_,x)=>x<86?200:195);
+  assert.deepEqual(moveTank(ledge,[85,915],0,1,60),{x:91,fuel:54});
+  for(const height of [180,220]){
+    const cliff=Array.from({length:1001},(_,x)=>x<86?200:height);
+    assert.deepEqual(moveTank(cliff,[85,915],0,1,60),{x:85,fuel:60});
+  }
+  const pose=tankPose(pile,100.5);
+  assert.ok(Number.isFinite(pose.y)&&Number.isFinite(pose.angle),'Interpolated drawing positions have a valid terrain pose');
+});
+
+test('starting platforms blend into hills without trapping either tank',()=>{
+  for(let n=0;n<20;n++){
+    const ground=terrain(()=>n/20);
+    for(const player of [0,1]){
+      const positions=[85,915],direction=player===0?1:-1;let fuel=MOVE_FUEL;
+      while(fuel>0){const moved=moveTank(ground,positions,player,direction,fuel);assert.ok(moved.fuel<fuel,'A spawn platform must be climbable');positions[player]=moved.x;fuel=moved.fuel;}
+    }
+  }
 });

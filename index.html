@@ -11940,6 +11940,13 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     },
     getShared(){ projectTree(); templates(); return separate(book); },
     getLocation(){ return {list:book.activeList,view:book.view, sheet:book.active, takeoff:book.activeTakeoff}; },
+    aiDataEnabled(){ return findTakeoff(book.activeTakeoff)?.tk.aiData === true; },
+    setAiDataEnabled(enabled){
+      const hit = findTakeoff(book.activeTakeoff);
+      if (!hit) return;
+      hit.tk.aiData = !!enabled;
+      renderProjects(); save();
+    },
     flatAddEnabled(){ return !!state.flatAddEnabled; },
     setFlatAddEnabled(enabled){ state.flatAddEnabled = !!enabled; renderAll(); save(); },
     getProjectLists(){ return book.lists || []; },

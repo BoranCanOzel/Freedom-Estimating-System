@@ -30,6 +30,27 @@ async function openWorkbook(page, data = workbook(), name = 'Workspace tester') 
   await expect(page.locator('#server-status')).toHaveText('All changes saved', {timeout:20000});
 }
 
+test('AI Data marks only the selected estimate and persists when toggled',async({page})=>{
+  await openWorkbook(page);
+  const checkbox=page.getByRole('checkbox',{name:'AI Data',exact:true});
+  await expect(checkbox).not.toBeChecked();
+  await checkbox.check();
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();
+  await expect(checkbox).toBeChecked();
+  const data=await page.evaluate(()=>window.estimator.getShared());
+  expect(data.lists[0].companies[0].projects[0].takeoffs[0].aiData).toBe(true);
+  await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'ts',sheet:'ss',view:'sheet'}));
+  await expect(checkbox).not.toBeChecked();
+  await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'tn',sheet:'sn',view:'summary'}));
+  await expect(checkbox).toBeChecked();
+  await checkbox.uncheck();
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();
+  await expect(checkbox).not.toBeChecked();
+  expect(await page.evaluate(()=>window.estimator.getShared().lists[0].companies[0].projects[0].takeoffs[0].aiData)).toBe(false);
+});
+
 test('delete workbook requires DELETE and removes the active workbook',async({page})=>{
   await openWorkbook(page);
   const name=await page.locator('#server-title').innerText();
