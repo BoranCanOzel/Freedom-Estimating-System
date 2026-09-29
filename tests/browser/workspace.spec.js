@@ -1516,3 +1516,25 @@ test('new takeoffs and option pages start without sample content', async ({page}
   await page.reload();await expect(page.locator('#server-status')).toHaveText('All changes saved');
   await check();
 });
+
+test('service costs edit inline and preserve add-ons after reload',async({page})=>{
+  const data=workbook();
+  const rows=data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0].rows;
+  rows[0]={id:'service-flat',kind:'service',name:'Delivery',count:1,time:1,days:1,cost:350,markup:0};
+  rows.push({id:'service-parts',kind:'service',name:'Mixer package',count:1,time:1,days:1,cost:250,markup:0,parts:[{id:'fuel',kind:'part',name:'Fuel',count:1,time:1,days:1,cost:35}]});
+  await openWorkbook(page,data);
+  await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'tn',sheet:'sn',view:'sheet'}));
+  const costs=page.locator('#sheetTable tbody input[aria-label="cost"]');
+  await expect(costs.nth(0)).toHaveValue('350.00');
+  await expect(costs.nth(1)).toHaveValue('285.00');
+  await costs.nth(0).fill('400');await costs.nth(0).press('Tab');
+  await costs.nth(1).fill('300');await costs.nth(1).press('Tab');
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();
+  await expect(costs.nth(0)).toHaveValue('400.00');
+  await expect(costs.nth(1)).toHaveValue('300.00');
+  const saved=await page.evaluate(()=>window.estimator.getShared().lists[0].companies[0].projects[0].takeoffs[0].sheets[0].rows);
+  expect(saved[0].cost).toBe(400);
+  expect(saved[1].cost).toBe(265);
+  expect(saved[1].parts[0].cost).toBe(35);
+});

@@ -3289,9 +3289,15 @@
     inp.placeholder = ph || '';
     inp.setAttribute('aria-label', field);
     if (!currency) inp.classList.add('mid');
-    const raw = () => (row[field] === '' || row[field] == null ? '' : String(row[field]));
+    const serviceRate = field === 'cost' && row.kind === 'service';
+    const raw = () => serviceRate ? String(serviceCost(row)) : (row[field] === '' || row[field] == null ? '' : String(row[field]));
     inp.value = currency && raw() !== '' ? fmt.format(num(raw())) : raw();
-    inp.addEventListener('input', () => { row[field] = inp.value.replace(/,/g,''); recalc(); });
+    if (serviceRate) inp.title = 'Cost including add-ons. Editing adjusts the base rate and keeps add-ons.';
+    inp.addEventListener('input', () => {
+      const value = inp.value.replace(/,/g,'');
+      row[field] = serviceRate ? Math.round((num(value) - serviceExtra(row)) * 1e8) / 1e8 : value;
+      recalc();
+    });
 
     if (currency){
       // strip the formatting while editing, put it back on the way out
@@ -3853,11 +3859,9 @@
     const roundOut = tdRound.querySelector('.money');
 
     let tdCost = null, costOut = null;
-    if (row.kind === 'construct' || row.kind === 'service'){
+    if (row.kind === 'construct'){
       tdCost = moneyCell('cost-sum');
-      tdCost.title = row.kind === 'service'
-        ? 'Base rate plus add-ons — open the card to change it'
-        : 'Summed from the parts inside this construct';
+      tdCost.title = 'Summed from the parts inside this construct';
       costOut = tdCost.querySelector('.money');
     }
 
@@ -6273,6 +6277,10 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       const c = calc(r);
       const mkAmt = c.markup;
       if (ref && ref.costOut) money(ref.costOut, derivedCost(r));
+      if (ref && r.kind === 'service'){
+        const input = ref.tr.querySelector('input[aria-label="cost"]');
+        if (input && document.activeElement !== input) input.value = fmt.format(serviceCost(r));
+      }
       if (ref && ref.sub){
         money(ref.sub, c.sub);
         money(ref.grand, c.grand);
