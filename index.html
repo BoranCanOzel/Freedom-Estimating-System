@@ -12032,6 +12032,26 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     flatAddEnabled(){ return !!state.flatAddEnabled; },
     setFlatAddEnabled(enabled){ state.flatAddEnabled = !!enabled; renderAll(); save(); },
     getProjectLists(){ return book.lists || []; },
+    getPdfReport(){
+      const hit = findTakeoff(book.activeTakeoff);
+      if (!hit) throw new Error('Open a takeoff before saving a PDF.');
+      const {co,pr,tk} = hit;
+      const fields = (kind,record,base) => base.concat(customFields(kind).map(key=>[key,record.custom?.[key]])).filter(([,value])=>value!=null&&String(value).trim());
+      return structuredClone({name:tk.name || 'Takeoff',project:pr.name || '',customer:co.name || '',summaryNotes:book.summaryNotes || '',
+        metadata:[
+          {title:'Customer',fields:fields('company',co,[['Customer',co.name],['Address',co.address],['Phone',co.phone],['Email',co.email]])},
+          {title:'Project',fields:fields('project',pr,[['Project',pr.name],['Status',pr.status],['Job address',pr.address || co.address],['Contacts',pr.contacts],['Email',pr.email],['Notes',pr.notes]])},
+          {title:'Takeoff',fields:fields('takeoff',tk,[['Takeoff',tk.name],['Description',tk.note]])}
+        ],
+        sheets:book.sheets.map(sh=>({...sh,totals:sheetTotals(sh),rows:sh.rows.map(row=>{
+          if(row.type==='section')return {...row,sectionQuantities:sh.units.map(u=>num(secUnit(row,u).qty))};
+          if(row.type==='sectionEnd'||row.kind==='none')return {...row};
+          const components=row.kind==='service'?serviceLines(row).map(l=>({name:l.p.name,note:l.p.note,count:l.ct,time:l.t,days:l.d,cost:l.c,markup:l.mk,total:l.total}))
+            :row.kind==='construct'?(row.parts||[]).map(p=>({...p,count:num(p.count)||1,time:num(p.time)||1,days:num(p.days)||1,total:(num(p.count)||1)*(num(p.time)||1)*(num(p.days)||1)*num(p.cost)*(1+num(p.markup)/100)})):[];
+          const totals=calc(row,sh);
+          return {...row,effectiveCost:derivedCost(row),effectiveTime:mult(row,'time',sh),effectiveDays:mult(row,'days',sh),totals,rounded:roundTo(totals.grand,num(sh.roundStep)||1),components};
+        })}))});
+    },
     getMapAddress(){
       const hit = findTakeoff(book.activeTakeoff);
       return hit ? String(hit.pr.address || '').trim() || String(hit.co.address || '').trim() : '';

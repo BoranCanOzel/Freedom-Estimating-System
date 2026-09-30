@@ -3,4 +3,4 @@
 #ai-access-dialog::backdrop{background:#0007}#ai-access-package{margin-top:16px}#ai-access-connection{display:block;width:100%;margin:8px 0;padding:10px;font:12px var(--f-mono);background:var(--paper);color:var(--ink);border:1px solid var(--rule);resize:vertical}
 .ai-access-record{padding:10px 0;border-top:1px solid var(--rule)}.ai-access-record>button{margin-left:12px}.ai-access-record pre{max-height:230px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:12px var(--f-mono)}
 #ai-access-message{color:var(--slate);min-height:1.5em}#ai-access-dialog button:disabled{opacity:.5;cursor:default}#takeoff-ai-access{white-space:nowrap}
-@media print{#ai-access-dialog,#takeoff-ai-access{display:none!important}}
+@media print{#ai-access-dialog,#takeoff-ai-access,#takeoff-pdf,#takeoff-share{display:none!important}}

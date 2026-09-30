@@ -24,11 +24,52 @@ export function setupAiInformation(api) {
   const discard=()=>{if(!dirty)return true;if(!confirm('Discard your unsaved AI Information changes?'))return false;library=structuredClone(savedLibrary);dirty=false;return true;};
   const path=value=>{const names=[];let current=value;while(current){const found=library.items.find(i=>i.id===current);if(!found)break;names.unshift(found.title);current=found.parent;}return names.join(' / ');};
   const descendants=id=>{const result=new Set([id]);let changed=true;while(changed){changed=false;for(const i of library.items)if(result.has(i.parent)&&!result.has(i.id)){result.add(i.id);changed=true;}}return result;};
+  const rootDrop=document.createElement('div');rootDrop.id='ai-info-root-drop';rootDrop.textContent='Library (top level)';
+  const dragHint=document.createElement('p');dragHint.className='ai-info-drag-hint';dragHint.textContent='Drag into a folder or between entries to organize. Moves save immediately. Save text edits before dragging.';
+  $('tree').before(rootDrop,dragHint);
+  let dragged='';
+  function clearDrop(){page.querySelectorAll('[data-drop]').forEach(el=>delete el.dataset.drop);}
+  function endDrag(){dragged='';clearDrop();page.querySelectorAll('.ai-info-dragging').forEach(el=>el.classList.remove('ai-info-dragging'));}
+  function destination(event,target){
+    if(!dragged||busy||dirty)return null;
+    if(!target)return {parent:'',mode:'inside',target:''};
+    if(descendants(dragged).has(target.id))return null;
+    const rect=event.currentTarget.getBoundingClientRect(),fraction=(event.clientY-rect.top)/rect.height;
+    const mode=target.kind==='folder'&&fraction>=.25&&fraction<=.75?'inside':fraction<.5?'before':'after';
+    return {parent:mode==='inside'?target.id:target.parent,mode,target:target.id};
+  }
+  function dropTarget(element,target){
+    element.ondragover=event=>{
+      clearDrop();const move=destination(event,target);
+      if(!move){if(event.dataTransfer)event.dataTransfer.dropEffect='none';return;}
+      event.preventDefault();event.dataTransfer.dropEffect='move';element.dataset.drop=move.mode;
+    };
+    element.ondragleave=()=>{delete element.dataset.drop;};
+    element.ondrop=event=>{
+      const move=destination(event,target),id=dragged;endDrag();
+      if(!move)return;event.preventDefault();
+      run(async()=>{
+        const source=library.items.find(i=>i.id===id);if(!source)return;
+        const items=library.items.filter(i=>i.id!==id),moved={...source,parent:move.parent};
+        if(move.mode==='inside')items.push(moved);
+        else{const index=items.findIndex(i=>i.id===move.target);items.splice(index+(move.mode==='after'?1:0),0,moved);}
+        if(JSON.stringify(items)===JSON.stringify(library.items))return;
+        await persist(items);
+      });
+    };
+  }
+  dropTarget(rootDrop,null);
   function tree(){
     $('tree').replaceChildren();const query=$('search').value.toLowerCase().trim();
     const add=(parent,depth)=>{for(const i of library.items.filter(i=>i.parent===parent)){
       if(!query||(i.title+' '+i.text+' '+path(i.parent)).toLowerCase().includes(query)){
         const row=document.createElement('button');row.type='button';row.className='ai-info-tree-item';row.style.paddingLeft=(12+depth*18)+'px';row.textContent=(i.kind==='folder'?'▸  ':'—  ')+i.title;row.title=path(i.id);row.setAttribute('aria-pressed',String(i.id===selected));
+        row.dataset.id=i.id;row.draggable=true;
+        row.ondragstart=event=>{
+          if(busy||dirty){event.preventDefault();if(dirty)message('Save your text edits before moving folders or entries.');return;}
+          dragged=i.id;event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('application/x-freedom-ai-item',i.id);row.classList.add('ai-info-dragging');
+        };
+        row.ondragend=endDrag;dropTarget(row,i);
         row.onclick=()=>{if(busy||!discard())return;selected=i.id;dirty=false;render();};$('tree').append(row);
       }
       if(i.kind==='folder')add(i.id,depth+1);

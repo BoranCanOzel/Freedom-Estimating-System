@@ -10,6 +10,7 @@ import { normalizeCursor } from '../shared/cursors.js';
 import { setupTankDuel } from './tank-duel.js';
 import { setupAiAccess } from './ai-access.js';
 import { setupShareAccess } from './share-access.js';
+import { setupPdfDownload } from './pdf-download.js';
 import { setupTransfers } from './transfers.js';
 import { detectTransfer, transferChoices } from '../shared/transfers.js';
 
@@ -545,6 +546,7 @@ const takeoffAccessContext=()=>{
 };
 setupAiAccess(api,takeoffAccessContext);
 setupShareAccess(api,takeoffAccessContext);
+setupPdfDownload(takeoffAccessContext,message);
 projectPresence = setupProjectPresence(bridge);
 $('workspace-cursor-color').onchange = async event => {
   const control = event.target, previous = document.body.dataset.sharedCursorColor || '';

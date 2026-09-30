@@ -30,6 +30,54 @@ async function openWorkbook(page, data = workbook(), name = 'Workspace tester') 
   await expect(page.locator('#server-status')).toHaveText('All changes saved', {timeout:20000});
 }
 
+test('Save as PDF downloads every takeoff option with readable pagination and complete pricing',async({page})=>{
+  const {readFile}=await import('node:fs/promises');
+  const {getDocument,OPS}=await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const data=workbook(),takeoff=data.lists[0].companies[0].projects[0].takeoffs[0];
+  takeoff.name='Complete takeoff';takeoff.note='Takeoff description';data.summaryNotes='Scope exclusions and clarifications.';
+  const first=takeoff.sheets[0];first.note='Option-specific scope note';first.flatAddEnabled=true;first.roundTotal=100;
+  first.fees=Array.from({length:8},(_,i)=>({id:'fee'+i,label:'Custom fee '+i,pct:1}));
+  first.units=Array.from({length:9},(_,i)=>({id:'unit'+i,label:'Measured unit '+i,qty:i+1}));
+  first.rows=[{id:'section',type:'section',name:'Site preparation',note:'Section scope included',collapsed:true},
+    ...Array.from({length:65},(_,i)=>({id:'item'+i,kind:'labor',name:`Export item ${String(i).padStart(3,'0')}`,count:1,time:1,days:1,cost:125,markup:5,flatAdd:10,note:'Detail visible even when collapsed. José’s crew — 25 m².'})),
+    {id:'section-end',type:'sectionEnd'},
+    {id:'long',kind:'labor',name:'Long note item',cost:100,count:1,time:1,days:1,note:Array.from({length:130},(_,i)=>`Detailed scope line ${i}: Include cutting and cleanup.`).join('\n')+'\nEND OF LONG NOTE'}];
+  takeoff.sheets.push({...sheet('second','Second option'),rows:[{id:'svc',kind:'service',name:'Service with add-ons',count:1,time:1,days:1,cost:100,parts:[{id:'p',name:'Included component',count:'2',time:'1',days:'1',cost:'5',markup:'0'}]}]});
+  const picture=await page.evaluate(()=>{const canvas=document.createElement('canvas');canvas.width=320;canvas.height=180;const ctx=canvas.getContext('2d');ctx.fillStyle='#d8e5ed';ctx.fillRect(0,0,320,180);ctx.fillStyle='#203440';ctx.font='20px sans-serif';ctx.fillText('Site reference',20,60);return canvas.toDataURL('image/png');});
+  takeoff.sheets[1].rows[0].pics=[{id:'photo',name:'Site reference photo',url:picture}];
+  takeoff.sheets.push({...sheet('empty','Empty alternative'),rows:[]});
+  await openWorkbook(page,data);
+  await expect(page.locator('#takeoff-share + #takeoff-pdf')).toBeVisible();
+  const before=await page.evaluate(()=>JSON.stringify(window.estimator.getShared()));
+  const downloadPromise=page.waitForEvent('download');await page.locator('#takeoff-pdf').click();const download=await downloadPromise;
+  expect(download.suggestedFilename()).toBe('Complete takeoff - Takeoff.pdf');
+  await download.saveAs('.tools/takeoff-export-review.pdf');
+  expect(await page.evaluate(()=>JSON.stringify(window.estimator.getShared()))).toBe(before);
+  const loading=getDocument({data:new Uint8Array(await readFile(await download.path())),useSystemFonts:false});
+  const pdf=await loading.promise;
+  expect(pdf.numPages).toBeGreaterThan(3);
+  let all='',hasImage=false;
+  for(let i=1;i<=pdf.numPages;i++){
+    const pageData=await pdf.getPage(i),content=await pageData.getTextContent();
+    const operators=await pageData.getOperatorList();hasImage||=operators.fnArray.some(op=>op===OPS.paintImageXObject||op===OPS.paintInlineImageXObject);
+    const text=content.items.map(item=>item.str||'').join(' ');all+=text+'\n';
+    expect(text).toContain(`Page ${i} of ${pdf.numPages}`);
+    for(const item of content.items.filter(item=>item.str?.trim())){
+      expect(item.transform[4]).toBeGreaterThanOrEqual(35);
+      expect(item.transform[4]+item.width).toBeLessThanOrEqual(757);
+      expect(item.transform[5]).toBeGreaterThan(10);
+      expect(item.transform[5]+item.height).toBeLessThan(603);
+    }
+  }
+  for(let i=0;i<65;i++)expect(all).toContain(`Export item ${String(i).padStart(3,'0')}`);
+  for(const expected of ['Site preparation','Section scope included','Takeoff description','Scope exclusions and clarifications.','Second option','Included component','$110.00','$113.30','END OF LONG NOTE','Custom fee 7','Measured unit 8','José’s crew','25 m²','Rounded option total'])expect(all).toContain(expected);
+  expect(all).not.toContain('South takeoff');
+  expect(all).toContain('Site reference photo');expect(all).toContain('No line items in this option.');expect(hasImage).toBe(true);
+  await loading.destroy();
+  await page.locator('#rail .tab-summary').click();
+  await expect(page.locator('#takeoff-share + #takeoff-pdf')).toBeVisible();
+});
+
 test('AI Data marks only the selected estimate and persists when toggled',async({page})=>{
   await openWorkbook(page);
   const checkbox=page.getByRole('checkbox',{name:'AI Data',exact:true});
@@ -54,6 +102,45 @@ test('AI Data marks only the selected estimate and persists when toggled',async(
   await page.reload();
   await expect(checkbox).not.toBeChecked();
   expect(await page.evaluate(()=>window.estimator.getShared().lists[0].companies[0].projects[0].takeoffs[0].aiData)).toBe(false);
+});
+
+test('AI Information drag and drop moves folders with descendants, reorders and protects drafts',async({page})=>{
+  await openWorkbook(page);
+  const items=[
+    {id:'a',kind:'folder',parent:'',title:'Rates',text:''},
+    {id:'b',kind:'folder',parent:'',title:'Standards',text:''},
+    {id:'nested',kind:'folder',parent:'a',title:'Concrete',text:''},
+    {id:'child',kind:'entry',parent:'nested',title:'Cutting',text:'15 LF/hour'},
+    {id:'entry',kind:'entry',parent:'',title:'Crew',text:'Two people'}
+  ];
+  const original=await (await page.request.get('/api/ai-information')).json();
+  await page.request.put('/api/ai-information',{data:{revision:original.revision,items}});
+  await page.locator('#ai-information-open').click();
+  const row=id=>page.locator(`#ai-info-tree [data-id="${id}"]`);
+  const read=async()=> (await (await page.request.get('/api/ai-information')).json()).items;
+  await row('entry').dragTo(row('a'));
+  await expect.poll(async()=>(await read()).find(i=>i.id==='entry').parent).toBe('a');
+  await row('a').dragTo(row('b'));
+  await expect.poll(async()=>(await read()).find(i=>i.id==='a').parent).toBe('b');
+  expect((await read()).find(i=>i.id==='child').parent).toBe('nested');
+  // A folder cannot be dropped into any of its own descendants.
+  await row('b').dragTo(row('nested'));
+  expect((await read()).find(i=>i.id==='b').parent).toBe('');
+  await row('a').dragTo(page.locator('#ai-info-root-drop'));
+  await expect.poll(async()=>(await read()).find(i=>i.id==='a').parent).toBe('');
+  await row('a').dragTo(row('b'),{targetPosition:{x:20,y:2}});
+  await expect.poll(async()=>(await read()).filter(i=>!i.parent).map(i=>i.id)).toEqual(['a','b']);
+  await row('entry').click();
+  await page.locator('#ai-info-text').fill('Unsaved crew guidance');
+  await row('entry').dragTo(row('b'));
+  await expect(page.locator('#ai-info-text')).toHaveValue('Unsaved crew guidance');
+  expect((await read()).find(i=>i.id==='entry').parent).toBe('a');
+  await expect(page.locator('#ai-info-status')).toContainText('Save your text edits');
+  await page.locator('#ai-info-save').click();
+  await expect(page.locator('#ai-info-status')).toContainText('Saved.');
+  await page.reload();
+  await page.locator('#ai-information-open').click();
+  await expect(page.locator('#ai-info-tree button')).toHaveText(['▸  Rates','▸  Concrete','—  Cutting','—  Crew','▸  Standards']);
 });
 
 test('AI Information organizes text, protects drafts and persists folder changes',async({page})=>{

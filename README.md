@@ -138,6 +138,12 @@ Use **+ Subsection** on a section header to add a child. Indentation and branch 
 
 Drag library sections onto the lower half of a section header to place them inside it, or between rows to choose another position. Saving a section to the library preserves its nested sections, and dropping that template restores the tree. Nested templates can also be expanded and dragged individually from the library. While dragging, translucent rows show the actual placement, nesting, and totals before release, including after a section subtotal. Press Escape to cancel.
 
+## Takeoff PDF export
+
+**Save as PDF**, next to **Share**, downloads the current takeoff directly. The US Letter landscape report includes customer/project context, an option summary, every option's line items and section subtotals, fees, unit pricing, rounded amounts, saved notes, component breakdowns, and embedded pictures. Collapsed rows, hidden details, theme, and screen zoom do not omit report content. Save an open editor before exporting.
+
+Wide pricing tables continue in labeled groups with matching item numbers; headers and page numbers repeat. Notes print once in a separate section. The browser generates selectable PDF text using bundled Noto Sans fonts (license: `client/fonts/OFL.txt`). The PDF engine loads on demand and no estimate data is sent to an external conversion service. Run `npm ci --include=dev` and `npm run build` when deploying; the build also produces `dist/pdf-renderer.js`.
+
 ## AI Information
 
 The top-bar **AI Information** page is a shared reference library across all workbooks. Signed-in users can create, nest, rename, move, and delete folders and plain-text entries. There are no file uploads or predefined categories. Save changes explicitly; conflicting saves preserve your draft and ask you to reload rather than overwrite newer information.
