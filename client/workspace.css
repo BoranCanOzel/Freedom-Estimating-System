@@ -100,7 +100,6 @@ body.server-mode #sheetTable .h-adds .btn{min-height:44px;padding:10px 14px;font
 body.server-mode #sheetTable .h-adds .btn:hover{background:#ffb347;color:#241b10;border-color:#e99525}
 body.server-mode #sheetTable .sec-add{opacity:1;min-height:44px;min-width:88px;padding:10px 14px;font-size:13px;white-space:nowrap;border-radius:5px}
 body #sheetTable tbody tr.section-head.tree-child td.c-item,body #sheetTable tbody tr.section-foot.tree-child td.c-item{border-left:0}
-body #sheetTable tbody tr.section-head.tree-child td.c-item::after,body #sheetTable tbody tr.section-foot.tree-child td.c-item::after{content:none}
 body #sheetTable tr.section-head.tree-child .name-in{font-family:var(--f-sans);font-size:12.5px;font-weight:600;letter-spacing:normal;text-transform:none;color:var(--ink);text-shadow:none}
 body #sheetTable tr.section-head.tree-child .caret{color:var(--muted)}
 body #sheetTable tr.section-head.tree-child .name-in::placeholder{color:var(--muted)}
@@ -230,7 +229,7 @@ body.server-mode #summaryCard .eyebrow-row{gap:10px;flex-wrap:wrap;margin-bottom
 body.server-mode #summaryCard .eyebrow-row>.eyebrow{margin-right:auto}
 body.server-mode #summaryCard .eyebrow-row>.btn.ghost,body.server-mode #summaryCard .eyebrow-row>#workspace-map{margin-left:0}
 
-/* Keep the subsection bars; show nesting with a blank left gutter. */
+/* Keep subsection bars and item surfaces inside a gutter with L-shaped branches. */
 body{--subsection-surface:color-mix(in srgb,#277c91 6%,var(--card));--subsection-footer:color-mix(in srgb,#277c91 4%,var(--card))}
 body.dark{--subsection-surface:color-mix(in srgb,#71c2d3 6%,var(--card));--subsection-footer:color-mix(in srgb,#71c2d3 4%,var(--card))}
 body #sheetTable .section-title-group{display:flex;flex-direction:column;justify-content:center;gap:3px;min-width:0;flex:1}
@@ -240,11 +239,13 @@ body #sheetTable tr.section-head.tree-child:not(.dragging):not(.drop-preview) td
 body.medieval #sheetTable tbody tr.section-head.tree-child:not(.dragging):not(.drop-preview) td{background:#28343b!important}
 body #sheetTable tr.section-head.tree-child .subsection-badge{align-self:flex-start;padding:0;border:0;border-radius:0;background:transparent;color:var(--muted);font:500 10px var(--f-sans);letter-spacing:.02em}
 body #sheetTable tr.section-head.tree-child .name-in{font-size:13px;font-weight:600;line-height:1.4;padding-top:0;padding-bottom:0}
-body #sheetTable tr.section-head.tree-child .caret{color:var(--muted);border-radius:4px}
+body #sheetTable tr.section-head.tree-child .item-cell{position:relative}
+body #sheetTable tr.section-head.tree-child .caret{position:absolute;left:-26px;top:50%;transform:translateY(-50%);z-index:1;width:24px;height:28px;color:var(--muted);background:var(--card);border-radius:4px}
+body.medieval #sheetTable tr.section-head.tree-child .caret{color:#6B6254}
 body #sheetTable tr.section-head.tree-child .caret:hover{color:var(--ink);background:var(--calc)}
-body #sheetTable tr.tree-child .c-item{padding-left:calc(var(--section-depth) * 28px)!important}
-body #sheetTable tr.tree-child .c-item::before{content:none}
-body #sheetTable tbody tr:is(.section-head,.section-foot).tree-child td.c-item::before{content:"";position:absolute;left:0;top:0;bottom:0;width:calc(var(--section-depth) * 28px);height:auto;border:0;background:var(--card);pointer-events:none}
+body #sheetTable tbody tr.tree-child td.c-item{padding-left:calc(var(--section-depth) * 28px)!important;border-left:0}
+body #sheetTable tbody tr.tree-child td.c-item::before{content:"";position:absolute;left:0;top:0;bottom:0;width:calc(var(--section-depth) * 28px);height:auto;border:0;background:var(--card);pointer-events:none}
+body #sheetTable tbody tr.tree-child td.c-item::after{content:"";position:absolute;left:calc(var(--section-depth) * 28px - 17px);top:0;width:10px;height:50%;border-left:1px solid var(--rule-strong);border-bottom:1px solid var(--rule-strong);pointer-events:none}
 body #sheetTable tr.section-foot.tree-child:not(.dragging):not(.drop-preview) td{background:var(--subsection-footer)!important;border-top:1px solid var(--rule-hair);border-bottom:1px solid var(--rule);box-shadow:none}
 body.medieval #sheetTable tr.section-foot.tree-child:not(.dragging):not(.drop-preview) td{background:#d8d3c5!important}
 body #sheetTable tr.section-foot .sec-label{padding:9px 12px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:500 11px var(--f-sans);letter-spacing:normal;text-transform:none;color:var(--muted)}
