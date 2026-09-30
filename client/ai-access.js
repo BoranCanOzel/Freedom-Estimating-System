@@ -5,7 +5,7 @@ export function setupAiAccess(api,getContext) {
   const button=document.createElement('button');button.id='takeoff-ai-access';button.type='button';button.textContent='AI access';button.className='btn ghost';
   const dialog=document.createElement('dialog');dialog.id='ai-access-dialog';dialog.setAttribute('aria-labelledby','ai-access-title');
   dialog.innerHTML=`<header><h2 id="ai-access-title">AI access</h2><button id="ai-access-close" type="button">Close</button></header>
-    <p id="ai-access-scope"></p><p>One takeoff, including all its option pages. Access lasts 30 minutes and permits one successful save. Reads and previews do not use up the save.</p>
+    <p id="ai-access-scope"></p><p>One takeoff, including all its option pages. Access never expires and allows unlimited saves. It stays active until you revoke it.</p>
     <button id="ai-access-generate" type="button">Generate access</button>
     <div id="ai-access-package" hidden><label for="ai-access-connection">Connection package — keep this key private</label><textarea id="ai-access-connection" readonly rows="10" spellcheck="false"></textarea><button id="ai-access-copy" type="button">Copy connection package</button><p>Configure a tool connection using the endpoint and Bearer key. Pasting a URL into a normal chat does not grant editing tools.</p></div>
     <p id="ai-access-message" role="status"></p><h3>Access keys</h3><div id="ai-access-grants"></div><h3>AI changes</h3><div id="ai-access-changes"></div>`;
@@ -23,8 +23,8 @@ export function setupAiAccess(api,getContext) {
     $('grants').replaceChildren();$('changes').replaceChildren();
     for(const grant of data.grants){
       const row=document.createElement('div');row.className='ai-access-record';
-      const status=grant.revoked?'Revoked':grant.used_at?'Used':Date.now()>=grant.expires_at?'Expired':'Active';
-      const text=document.createElement('span');text.textContent=`${status} · ${grant.created_by} · expires ${when(grant.expires_at)}`;row.append(text);
+      const status=grant.revoked?'Revoked':'Active';
+      const text=document.createElement('span');text.textContent=`${status} · ${grant.created_by} · never expires`;row.append(text);
       if(status==='Active'){const revoke=document.createElement('button');revoke.type='button';revoke.textContent='Revoke';revoke.onclick=action(async()=>{await api(path()+'/'+grant.id,{method:'DELETE'});await refresh();});row.append(revoke);}
       $('grants').append(row);
     }
@@ -47,7 +47,7 @@ export function setupAiAccess(api,getContext) {
       if(!dialog.open||context!==requested)return;
       const origin=new URL(publicUrl('/',location.origin)).origin;
       const url=value=>publicUrl(value,origin);
-      $('connection').value=`Freedom Estimating — authorized takeoff: ${grant.takeoffName}\nExpires: ${grant.expiresAt}\nOne successful save only.\n\nWebsite URL: ${origin}\nREST endpoint: ${url(grant.endpoint)}\nMCP endpoint: ${url(grant.mcp)}\nAuthorization: Bearer ${grant.key}\nOpenAPI schema: ${url(grant.openapi)}\n\nFirst call get_instructions (MCP) or GET ${url(grant.instructions)} with the Authorization header. Then read_takeoff, validate_changes, and save_takeoff. Preserve the read revision and use a unique requestId when saving. Do not attempt to edit any other takeoff. A 409 means reread and reapply your intended changes. The server returns a receipt after saving.\n\nUse these full URLs for REST requests:\nGET ${url(grant.instructions)}\nGET ${url(grant.endpoint + "/takeoff")}\nPOST ${url(grant.endpoint + "/validate")} with {revision,takeoff}\nPOST ${url(grant.endpoint + "/save")} with {revision,takeoff,requestId}\nInclude the Authorization header above on every request. Configure the Bearer key in the tool client; never put it in a URL.`;
+      $('connection').value=`Freedom Estimating — authorized takeoff: ${grant.takeoffName}\nExpires: Never\nUnlimited saves. Active until manually revoked.\n\nWebsite URL: ${origin}\nREST endpoint: ${url(grant.endpoint)}\nMCP endpoint: ${url(grant.mcp)}\nAuthorization: Bearer ${grant.key}\nOpenAPI schema: ${url(grant.openapi)}\n\nFirst call get_instructions (MCP) or GET ${url(grant.instructions)} with the Authorization header. Then read_takeoff, validate_changes, and save_takeoff. Preserve the read revision and use a unique requestId when saving. Do not attempt to edit any other takeoff. A 409 means reread and reapply your intended changes. The server returns a receipt after saving.\n\nUse these full URLs for REST requests:\nGET ${url(grant.instructions)}\nGET ${url(grant.endpoint + "/takeoff")}\nPOST ${url(grant.endpoint + "/validate")} with {revision,takeoff}\nPOST ${url(grant.endpoint + "/save")} with {revision,takeoff,requestId}\nInclude the Authorization header above on every request. Configure the Bearer key in the tool client; never put it in a URL.`;
       $('package').hidden=false;await refresh();
     }finally{$('generate').disabled=false;}
   });

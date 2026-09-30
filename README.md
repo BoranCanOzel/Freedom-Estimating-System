@@ -48,14 +48,14 @@ HTTPS. This implementation provides Bearer authentication, not an OAuth flow;
 clients that require OAuth need a separate integration. The MCP endpoint supports
 the 2025-03-26, 2025-06-18, and 2025-11-25 Streamable HTTP versions.
 
-Each key is bound to one takeoff and all of its option pages, expires after 30
-minutes, and permits one successful save. Read/validate requests do not consume
-it. Keys are stored hashed, displayed only when generated, and can be revoked
-from the same panel. Changing the website password also revokes outstanding keys.
+Each key is bound to one takeoff and all of its option pages, never expires,
+and permits unlimited saves until manually revoked. Existing non-revoked keys
+also become permanent, including previously used or expired keys. Keys are stored hashed, displayed only when generated, and can be revoked
+from the same panel. Keys remain active across server restarts and website password changes.
 
 AI changes appear live in the estimate. The panel lists the changes and offers
 **Undo AI change** when the takeoff has not changed since that save. Other
-takeoffs can change independently. Undo never reactivates the key. AI access and
+takeoffs can change independently. Undo leaves the key active. AI access and
 change history persist in the existing SQLite database; schema migration runs
 automatically on server startup. Deploy all files, build, then restart Node.
 
