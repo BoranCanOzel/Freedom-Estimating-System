@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { Script } from 'node:vm';
 import { mergeScope } from '../shared/scope.js';
 import { zzProject, zzScope, scriptTool, scopeScript, zzTransportError } from '../server-zztakeoff.js';
 
@@ -30,4 +31,20 @@ test('ZZTakeoff errors distinguish browser waits, DNS, TLS and interrupted conne
     const failure=zzTransportError(error,stage);
     assert.match(failure.message,expected);assert.doesNotMatch(failure.message,/private-test-token/);
   }
+});
+
+test('generated scope code executes as a synchronous script, checks the project and fetches every page',()=>{
+  const script=new Script(scopeScript('source'));
+  const calls=[];
+  const context={getContext:()=>({projectId:'source'}),Takeoffs:{list(query,options){
+    calls.push(options.skip);
+    return {records:[{_id:options.skip?'second':'first'}],pagination:{more:options.skip===0,skip:100,limit:100}};
+  }}};
+  const result=script.runInNewContext(context,{timeout:1000});
+  assert.deepEqual(JSON.parse(JSON.stringify(result)),{projectId:'source',records:[{_id:'first'},{_id:'second'}]});
+  assert.deepEqual(calls,[0,100]);
+  assert.equal(result.then,undefined);
+  assert.throws(()=>script.runInNewContext({...context,getContext:()=>({projectId:'wrong'})}),/Open the linked project/);
+  assert.deepEqual(calls,[0,100]);
+  assert.throws(()=>script.runInNewContext({...context,Takeoffs:{list:()=>({records:[],pagination:{more:true,skip:0}})}}),/did not advance/);
 });

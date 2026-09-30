@@ -87,19 +87,23 @@ export function zzScope(records,projectId){
 
 export function scopeScript(projectId){
   // Fixed read-only script. The link cannot inject script or select another user's tab.
-  return `const context = await getContext();
+  // ZZTakeoff scripts are synchronous; only UI components use await. An IIFE
+  // returns the payload as the script's completion value without a top-level return.
+  return `(function () {
+const context = getContext();
 const projectId = context.projectId || (context.project && (context.project._id || context.project.id));
 if (projectId !== ${JSON.stringify(projectId)}) throw new Error('Open the linked project in your connected ZZTakeoff tab, then fetch again.');
 const records = []; let skip = 0;
 for (let page = 0; page < 100; page++) {
-  const result = await Takeoffs.list({}, {limit:100, skip});
+  const result = Takeoffs.list({}, {limit:100, skip});
   if (!Array.isArray(result.records)) throw new Error('ZZTakeoff returned an unsupported takeoff list.');
   records.push(...result.records);
   if (!result.pagination || !result.pagination.more) return {projectId, records};
   if (!(result.pagination.skip > skip)) throw new Error('ZZTakeoff pagination did not advance.');
   skip = result.pagination.skip;
 }
-throw new Error('This project exceeds the 10,000-item fetch limit. No partial scope was imported.');`;
+throw new Error('This project exceeds the 10,000-item fetch limit. No partial scope was imported.');
+})()`;
 }
 
 export function scriptTool(tools){
