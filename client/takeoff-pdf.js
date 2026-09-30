@@ -54,58 +54,57 @@ export function buildTakeoffPdf(report,{fonts,date=new Date()}={}) {
     const base=[['count','Count'],['time','Time'],['days','Days'],['cost','Unit cost'],['markup','Markup %'],['sub','Subtotal'],['grand','Grand total']];
     const extra=[...(sh.flatAddEnabled?[['flat','Flat add']]:[]),
       ...sh.fees.map((fee,i)=>['fee'+i,`${fee.label||'Fee'} (${number(fee.pct)}%)`]),
-      ['round',`Rounded line (${money(Number(sh.roundStep)||1)} step)`],
+      ...(!sh.hiddenCols?.includes('round')?[['round',`Rounded line (${money(Number(sh.roundStep)||1)} step)`]]:[]),
       ...sh.units.map((unit,i)=>['unit'+i,`${unit.label||'Unit'} price\nQty ${number(unit.qty)}`])];
-    const rows=[],stack=[],notes=[];let line=0,roundSum=0;
+    const rows=[],stack=[];let line=0,roundSum=0;
     const summaryValues=(totals,quantities,rounded)=>Object.fromEntries([
       ['sub',money(totals.sub)],['grand',money(totals.grand)],['round',money(rounded)],['flat',money(totals.flat)],
       ...totals.fees.map((amount,i)=>['fee'+i,money(amount)]),
       ...sh.units.map((u,i)=>['unit'+i,Number(quantities[i])?money(totals.grand/Number(quantities[i])):'—'])]);
-    const close=()=>{const group=stack.pop();if(group)rows.push({kind:'subtotal',label:group.name+' — subtotal',values:summaryValues(group,group.quantities,group.rounded)});};
+    const close=()=>{
+      const group=stack.pop();if(!group)return;
+      const values=summaryValues(group,group.quantities,group.rounded);
+      sh.units.forEach((unit,i)=>{values['unit'+i]+='\nQty '+number(group.quantities[i]);});
+      rows.push({kind:'subtotal',label:group.name+' — subtotal',values});
+    };
     for(const row of sh.rows){
       if(row.type==='section'){
         stack.push({name:row.name||'Section',sub:0,grand:0,flat:0,rounded:0,fees:sh.fees.map(()=>0),quantities:row.sectionQuantities||[]});
         const label=stack.map(g=>g.name).join(' / ');
-        rows.push({kind:'section',label});if(row.note)notes.push([label,row.note]);
-        if(sh.units.length)notes.push([label+' — quantities',sh.units.map((u,i)=>`${u.label||'Unit'}: ${number(row.sectionQuantities?.[i])}`).join('\n')]);
+        rows.push({kind:'section',label,note:row.note});
         continue;
       }
       if(row.type==='sectionEnd'){close();continue;}
-      if(row.kind==='none'){rows.push({kind:'section',label:row.name||'Note'});if(row.note)notes.push([row.name||'Note',row.note]);continue;}
+      if(row.kind==='none'){rows.push({kind:'section',label:row.name||'Note',note:row.note});continue;}
       const totals=row.totals;roundSum+=row.rounded;
       for(const group of stack){group.sub+=totals.sub;group.grand+=totals.grand;group.flat+=totals.flat;group.rounded+=row.rounded;totals.fees.forEach((fee,i)=>group.fees[i]+=fee);}
       const label=`${++line}. ${row.name||'Unnamed item'}`;
-      if(row.note)notes.push([label,row.note]);
-      rows.push({kind:'item',label,values:{...summaryValues(totals,sh.units.map(u=>u.qty),row.rounded),count:number(row.count),time:number(row.effectiveTime),days:number(row.effectiveDays),cost:money(row.effectiveCost),markup:number(row.markup)+'%',flat:money(totals.flat)}});
+      rows.push({kind:'item',label,note:row.note,values:{...summaryValues(totals,sh.units.map(u=>u.qty),row.rounded),count:number(row.count),time:number(row.effectiveTime),days:number(row.effectiveDays),cost:money(row.effectiveCost),markup:number(row.markup)+'%',flat:money(totals.flat)}});
     }
     while(stack.length)close();
     const total=summaryValues({...sh.totals,flat:sh.rows.reduce((sum,row)=>sum+(row.totals?.flat||0),0)},sh.units.map(u=>u.qty),roundSum);
-    const bands=[base];for(let i=0;i<extra.length;i+=6)bands.push(extra.slice(i,i+6));
-    for(const [bandIndex,columns] of bands.entries()){
-      if(bandIndex){
-        if(y>height-160){newPage(option);paragraph(option,{size:17,bold:true});}
-        paragraph(`Additional pricing ${bandIndex} of ${bands.length-1} — matching item numbers`,{size:11,bold:true});
-      }
-      const cellWidth=(usable-230)/columns.length;
-      const body=rows.length?rows.map(row=>row.kind==='section'?[{content:row.label,colSpan:columns.length+1,styles:{fontStyle:'bold',fillColor:[225,232,237]}}]
-        :[{content:row.label,styles:row.kind==='subtotal'?{fontStyle:'bold',fillColor:[237,240,242]}:{}},...columns.map(([key])=>({content:row.values[key]||'',styles:row.kind==='subtotal'?{fontStyle:'bold',fillColor:[237,240,242]}:{}}))])
-        :[[{content:'No line items in this option.',colSpan:columns.length+1}]];
-      table({head:[['Item / description',...columns.map(([,label])=>label)]],body,
-        foot:[['Option total',...columns.map(([key])=>total[key]||'')]],
-        columnStyles:Object.fromEntries([[0,{cellWidth:230}],...columns.map((_,i)=>[i+1,{cellWidth,halign:'right'}])])});
-    }
+    // One item list per option. Wide estimates wrap remaining values beneath
+    // their own item instead of repeating the takeoff in separate tables.
+    const columns=[...base.slice(0,-1),...extra.slice(0,2),base.at(-1)];
+    const inline=extra.slice(2),cellWidth=(usable-190)/columns.length;
+    const detailCells=(value,subtotal=false)=>[{content:value,colSpan:columns.length+1,styles:{fontSize:9,textColor:subtotal?ink:muted,fillColor:subtotal?[237,240,242]:[250,251,252],cellPadding:{top:4,bottom:6,left:12,right:6}}}];
+    const pricing=values=>inline.filter(([key])=>values?.[key]).map(([key,label])=>{
+      const value=values[key];
+      const name=value.includes('\nQty ')?label.split('\n')[0]:label.replace(/\n/g,' / ');
+      return name+': '+value.replace(/\n/g,' / ');
+    }).join('    ·    ');
+    const body=rows.length?rows.flatMap(row=>{
+      const subtotal=row.kind==='subtotal';
+      const cells=row.kind==='section'?[{content:row.label,colSpan:columns.length+1,styles:{fontStyle:'bold',fillColor:[225,232,237]}}]
+        :[{content:row.label,styles:subtotal?{fontStyle:'bold',fillColor:[237,240,242]}:{}},...columns.map(([key])=>({content:row.values[key]||'',styles:subtotal?{fontStyle:'bold',fillColor:[237,240,242]}:{}}))];
+      const detail=[text(row.note).trim(),pricing(row.values)].filter(Boolean).join('\n');
+      return detail?[cells,detailCells(detail,subtotal)]:[cells];
+    }):[[{content:'No line items in this option.',colSpan:columns.length+1}]];
+    const foot=[['Option total',...columns.map(([key])=>total[key]||'')]];
+    if(pricing(total))foot.push(detailCells(pricing(total),true));
+    table({head:[['Item / description',...columns.map(([,label])=>label)]],body,foot,
+      columnStyles:Object.fromEntries([[0,{cellWidth:190}],...columns.map((_,i)=>[i+1,{cellWidth,halign:'right'}])])});
     if(Number(sh.roundTotal))paragraph(`Rounded option total: ${money(sh.totals.grandRounded)} (nearest ${money(sh.roundTotal)}). Calculated total: ${money(sh.totals.grand)}.`,{bold:true});
-    if(notes.length){
-      if(y>height-160)newPage(option+' · Scope notes');
-      table({head:[['Item / section reference','Scope notes and details']],body:notes,columnStyles:{0:{cellWidth:190}},
-        didDrawCell:({section:cellSection,column,cell,row})=>{
-          if(cellSection==='body'&&column.index===0&&row.spansMultiplePages&&!cell.text.join('').trim()){
-            doc.setFont(font,'normal');doc.setFontSize(9);doc.setTextColor(...ink);
-            const lines=doc.splitTextToSize(text(row.raw[0])+' (continued)',cell.width-12);
-            doc.text(lines.slice(0,Math.max(1,Math.floor((cell.height-12)/11))),cell.x+6,cell.y+14);
-          }
-        }});
-    }
     for(const row of sh.rows.filter(r=>r.components?.length)){
       if(y>height-190)newPage(option+' · Components');
       paragraph(`${row.name||'Item'} — component breakdown`,{size:15,bold:true});

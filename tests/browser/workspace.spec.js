@@ -69,9 +69,17 @@ test('Save as PDF downloads every takeoff option with readable pagination and co
       expect(item.transform[5]+item.height).toBeLessThan(603);
     }
   }
-  for(let i=0;i<65;i++)expect(all).toContain(`Export item ${String(i).padStart(3,'0')}`);
+  for(let i=0;i<65;i++)expect(all.split(`Export item ${String(i).padStart(3,'0')}`)).toHaveLength(2);
   for(const expected of ['Site preparation','Section scope included','Takeoff description','Scope exclusions and clarifications.','Second option','Included component','$110.00','$113.30','END OF LONG NOTE','Custom fee 7','Measured unit 8','José’s crew','25 m²','Rounded option total'])expect(all).toContain(expected);
   expect(all).not.toContain('South takeoff');
+  expect(all).not.toContain('Item / section reference');
+  expect(all).not.toContain('Scope notes and details');
+  expect(all).not.toContain('Additional pricing');
+  expect(all).not.toContain('matching item numbers');
+  expect(all).not.toContain('— quantities');
+  expect(all.indexOf('Section scope included')).toBeLessThan(all.indexOf('Export item 000'));
+  expect(all.indexOf('Detail visible even when collapsed.')).toBeLessThan(all.indexOf('Export item 001'));
+  expect(all.match(/Detail visible even when collapsed\./g)).toHaveLength(65);
   expect(all).toContain('Site reference photo');expect(all).toContain('No line items in this option.');expect(hasImage).toBe(true);
   await loading.destroy();
   await page.locator('#rail .tab-summary').click();
