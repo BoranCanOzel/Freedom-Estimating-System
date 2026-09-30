@@ -145,9 +145,17 @@ test('single player controls both tanks and remembers each aim without changing 
   await expect(page.locator('#duel-fuel')).toHaveText('Turn fuel: 60/60');
   await page.locator('#duel-shield').click();
   await page.screenshot({path:'test-results/tank-shield.png'});
+  await page.evaluate(()=>{
+    window.shieldDeflected=false;
+    const status=document.querySelector('#duel-status');
+    const observer=new MutationObserver(()=>{
+      if(status.textContent.includes('deflected the hit')){window.shieldDeflected=true;observer.disconnect();}
+    });
+    observer.observe(status,{childList:true,characterData:true,subtree:true});
+  });
   await page.locator('#duel-angle').fill('90');await page.locator('#duel-power').fill('10');
   await page.locator('#duel-fire').click();
-  await expect(page.locator('#duel-status')).toContainText('deflected the hit');
+  await expect.poll(()=>page.evaluate(()=>window.shieldDeflected)).toBe(true);
   await expect(page.locator('#duel-fire')).toBeEnabled();
   await expect(page.locator('#duel-result')).not.toBeVisible();
   await page.locator('#duel-angle').fill('175');await page.locator('#duel-power').fill('10');
