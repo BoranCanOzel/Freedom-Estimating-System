@@ -1,0 +1,16 @@
+#ai-information-page{position:fixed;inset:var(--ai-info-top,58px) 0 0;z-index:590;background:var(--paper);color:var(--ink);overflow:auto;padding:28px max(24px,calc((100vw - 1240px)/2));font-family:var(--f-sans)}
+#ai-information-page>header{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:24px}
+#ai-information-page h1{font-size:30px;margin:4px 0 10px}#ai-information-page p{line-height:1.6;max-width:720px}
+#ai-information-page .ai-info-eyebrow{font-size:11px;letter-spacing:.12em;color:var(--muted);margin:0}
+.ai-info-layout{display:grid;grid-template-columns:280px minmax(0,1fr);min-height:60vh;border:1px solid var(--rule);border-radius:8px;overflow:hidden;background:var(--card)}
+.ai-info-layout>aside{padding:18px;background:var(--calc);border-right:1px solid var(--rule)}
+.ai-info-layout>main{padding:28px;min-width:0}.ai-info-tools{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+#ai-information-page label{display:flex;flex-direction:column;gap:8px;margin-bottom:20px;font-size:13px}
+#ai-information-page :is(input,textarea,select){box-sizing:border-box;width:100%;max-width:none;padding:10px;background:var(--paper);color:var(--ink);border:1px solid var(--rule);border-radius:4px;font:14px var(--f-sans)}
+#ai-information-page textarea{resize:vertical;line-height:1.7;min-height:300px}
+#ai-information-page button{padding:8px 12px;border:1px solid var(--rule);border-radius:4px;background:var(--paper);color:var(--ink);cursor:pointer;font:13px var(--f-sans)}
+#ai-info-tree{display:flex;flex-direction:column;gap:5px;font-size:13px}#ai-info-tree .ai-info-tree-item{text-align:left;overflow-wrap:anywhere;border-color:transparent;background:transparent;line-height:1.5}
+#ai-info-tree button[aria-pressed=true]{background:var(--paper);border-color:var(--rule);box-shadow:inset 3px 0 var(--amber)}
+#ai-information-page #ai-info-save{background:var(--ink);color:var(--paper)}
+#ai-information-page>footer{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:16px 0;font-size:13px}
+@media(max-width:700px){#ai-information-page{padding:16px}.ai-info-layout{grid-template-columns:1fr}.ai-info-layout>aside{border-right:0;border-bottom:1px solid var(--rule)}.ai-info-layout>main{padding:18px}#ai-info-tree{max-height:220px;overflow:auto}}

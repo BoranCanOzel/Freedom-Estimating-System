@@ -138,6 +138,12 @@ Use **+ Subsection** on a section header to add a child. Indentation and branch 
 
 Drag library sections onto the lower half of a section header to place them inside it, or between rows to choose another position. Saving a section to the library preserves its nested sections, and dropping that template restores the tree. Nested templates can also be expanded and dragged individually from the library. While dragging, translucent rows show the actual placement, nesting, and totals before release, including after a section subtotal. Press Escape to cancel.
 
+## AI Information
+
+The top-bar **AI Information** page is a shared reference library across all workbooks. Signed-in users can create, nest, rename, move, and delete folders and plain-text entries. There are no file uploads or predefined categories. Save changes explicitly; conflicting saves preserve your draft and ask you to reload rather than overwrite newer information.
+
+The library is stored in the `ai_information` table in `projects.sqlite`, so include it in the full database backup. It is separate from workbook JSON exports and project snapshots. AI access keys receive read-only access to this library, including updates made after the key was created. Instructions and takeoff responses include the library first; `read_ai_information` (MCP) or `/api/ai/v1/information` (REST) retrieves it again. The connection instructions direct models to analyze relevant references before working; the server cannot verify a model's reasoning.
+
 ## Collaboration behavior
 
 - Fields update live; colored pointers and outlines identify another person's location and active field.

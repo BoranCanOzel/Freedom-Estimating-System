@@ -58,7 +58,7 @@ export function setupHistory(bridge, connection) {
     paint();
   }
   function nativeField(target) {
-    return target instanceof Element && !!target.closest('dialog, .folder-rename-form, #folderNew, #catFolderNew, #projSearch, #libSearch, #server-search, [contenteditable=true]');
+    return target instanceof Element && !!target.closest('dialog, #ai-information-page, .folder-rename-form, #folderNew, #catFolderNew, #projSearch, #libSearch, #server-search, [contenteditable=true]');
   }
   document.addEventListener('keydown', event => {
     if (!(event.ctrlKey || event.metaKey) || event.altKey || event.isComposing) return;

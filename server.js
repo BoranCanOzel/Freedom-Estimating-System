@@ -12,6 +12,7 @@ import { resolveLocation } from './shared/navigation.js';
 import { cursorStyles, normalizeCursor, cursorColors, normalizeCursorColor } from './shared/cursors.js';
 import { createDuels } from './server-duels.js';
 import { mountAiAccess } from './server-ai-access.js';
+import { mountAiInformation } from './server-ai-information.js';
 import { mountShareAccess } from './server-share-access.js';
 import { sitePasswordHash as configuredPasswordHash } from './server-auth.js';
 
@@ -109,7 +110,8 @@ export function createApp(options = {}) {
     }
     return rooms.get(id);
   }
-  mountAiAccess({app,db,session,project,rooms,snapshot});
+  const readAiInformation=mountAiInformation({app,db,session});
+  mountAiAccess({app,db,session,project,rooms,snapshot,readAiInformation});
   const sharePresence=mountShareAccess({app,db,session,project,rooms,snapshot,authChanged});
   app.get('/api/session', (req, res) => res.json({ user: session(req)?.name || null, passwordRequired: true }));
   app.post('/api/login', (req, res) => {

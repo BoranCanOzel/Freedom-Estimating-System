@@ -2,6 +2,7 @@ import * as Y from 'yjs';
 import { readBook, writeBook, validateBook } from '../shared/model.js';
 import './style.css';
 import { setupWorkspace } from './workspace.js';
+import { setupAiInformation } from './ai-information.js';
 import { setupProjectPresence, peerColor } from './project-presence.js';
 import { resolveLocation } from '../shared/navigation.js';
 import { setupHistory } from './history.js';
@@ -512,6 +513,7 @@ document.body.insertAdjacentHTML('afterbegin', `
   </form></dialog>`);
 document.body.classList.add('server-mode');
 workspace = setupWorkspace();
+setupAiInformation(api);
 const transfers=setupTransfers(bridge,()=>connection,message);
 const importDialog=document.createElement('dialog');importDialog.id='import-preview';
 importDialog.innerHTML='<form><h2>Import JSON</h2><p id="import-detected"></p><label>Import as <select id="import-kind"></select></label><p>A workbook creates a new saved workbook. Individual records are added as copies to a destination you select.</p><div class="server-dialog-actions"><button type="button">Cancel</button><button type="submit">Continue</button></div></form>';

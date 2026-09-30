@@ -130,7 +130,13 @@ export function setupWorkspace() {
   aiData.type = 'checkbox'; aiData.id = 'takeoff-ai-data';
   aiDataLabel.append(aiData, document.createTextNode('AI Data'));
   map.after(aiDataLabel);
-  aiData.addEventListener('change', () => { bridge.setAiDataEnabled(aiData.checked); sync(); });
+  aiData.addEventListener('change', () => {
+    const enabled = aiData.checked;
+    if (window.confirm(enabled
+      ? 'Use this estimate as AI reference data? This includes all of its option pages.'
+      : 'Remove this estimate from AI reference data?')) bridge.setAiDataEnabled(enabled);
+    sync();
+  });
   move('reset', 'workspace-option-actions');
   const excel = document.querySelector('.js-export');
   excel.textContent = 'Export estimate to Excel'; excel.dataset.ready = ''; $('workspace-excel').append(excel);

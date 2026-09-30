@@ -27,8 +27,19 @@ test('AI grants enforce scope, repeated saves, revisions, validation, live broad
     assert.equal((await call(api+'/takeoff')).status,401);
     assert.equal((await call(admin,'POST',{list:'list',takeoff:'missing'})).status,404);
     const access=await grant(),key=access.key;assert.equal(access.expiresAt,null);
+    assert.equal((await fetch(base+'/api/ai-information')).status,401);
+    const empty=await (await call('/api/ai-information')).json();
+    const items=[{id:'rates',parent:'',kind:'folder',title:'Production rates',text:''},{id:'cut',parent:'rates',kind:'entry',title:'Concrete cutting',text:'Use 15 LF per crew hour.'}];
+    const library=await call('/api/ai-information','PUT',{revision:empty.revision,items});assert.equal(library.status,200);
+    const stored=await library.json();
+    assert.equal((await call('/api/ai-information','PUT',{revision:empty.revision,items:[]})).status,409);
+    assert.equal((await call('/api/ai-information','PUT',{revision:stored.revision,items:[{...items[0],parent:'rates'}]})).status,422);
+    assert.equal((await call('/api/ai-information','PUT',{revision:stored.revision,items:[{...items[0],file:'upload.pdf'}]})).status,422);
+    assert.equal((await call('/api/ai-information','PUT',{revision:stored.revision,items:[]},key)).status,401);
+    assert.deepEqual((await (await call(api+'/information','GET',undefined,key)).json()).items,items);
+
     assert.equal((await call('/api/projects','GET',undefined,key)).status,401);
-    const instructions=await (await call(api+'/instructions','GET',undefined,key)).json();assert.ok(instructions.schema);assert.match(instructions.instructions,/ONE takeoff/);
+    const instructions=await (await call(api+'/instructions','GET',undefined,key)).json();assert.deepEqual(instructions.aiInformation.items,items);assert.ok(instructions.schema);assert.match(instructions.instructions,/ONE takeoff/);
     const spec=await (await call(api+'/openapi.json')).json();assert.ok(spec.paths['/save'].post.requestBody);
     const original=await (await call(api+'/takeoff','GET',undefined,key)).json();assert.equal(original.takeoff.id,'one');assert.ok(!JSON.stringify(original).includes('Private customer'));
     const change={revision:original.revision,takeoff:structuredClone(original.takeoff),requestId:'save-1'};change.takeoff.sheets[0].rows[0].cost=25;
@@ -66,7 +77,7 @@ test('AI grants enforce scope, repeated saves, revisions, validation, live broad
     assert.equal((await call(api+'/validate','POST',{revision:original.revision,takeoff:original.takeoff},fresh.key)).status,200);
     const rpc=async(method,params)=>{const response=await call(api+'/mcp','POST',{jsonrpc:'2.0',id:1,method,params},fresh.key);assert.equal(response.status,200);return response.json();};
     assert.equal((await rpc('initialize',{protocolVersion:'2025-11-25'})).result.protocolVersion,'2025-11-25');
-    assert.equal((await rpc('tools/list')).result.tools.length,4);
+    assert.equal((await rpc('tools/list')).result.tools.length,5);
     assert.equal(JSON.parse((await rpc('tools/call',{name:'read_takeoff',arguments:{}})).result.content[0].text).takeoff.id,'one');
     await call(admin+'/'+fresh.id,'DELETE');assert.equal((await call(api+'/takeoff','GET',undefined,fresh.key)).status,403);
     const permanent=await grant();inspect=new DatabaseSync(join(dataDir,'projects.sqlite'));
@@ -90,9 +101,13 @@ test('permanent AI keys migrate legacy receipts, survive restarts and serialize 
     const book={lists:[{id:'list',companies:[{id:'co',projects:[{id:'pr',takeoffs:[takeoff('one')]}]}]}]};
     const created=await (await fetch(base+'/api/projects',{method:'POST',headers:{cookie,'Content-Type':'application/json'},body:JSON.stringify({name:'Restart AI',book})})).json();
     const access=await (await fetch(base+'/api/projects/'+created.id+'/ai-access',{method:'POST',headers:{cookie,'Content-Type':'application/json'},body:JSON.stringify({list:'list',takeoff:'one'})})).json();
+    const initialLibrary=await (await fetch(base+'/api/ai-information',{headers:{cookie}})).json();
+    const referenceItems=[{id:'standard',parent:'',kind:'entry',title:'Company standard',text:'Include mobilization separately.'}];
+    assert.equal((await fetch(base+'/api/ai-information',{method:'PUT',headers:{cookie,'Content-Type':'application/json'},body:JSON.stringify({revision:initialLibrary.revision,items:referenceItems})})).status,200);
     await app.close();await start();
     const headers={Authorization:'Bearer '+access.key,'Content-Type':'application/json'};
     const read=await (await fetch(base+'/api/ai/v1/takeoff',{headers})).json();assert.equal(read.takeoff.id,'one');
+    assert.deepEqual(read.aiInformation.items,referenceItems);
     read.takeoff.name='Saved once';
     const changes=[1,2].map(n=>({revision:read.revision,takeoff:read.takeoff,requestId:'concurrent-'+n}));
     const saves=await Promise.all(changes.map(body=>fetch(base+'/api/ai/v1/save',{method:'POST',headers,body:JSON.stringify(body)})));

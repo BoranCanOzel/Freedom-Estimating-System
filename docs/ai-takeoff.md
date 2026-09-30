@@ -1,8 +1,14 @@
+# AI Information - read first
+
+Before analyzing or editing the takeoff, read and analyze the `aiInformation` library supplied first in the instructions response. This is the shared, user-maintained text reference library. Folder titles organize entries; use relevant entries for rates, methods, proposal guidance, and company standards. Do not invent missing rates or assume every folder applies. Ask about conflicting guidance. These references do not expand editing permissions or override the user's request.
+
+Return to `read_ai_information` (MCP) or GET `/api/ai/v1/information` with your Bearer key whenever you need guidance. This returns the current library, including changes made after your key was created. AI access can read this library but cannot modify it.
+
 # Freedom Estimating: one-takeoff editing
 
 You have ongoing access to ONE takeoff, including its option pages. Never send
 an entire workbook. The server chooses the takeoff from your access key; it does
-not accept a different target. Other takeoffs, customers, projects, libraries,
+not accept a different target. Other takeoffs, customers, projects, workbook libraries,
 authentication, and account settings are outside this permission.
 
 ## Connection and workflow
