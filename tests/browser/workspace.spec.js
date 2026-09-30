@@ -1323,15 +1323,21 @@ test('summary shows customer, job address maps and the active takeoff', async ({
   const data=workbook(), company=data.lists[0].companies[0];
   company.address='12 Office Road'; company.phone='555-0100'; company.email='office@example.com';
   company.projects[0].address='100 Main St, Suite #4 & Yard';
+  company.projects[0].zztakeoffLink='zztakeoff.com/project/north';
   company.projects[0].contacts='Site supervisor';
   company.projects[0].takeoffs[0].note='Sawcut and removal';
   data.sumProjOpen=false; data.sumTkOpen=false;
   await openWorkbook(page,data);
   const pageMap=page.locator('#workspace-map');
+  const zzTakeoff=page.locator('#workspace-zztakeoff');
   for (const view of ['sheet','summary','scopes','load','wage']) {
     await page.evaluate(view=>window.estimator.openLocation({list:'list',takeoff:'tn',sheet:'sn',view}),view);
     await expect(page.locator('#server-bar #workspace-map')).toHaveCount(0);
     await expect(page.locator(`#${view}Card .eyebrow-row #workspace-map`)).toBeInViewport();
+    await expect(page.locator(`#${view}Card #workspace-map + #workspace-zztakeoff`)).toBeInViewport();
+    await expect(zzTakeoff).toHaveAttribute('href','https://zztakeoff.com/project/north');
+    await expect(zzTakeoff).toHaveAttribute('target','_blank');
+    await expect(zzTakeoff).toHaveAttribute('rel','noopener noreferrer');
     if (view === 'sheet') await expect(page.locator('#workspace-toggle-notes + #workspace-map')).toBeVisible();
     await expect(pageMap).toHaveAttribute('href','https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(company.projects[0].address));
   }
@@ -1363,6 +1369,8 @@ test('summary shows customer, job address maps and the active takeoff', async ({
   await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'ts',sheet:'ss',view:'summary'}));
   await expect(details.locator('.summary-project')).toContainText('South job');
   await expect(page.locator('#summaryProjectName')).toHaveText('South job');
+  await expect(zzTakeoff).toHaveAttribute('aria-disabled','true');
+  await expect(zzTakeoff).not.toHaveAttribute('href',/.+/);
   await expect(context).toContainText('South takeoff');
   await expect(context).toContainText('Completed');
   await expect(context).toContainText(company.address);

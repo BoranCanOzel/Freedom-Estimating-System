@@ -123,13 +123,19 @@ export function setupWorkspace() {
   map.target = '_blank'; map.rel = 'noopener noreferrer';
   map.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg><span>Map</span>';
   detailCopy.after(map);
+  const zzTakeoff = document.createElement('a');
+  zzTakeoff.id = 'workspace-zztakeoff'; zzTakeoff.className = 'summary-map-link';
+  zzTakeoff.target = '_blank'; zzTakeoff.rel = 'noopener noreferrer';
+  zzTakeoff.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M10 14 21 3M21 14v7H3V3h7"/></svg><span>ZZTakeoff</span>';
+  zzTakeoff.setAttribute('aria-label', 'Open project in ZZTakeoff');
+  map.after(zzTakeoff);
   const aiDataLabel = document.createElement('label');
   aiDataLabel.className = 'workspace-ai-data';
   aiDataLabel.title = 'Use this estimate, including all option pages, as reference data for AI models.';
   const aiData = document.createElement('input');
   aiData.type = 'checkbox'; aiData.id = 'takeoff-ai-data';
   aiDataLabel.append(aiData, document.createTextNode('AI Data'));
-  map.after(aiDataLabel);
+  zzTakeoff.after(aiDataLabel);
   aiData.addEventListener('change', () => {
     const enabled = aiData.checked;
     sync();
@@ -203,6 +209,7 @@ export function setupWorkspace() {
     const ready = document.body.classList.contains('server-active'), view = bridge.getLocation().view || 'sheet';
     const mapHost = document.querySelector(`#${view}Card .eyebrow-row`);
     if (mapHost && map.parentElement !== mapHost) mapHost.append(map);
+    if (mapHost && zzTakeoff.previousElementSibling !== map) map.after(zzTakeoff);
     if (mapHost && aiDataLabel.parentElement !== mapHost) mapHost.append(aiDataLabel);
     aiData.checked = ready && bridge.aiDataEnabled();
     aiData.disabled = !ready || !bridge.getLocation().takeoff;
@@ -215,6 +222,15 @@ export function setupWorkspace() {
     } else {
       map.removeAttribute('href');
       map.setAttribute('aria-disabled', 'true');
+    }
+    const zzLink = ready ? bridge.getZZTakeoffLink() : '';
+    zzTakeoff.title = zzLink || 'Add a ZZTakeoff link in the project edit card.';
+    if (zzLink) {
+      zzTakeoff.href = zzLink;
+      zzTakeoff.removeAttribute('aria-disabled');
+    } else {
+      zzTakeoff.removeAttribute('href');
+      zzTakeoff.setAttribute('aria-disabled', 'true');
     }
     document.body.dataset.workspaceView = view;
     $('workspace-flat-add').checked = ready && bridge.flatAddEnabled();

@@ -9787,10 +9787,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         if(k==='zztakeoffLink'){
           const input=field.querySelector('input');input.type='url';input.inputMode='url';input.spellcheck=false;
           const open=document.createElement('button');open.type='button';open.className='btn alt tiny';open.textContent='Open ZZTakeoff';
-          const link=()=>{
-            const value=String(d[k]||'').trim();if(!value)return '';
-            try{const url=new URL(/^[a-z][a-z\d+.-]*:/i.test(value)?value:'https://'+value);return ['https:','http:'].includes(url.protocol)?url.href:'';}catch{return '';}
-          };
+          const link=()=>projectWebLink(d[k]);
           const sync=()=>{open.disabled=!link();open.title=link()||'Enter a valid web link to open ZZTakeoff';};
           input.addEventListener('input',sync);sync();
           open.onclick=()=>{const url=link();if(url)window.open(url,'_blank','noopener,noreferrer');};
@@ -11233,6 +11230,10 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     if (!Array.isArray(book.customFields[kind])) book.customFields[kind] = [];
     return book.customFields[kind];
   }
+  function projectWebLink(value){
+    value=String(value||'').trim();if(!value)return '';
+    try{const url=new URL(/^[a-z][a-z\d+.-]*:/i.test(value)?value:'https://'+value);return ['https:','http:'].includes(url.protocol)?url.href:'';}catch{return '';}
+  }
   function customFieldConfig(kind, name){
     const config = book.customFieldSettings?.[kind]?.[name];
     return {
@@ -12124,6 +12125,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       const hit = findTakeoff(book.activeTakeoff);
       return hit ? String(hit.pr.address || '').trim() || String(hit.co.address || '').trim() : '';
     },
+    getZZTakeoffLink(){ return projectWebLink(findTakeoff(book.activeTakeoff)?.pr.zztakeoffLink); },
     getEditorHistory(){
       if (document.getElementById('editor').hidden) return null;
       const draft = ({item:itemDraft, section:secDraft, scope:scopeDraft, part:partDraft,
