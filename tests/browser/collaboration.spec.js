@@ -40,7 +40,8 @@ test('two estimators share edits, cursors, reconnects and projects', async ({ br
     }
     // Scrolling must reuse collaborator nodes rather than rebuilding the header.
     await alice.locator('#workspace-view').evaluate(el=>{el.open=true;});
-    await alice.locator('#workspace-cursor-color').selectOption('#2878d0');
+    await alice.locator('#workspace-color-toggle').click();
+    await alice.getByRole('radio',{name:'Blue',exact:true}).check();
     await expect(bob.locator('.server-cursor')).toHaveCSS('color','rgb(40, 120, 208)');
     await expect(bob.locator('.server-person')).toHaveCSS('border-left-color','rgb(40, 120, 208)');
     await expect(bob.locator('#workspace-cursor-color')).toHaveValue('');

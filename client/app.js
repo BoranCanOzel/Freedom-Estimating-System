@@ -633,7 +633,7 @@ async function signedIn(name) {
   });
   [preferences] = await Promise.all([preferenceRequest, refresh()]);
   workspace.setCursor(preferences.cursor); $('workspace-cursor').disabled = !preferencesAvailable;
-  workspace.setCursorColor(preferences.color); $('workspace-cursor-color').disabled = !preferencesAvailable;
+  workspace.setCursorColor(preferences.color, name); $('workspace-cursor-color').disabled = !preferencesAvailable;
   syncProjectPanel();
   let remembered;
   try { remembered = localStorage.getItem('freedom:last-workbook:' + user); } catch {}

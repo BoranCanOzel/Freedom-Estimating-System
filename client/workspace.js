@@ -1,3 +1,4 @@
+import { peerColor } from './project-presence.js';
 import { renderProjectSettings } from './project-settings.js';
 import './workspace.css';
 import './textures.css';
@@ -39,8 +40,14 @@ export function setupWorkspace() {
             <option value="classic">Classic (original)</option><option value="arrow">Pointer arrow</option>
             <option value="crosshair">Crosshair</option><option value="ring">Ring</option>
           </select>
-        </div><div class="workspace-cursor-setting"><label for="workspace-cursor-color">Your color</label>
-          <select id="workspace-cursor-color" disabled>${Object.entries(cursorColors).map(([value,label])=>`<option value="${value}">${label}</option>`).join('')}</select>
+        </div><div class="workspace-color-picker">
+          <div class="workspace-cursor-setting"><span id="workspace-color-label">Your color</span>
+            <select id="workspace-cursor-color" hidden disabled aria-label="Your color">${Object.entries(cursorColors).map(([value,label])=>`<option value="${value}">${label}</option>`).join('')}</select>
+            <button id="workspace-color-toggle" type="button" disabled aria-labelledby="workspace-color-label workspace-color-name" aria-expanded="false" aria-controls="workspace-color-options"><span class="workspace-color-line" aria-hidden="true"></span><span id="workspace-color-name">Automatic</span><span aria-hidden="true">&#9662;</span></button>
+          </div>
+          <div id="workspace-color-options" role="radiogroup" aria-labelledby="workspace-color-label" hidden>
+            ${Object.entries(cursorColors).map(([value,label])=>`<label class="workspace-color-option"><input type="radio" name="workspace-color" value="${value}" disabled><span class="workspace-color-line" data-color="${value}" style="--cursor-color:${value||'var(--muted)'}" aria-hidden="true"></span><span>${label}</span></label>`).join('')}
+          </div>
         </div><p class="workspace-preference-hint">Your shared cursor and online color. Saved to your account.</p>
         <button id="workspace-tank-solo" type="button">Tank game: single player</button>
         <div data-for-view="sheet" class="menu-context"><div class="menu-divider"></div>
@@ -63,6 +70,30 @@ export function setupWorkspace() {
         <div class="menu-divider"></div><p class="menu-label">Manage option</p><div id="workspace-option-actions"></div>
       </div>
     </details>`;
+
+  const colorControl = $('workspace-cursor-color'), colorToggle = $('workspace-color-toggle'), colorOptions = $('workspace-color-options');
+  const colorRadios = [...colorOptions.querySelectorAll('input')];
+  const closeColors = () => { colorOptions.hidden = true; colorToggle.setAttribute('aria-expanded','false'); };
+  colorToggle.onclick = () => {
+    colorOptions.hidden = !colorOptions.hidden;
+    colorToggle.setAttribute('aria-expanded',String(!colorOptions.hidden));
+    if (!colorOptions.hidden) colorRadios.find(input=>input.checked)?.focus();
+  };
+  for (const input of colorRadios) input.onchange = () => {
+    if (colorControl.disabled) return;
+    colorControl.value = input.value; closeColors(); colorToggle.focus();
+    colorControl.dispatchEvent(new Event('change',{bubbles:true}));
+  };
+  colorOptions.onkeydown = event => {
+    if(event.key==='Escape'){event.preventDefault();event.stopPropagation();closeColors();colorToggle.focus();}
+  };
+  new MutationObserver(()=>{
+    colorToggle.disabled = colorControl.disabled;
+    colorRadios.forEach(input=>{input.disabled=colorControl.disabled;});
+    if(colorControl.disabled)closeColors();
+  }).observe(colorControl,{attributes:true,attributeFilter:['disabled']});
+  $('workspace-view').addEventListener('toggle',()=>{if(!$('workspace-view').open)closeColors();});
+  let cursorUser = '';
 
   // Reparent live controls: preserve listeners, IDs, and their existing behavior.
   const move = (id, host, parent = false) => $(host).append(parent ? $(id).parentElement : $(id));
@@ -199,10 +230,15 @@ export function setupWorkspace() {
     document.body.dataset.sharedCursor = style;
     $('workspace-cursor').value = style;
   }
-  function setCursorColor(color) {
+  function setCursorColor(color, name = cursorUser) {
+    cursorUser = name;
     color = normalizeCursorColor(color);
     document.body.dataset.sharedCursorColor = color;
-    $('workspace-cursor-color').value = color;
+    colorControl.value = color;
+    $('workspace-color-name').textContent = cursorColors[color];
+    colorToggle.style.setProperty('--cursor-color',peerColor(cursorUser,color));
+    for(const input of colorRadios)input.checked=input.value===color;
+    colorOptions.querySelector('[data-color=""]').style.setProperty('--cursor-color',peerColor(cursorUser,''));
   }
   return { sync, closeMenus, setCursor, setCursorColor };
 }
