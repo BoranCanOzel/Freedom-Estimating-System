@@ -8,23 +8,31 @@ import { createHash } from 'node:crypto';
 import { createApp } from '../server.js';
 
 test('ZZTakeoff OAuth is session bound and fetch only invokes the fixed read script',async()=>{
-  let challenge,called=false;
+  let challenge,called=false,hold=false,release,arrived,simulateError=false,stream=false,redirect=false;
   const zzFetch=async(url,options)=>{
     if(url.endsWith('/oauth/register'))return Response.json({client_id:'test-client'});
     if(url.endsWith('/oauth/token')){
       assert.equal(createHash('sha256').update(options.body.get('code_verifier')).digest('base64url'),challenge);
       return Response.json({access_token:'private-test-token',expires_in:3600});
     }
-    assert.equal(url,'https://www.zztakeoff.com/mcp');
+    assert.ok(['https://www.zztakeoff.com/mcp','https://www.zztakeoff.com/mcp/'].includes(url));
     assert.equal(options.headers.Authorization,'Bearer private-test-token');
     const request=JSON.parse(options.body);let result;
+    if(simulateError)throw new DOMException('Timed out','TimeoutError');
+    if(redirect&&request.method==='initialize'&&url.endsWith('/mcp'))return new Response(null,{status:307,headers:{location:'/mcp/'}});
     if(request.method==='initialize')result={protocolVersion:'2025-03-26'};
     else if(request.method==='notifications/initialized')return new Response(null,{status:202});
     else if(request.method==='tools/list')result={tools:[{name:'run_script',description:'Run a ZZTakeoff script',inputSchema:{properties:{code:{type:'string'}},required:['code']}}]};
     else{
       assert.equal(request.method,'tools/call');assert.equal(request.params.name,'run_script');
       assert.match(request.params.arguments.code,/projectId !== "source"/);assert.doesNotMatch(request.params.arguments.code,/\.update\(/);
+      if(hold){arrived?.();await new Promise(resolve=>{release=resolve;});}
       called=true;result={content:[{type:'text',text:JSON.stringify({projectId:'source',records:[{_id:'one',properties:{name:{value:'Slab'},area:{formatted:'160 SF'}}}]})}]};
+    }
+    if(stream){
+      const data=': ping\r\n\r\ndata: '+JSON.stringify({jsonrpc:'2.0',id:request.id,result})+'\r\n\r\n';
+      const encoded=new TextEncoder().encode(data);let index=0;
+      return new Response(new ReadableStream({pull(controller){if(index<encoded.length)controller.enqueue(encoded.slice(index,index+=1));else controller.close();}}),{headers:{'content-type':'text/event-stream'}});
     }
     return Response.json({jsonrpc:'2.0',id:request.id,result},{headers:{'mcp-session-id':'test-session'}});
   };
@@ -46,6 +54,24 @@ test('ZZTakeoff OAuth is session bound and fetch only invokes the fixed read scr
     assert.deepEqual(await (await call('status',undefined,other)).json(),{connected:false});
     const scope=await (await call('scope',{link:'https://www.zztakeoff.com/app/takeoff?projectId=source'})).json();
     assert.equal(scope.items[0].measurements,'area: 160 SF');assert.equal(called,true);
+    hold=true;stream=true;redirect=true;
+    const started=new Promise(resolve=>{arrived=resolve;});
+    const pendingResponse=await call('scope/jobs',{link:'https://www.zztakeoff.com/app/takeoff?projectId=source'});
+    assert.equal(pendingResponse.status,202);
+    const job=await pendingResponse.json();await started;
+    assert.equal((await (await call('scope/jobs/'+job.id)).json()).state,'pending');
+    assert.equal((await call('scope/jobs/'+job.id,undefined,other)).status,404);
+    assert.equal((await call('scope/jobs',{link:'https://www.zztakeoff.com/app/takeoff?projectId=different'})).status,409);
+    release();hold=false;
+    let result;
+    for(let i=0;i<30;i++){result=await (await call('scope/jobs/'+job.id)).json();if(result.state!=='pending')break;await new Promise(resolve=>setTimeout(resolve,5));}
+    assert.equal(result.state,'complete');assert.equal(result.result.items[0].measurements,'area: 160 SF');
+    simulateError=true;
+    const failedJob=await (await call('scope/jobs',{link:'https://www.zztakeoff.com/app/takeoff?projectId=source'})).json();
+    for(let i=0;i<30;i++){result=await (await call('scope/jobs/'+failedJob.id)).json();if(result.state!=='pending')break;await new Promise(resolve=>setTimeout(resolve,5));}
+    assert.equal(result.state,'failed');assert.match(result.error,/timed out.*starting the ZZTakeoff session/);
+    assert.equal(result.result,undefined);
+    simulateError=false;
     assert.match(await (await call(callback)).text(),/expired/);
     assert.equal((await call('scope',{link:'https://elsewhere.example/?projectId=source'})).status,422);
     await call('disconnect',{});assert.deepEqual(await (await call('status')).json(),{connected:false});

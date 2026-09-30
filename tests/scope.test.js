@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mergeScope } from '../shared/scope.js';
-import { zzProject, zzScope, scriptTool, scopeScript } from '../server-zztakeoff.js';
+import { zzProject, zzScope, scriptTool, scopeScript, zzTransportError } from '../server-zztakeoff.js';
 
 test('scope refresh preserves decisions by source ID and retains missing items for review',()=>{
   const old={source:'project',items:[{id:'a',name:'Old name',status:'excluded'},{id:'b',name:'Removed',status:'duplicate'}]};
@@ -20,4 +20,14 @@ test('ZZTakeoff source URLs and read-only scope extraction preserve evaluated qu
   assert.match(scopeScript('abc'),/Takeoffs\.list/);assert.doesNotMatch(scopeScript('abc'),/\.insert|\.update|\.delete/);
   assert.equal(scriptTool([{name:'get_script',description:'Read a script',inputSchema:{properties:{script:{type:'string'}}}}]),undefined);
   assert.equal(scriptTool([{name:'run_script',inputSchema:{required:['code','tabId'],properties:{code:{type:'string'}}}}]),undefined);
+});
+
+test('ZZTakeoff errors distinguish browser waits, DNS, TLS and interrupted connections without exposing secrets',()=>{
+  const stage='reading scope items';
+  assert.match(zzTransportError(new DOMException('private detail','TimeoutError'),stage).message,/timed out.*linked project.*reading scope items/);
+  for(const [code,expected] of [['ENOTFOUND',/DNS/],['CERT_HAS_EXPIRED',/TLS/],['ECONNRESET',/interrupted/],['UND_ERR_CONNECT_TIMEOUT',/outbound HTTPS/]]){
+    const error=new TypeError('private-test-token',{cause:Object.assign(new Error('private-test-token'),{code})});
+    const failure=zzTransportError(error,stage);
+    assert.match(failure.message,expected);assert.doesNotMatch(failure.message,/private-test-token/);
+  }
 });

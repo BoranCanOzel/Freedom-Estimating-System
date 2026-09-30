@@ -6085,14 +6085,15 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   }
 
   function renderCostBreakdown(){
-    const labels = {labor:'Labor',material:'Materials',equip:'Equipment',part:'Parts',service:'Services',construct:'Assemblies',hybrid:'Mixed',other:'Other',markup:'Markup / flat adds',fees:'Fees'};
-    const colors = ['#2563eb','#0d9488','#d97706','#9333ea','#db2777','#64748b','#0891b2','#78716c','#65a30d','#ea580c'];
+    const labels = {labor:'Labor',material:'Materials',equip:'Equipment',part:'Parts',service:'Services',construct:'Assemblies',hybrid:'Mixed',other:'Other',markup:'Markup',flat:'Flat adds',fees:'Fees'};
+    const colors = ['#2563eb','#0d9488','#d97706','#9333ea','#db2777','#64748b','#0891b2','#78716c','#65a30d','#dc2626','#ea580c'];
     const amounts = Object.fromEntries(Object.keys(labels).map(k => [k,0]));
     book.sheets.forEach(sh => sh.rows.forEach(r => {
       if (r.type === 'section' || r.type === 'sectionEnd' || r.kind === 'none') return;
       const c = calc(r,sh);
       amounts[Object.hasOwn(labels,r.kind) ? r.kind : 'other'] += c.base;
-      amounts.markup += c.markup + c.flat;
+      amounts.markup += c.markup;
+      amounts.flat += c.flat;
       amounts.fees += c.fees.reduce((a,b) => a+b,0);
     }));
     const entries = Object.keys(labels).map((k,i) => ({label:labels[k],value:amounts[k],color:colors[i]})).filter(x => Math.abs(x.value)>0.000001);
@@ -6106,7 +6107,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       angle=next;
       return shape+' fill="'+x.color+'"><title>'+title+'</title></'+(fraction>0.999999?'circle':'path')+'>';
     }).join('') : '';
-    document.getElementById('sumCostBreakdown').innerHTML = '<h3>Cost breakdown</h3><p>All options combined, by line item type. Services and assemblies include their components. Markup and fees are shown separately; excludes rounding.</p>'+
+    document.getElementById('sumCostBreakdown').innerHTML = '<h3>Cost breakdown</h3><p>All options combined, by line item type. Services and assemblies include their components. Markup, flat adds, and fees are shown separately; excludes rounding.</p>'+
       '<div class="cost-breakdown-row">'+entries.map(x => '<div class="cost-category"><span><i style="background:'+x.color+'"></i>'+x.label+'</span><strong>$'+fmt.format(x.value)+'</strong><small>'+(total>0&&!negative?(x.value/total*100).toFixed(1)+'%':'')+'</small></div>').join('')+'<div class="cost-category"><span>Total</span><strong>$'+fmt.format(total)+'</strong></div></div>'+
       (slices?'<svg class="cost-pie" viewBox="0 0 200 200" role="img" aria-label="Cost distribution by category"><title>Cost distribution by category; amounts and percentages listed above</title>'+slices+'</svg>':'<p>'+(negative?'Pie chart unavailable when categories include credits. Signed amounts are shown above.':'Add priced items to see the cost distribution.')+'</p>');
   }

@@ -4,6 +4,51 @@ import { publicUrl } from './client/public-url.js';
 const origin='https://www.zztakeoff.com', endpoint=origin+'/mcp';
 const fail=(message,status=502)=>Object.assign(new Error(message),{status});
 
+export function zzTransportError(error,stage){
+  if(error.status)return error;
+  const codes=[];
+  const collect=value=>{if(!value)return;if(value.code)codes.push(value.code);if(value.name==='TimeoutError'||value.name==='AbortError')codes.push('REQUEST_TIMEOUT');if(value.cause)collect(value.cause);for(const child of value.errors||[])collect(child);};
+  collect(error);
+  let reason;
+  if(codes.some(code=>['ENOTFOUND','EAI_AGAIN'].includes(code)))reason='The estimating server could not resolve ZZTakeoff\'s address (DNS).';
+  else if(codes.some(code=>/CERT|TLS|SSL|SELF_SIGNED|UNABLE_TO_VERIFY/.test(code)))reason='The estimating server could not verify ZZTakeoff\'s secure connection (TLS).';
+  else if(codes.some(code=>['ECONNREFUSED','ENETUNREACH','EHOSTUNREACH','UND_ERR_CONNECT_TIMEOUT','ETIMEDOUT'].includes(code)))reason='The estimating server could not establish a connection to ZZTakeoff. Check its outbound HTTPS access.';
+  else if(codes.some(code=>['REQUEST_TIMEOUT','UND_ERR_HEADERS_TIMEOUT','UND_ERR_BODY_TIMEOUT'].includes(code)))reason='ZZTakeoff timed out'+(stage==='reading scope items'?' while waiting for the scope. Keep the linked project open in ZZTakeoff and respond to any connection or read-access prompt.':'.');
+  else if(codes.some(code=>['ECONNRESET','UND_ERR_SOCKET','EPIPE'].includes(code)))reason='The connection to ZZTakeoff was interrupted.';
+  else reason='The estimating server could not communicate with ZZTakeoff.';
+  return fail(`${reason} Failed while ${stage}. Your saved scope is unchanged.`,codes.includes('REQUEST_TIMEOUT')?504:502);
+}
+
+async function readMcpResponse(response,id){
+  const reader=response.body?.getReader();
+  if(!reader)throw fail('ZZTakeoff returned an empty response.');
+  const decoder=new TextDecoder(),stream=response.headers.get('content-type')?.includes('text/event-stream');
+  let buffer='',size=0;
+  try{
+    while(true){
+      const part=await reader.read();
+      buffer+=decoder.decode(part.value||new Uint8Array(),{stream:!part.done});
+      size+=part.value?.length||0;
+      if(size>12*1024*1024)throw fail('ZZTakeoff response is too large. Your saved scope is unchanged.');
+      if(stream){
+        buffer=buffer.replace(/\r\n/g,'\n');
+        let end;
+        while((end=buffer.indexOf('\n\n'))>=0){
+          const block=buffer.slice(0,end);buffer=buffer.slice(end+2);
+          const data=block.split('\n').filter(line=>line.startsWith('data:')).map(line=>line.slice(5).trimStart()).join('\n');
+          if(data){const message=JSON.parse(data);if(message.id===id)return message;}
+        }
+      }
+      if(part.done)break;
+    }
+    if(!stream){const message=JSON.parse(buffer);if(message.id===id)return message;}
+    throw fail('ZZTakeoff closed the response before completing the request. Your saved scope is unchanged.');
+  }catch(error){
+    if(error instanceof SyntaxError)throw fail('ZZTakeoff returned an unreadable response. Your saved scope is unchanged.');
+    throw error;
+  }finally{await reader.cancel().catch(()=>{});}
+}
+
 export function zzProject(link){
   let url;
   try{url=new URL(/^https?:\/\//i.test(link)?link:'https://'+link);}catch{throw fail('Enter a valid ZZTakeoff project link.',422);}
@@ -71,17 +116,28 @@ export function mountZZTakeoff({app,db,session,fetchImpl=fetch}){
   db.exec(`CREATE TABLE IF NOT EXISTS zztakeoff_connections (
     session_token TEXT PRIMARY KEY REFERENCES sessions(token) ON DELETE CASCADE, tokens TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS zztakeoff_clients (origin TEXT PRIMARY KEY, client_id TEXT NOT NULL);`);
-  const pending=new Map(),refreshing=new Map();
+  const pending=new Map(),refreshing=new Map(),jobs=new Map();
   const authenticated=(req,res,next)=>{req.zzUser=session(req);return req.zzUser?next():res.status(401).json({error:'Please sign in.'});};
   const wrap=fn=>async(req,res)=>{try{await fn(req,res);}catch(error){res.status(error.status||502).json({error:error.message});}};
-  async function request(url,options={}){
-    try{return await fetchImpl(url,{...options,redirect:'error',signal:AbortSignal.timeout(30000)});}
-    catch{throw fail('ZZTakeoff could not be reached. Try again; your saved scope is unchanged.');}
+  async function request(url,options={},stage='connecting to ZZTakeoff',timeout=30000){
+    const signal=AbortSignal.timeout(timeout);
+    try{
+      for(let redirects=0;redirects<3;redirects++){
+        const response=await fetchImpl(url,{...options,redirect:'manual',signal});
+        if(![301,302,303,307,308].includes(response.status))return response;
+        const target=new URL(response.headers.get('location')||'',url);
+        await response.body?.cancel();
+        if(![307,308].includes(response.status)||target.origin!==origin||target.username||target.password||!response.headers.get('location'))throw fail(`ZZTakeoff redirected the request while ${stage}. Its connection endpoint needs checking; your saved scope is unchanged.`);
+        url=target.href;
+      }
+      throw fail('ZZTakeoff redirected the request too many times. Your saved scope is unchanged.');
+    }catch(error){throw zzTransportError(error,stage);}
   }
   async function json(url,options){
-    const response=await request(url,options);
-    if(!response.ok)throw fail('ZZTakeoff could not complete the connection. Reconnect and try again.');
-    try{return await response.json();}catch{throw fail('ZZTakeoff returned an unexpected response.');}
+    const stage=url.endsWith('/oauth/register')?'registering the connection':'authorizing the connection';
+    const response=await request(url,options,stage);
+    if(!response.ok)throw fail(`ZZTakeoff refused the request while ${stage} (HTTP ${response.status}).`+(response.status===400||response.status===401?' Reconnect ZZTakeoff to continue.':' Try again later; your saved scope is unchanged.'));
+    try{return await response.json();}catch(error){if(error instanceof SyntaxError)throw fail('ZZTakeoff returned an unexpected response.');throw zzTransportError(error,stage);}
   }
   function stored(token){const row=db.prepare('SELECT tokens FROM zztakeoff_connections WHERE session_token=?').get(token);return row?JSON.parse(row.tokens):null;}
   function store(token,data){db.prepare('INSERT INTO zztakeoff_connections VALUES (?,?) ON CONFLICT(session_token) DO UPDATE SET tokens=excluded.tokens').run(token,JSON.stringify(data));}
@@ -129,20 +185,19 @@ export function mountZZTakeoff({app,db,session,fetchImpl=fetch}){
   });
   app.post('/api/zztakeoff/disconnect',authenticated,(req,res)=>{db.prepare('DELETE FROM zztakeoff_connections WHERE session_token=?').run(req.zzUser.token);res.json({connected:false});});
 
-  async function mcp(token){
+  async function mcp(token,onProgress=()=>{}){
     const bearer=await access(token);let sequence=0,sessionId='',protocol='2025-03-26';
     async function call(method,params,notification=false){
       const id=++sequence;
-      const response=await request(endpoint,{method:'POST',headers:{Authorization:'Bearer '+bearer,'Content-Type':'application/json',Accept:'application/json, text/event-stream',...(sessionId?{'Mcp-Session-Id':sessionId,'MCP-Protocol-Version':protocol}:{})},body:JSON.stringify({jsonrpc:'2.0',...(notification?{}:{id}),method,params})});
+      const stage=({initialize:'starting the ZZTakeoff session','notifications/initialized':'finishing the ZZTakeoff connection','tools/list':'listing ZZTakeoff capabilities','tools/call':'reading scope items'})[method]||'contacting ZZTakeoff';
+      onProgress(stage);
+      const response=await request(endpoint,{method:'POST',headers:{Authorization:'Bearer '+bearer,'Content-Type':'application/json',Accept:'application/json, text/event-stream','MCP-Protocol-Version':protocol,...(sessionId?{'Mcp-Session-Id':sessionId}:{})},body:JSON.stringify({jsonrpc:'2.0',...(notification?{}:{id}),method,params})},stage,notification?30000:120000);
       if(response.status===401)throw fail('Reconnect ZZTakeoff to continue.',409);
-      if(!response.ok)throw fail('ZZTakeoff could not fetch the scope. Check that its project is open and MCP access is enabled.');
+      if(!response.ok)throw fail(`ZZTakeoff refused the request while ${stage} (HTTP ${response.status}). `+(response.status===403?'Check that MCP access is enabled for your ZZTakeoff account and workspace.':response.status===429?'ZZTakeoff is limiting requests. Wait a moment before trying again.':'Try again; your saved scope is unchanged.'));
       sessionId=response.headers.get('mcp-session-id')||sessionId;
       if(notification){await response.body?.cancel();return;}
       let result;
-      if(response.headers.get('content-type')?.includes('text/event-stream')){
-        const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='',size=0;
-        try{while(!result){const part=await reader.read();if(part.done)break;size+=part.value.length;if(size>12*1024*1024)throw fail('ZZTakeoff response is too large.');buffer+=decoder.decode(part.value,{stream:true}).replace(/\r\n/g,'\n');let end;while((end=buffer.indexOf('\n\n'))>=0){const block=buffer.slice(0,end);buffer=buffer.slice(end+2);const data=block.split('\n').filter(line=>line.startsWith('data:')).map(line=>line.slice(5).trim()).join('\n');if(data){const message=JSON.parse(data);if(message.id===id)result=message;}}}}finally{await reader.cancel();}
-      }else result=await response.json();
+      try{result=await readMcpResponse(response,id);}catch(error){throw zzTransportError(error,stage);}
       if(!result||result.error)throw fail('ZZTakeoff could not run the read request. Check the connected project and your permissions.');
       return result.result;
     }
@@ -150,8 +205,8 @@ export function mountZZTakeoff({app,db,session,fetchImpl=fetch}){
     protocol=init.protocolVersion||protocol;await call('notifications/initialized',{},true);
     return call;
   }
-  app.post('/api/zztakeoff/scope',authenticated,wrap(async(req,res)=>{
-    const projectId=zzProject(String(req.body?.link||'')),call=await mcp(req.zzUser.token);
+  async function fetchScope(token,link,onProgress){
+    const projectId=zzProject(link),call=await mcp(token,onProgress);
     const tools=[];let cursor;
     for(let page=0;page<20;page++){const result=await call('tools/list',cursor?{cursor}:{});tools.push(...(result.tools||[]));cursor=result.nextCursor;if(!cursor)break;}
     const runner=scriptTool(tools);
@@ -161,6 +216,29 @@ export function mountZZTakeoff({app,db,session,fetchImpl=fetch}){
     let data=result.structuredContent;
     if(!data?.records)for(const content of result.content||[])if(content.type==='text'){try{const parsed=JSON.parse(content.text);if(parsed.records){data=parsed;break;}}catch{}}
     if(data?.projectId!==projectId||!Array.isArray(data.records)||data.records.length>10000)throw fail('ZZTakeoff returned an unsupported scope response. No saved items were changed.');
-    res.json(zzScope(data.records,projectId));
+    return zzScope(data.records,projectId);
+  }
+  app.post('/api/zztakeoff/scope',authenticated,wrap(async(req,res)=>res.json(await fetchScope(req.zzUser.token,String(req.body?.link||'')))));
+
+  const pruneJobs=()=>{for(const [id,job] of jobs)if(job.expires<Date.now())jobs.delete(id);};
+  // Return immediately; polling keeps proxy timeouts independent of ZZTakeoff's browser prompts.
+  app.post('/api/zztakeoff/scope/jobs',authenticated,wrap(async(req,res)=>{
+    pruneJobs();
+    const link=String(req.body?.link||'');zzProject(link);
+    if(!stored(req.zzUser.token))throw fail('Connect ZZTakeoff first, then click Fetch from ZZTakeoff.',409);
+    for(const [id,job] of jobs)if(job.session===req.zzUser.token&&job.state==='pending'){
+      if(job.link!==link)throw fail('A ZZTakeoff fetch is already in progress. Wait for it to finish before fetching another project.',409);
+      return res.status(202).json({id,state:job.state,stage:job.stage});
+    }
+    if(jobs.size>=200)throw fail('Too many ZZTakeoff fetches are pending. Try again shortly.',429);
+    const id=randomBytes(24).toString('hex'),job={session:req.zzUser.token,link,state:'pending',stage:'connecting to ZZTakeoff',expires:Date.now()+10*60000};
+    jobs.set(id,job);
+    res.status(202).json({id,state:job.state,stage:job.stage});
+    fetchScope(job.session,link,stage=>{job.stage=stage;}).then(result=>{job.result=result;job.state='complete';},error=>{job.error=error.message;job.state='failed';});
   }));
+  app.get('/api/zztakeoff/scope/jobs/:id',authenticated,(req,res)=>{
+    pruneJobs();const job=jobs.get(req.params.id);
+    if(!job||job.session!==req.zzUser.token)return res.status(404).json({error:'This fetch expired or the estimating server restarted. Fetch again; your saved scope is unchanged.'});
+    res.json({state:job.state,stage:job.stage,...(job.state==='complete'?{result:job.result}:job.state==='failed'?{error:job.error}:{})});
+  });
 }

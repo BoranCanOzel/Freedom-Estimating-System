@@ -72,9 +72,20 @@ export function setupScope(api, context, bridge) {
     const target=key(),link=$('source').value.trim();
     bridge.setScopeLink(link);
     if(!link){$('message').textContent='Add the ZZTakeoff project link first.';$('source').focus();return;}
-    busy=true;$('message').textContent='Reading scope items from ZZTakeoff...';render();
+    busy=true;$('message').textContent='Connecting to ZZTakeoff. Keep the linked project open there and respond to any connection or read-access prompt.';render();
     try{
-      const response=await api('/zztakeoff/scope',{method:'POST',body:JSON.stringify({link})});
+      const job=await api('/zztakeoff/scope/jobs',{method:'POST',body:JSON.stringify({link})});
+      let response;
+      const started=Date.now();
+      while(true){
+        if(target!==key())return;
+        const progress=await api('/zztakeoff/scope/jobs/'+encodeURIComponent(job.id));
+        if(progress.state==='failed')throw Error(progress.error);
+        if(progress.state==='complete'){response=progress.result;break;}
+        $('message').textContent='Fetching: '+(progress.stage||'waiting for ZZTakeoff')+'. Keep the linked project open in ZZTakeoff and respond to any connection or read-access prompt.';
+        if(Date.now()-started>8*60000)throw Error('ZZTakeoff has not finished responding. Check its open project tab, then fetch again. Your saved scope is unchanged.');
+        await new Promise(resolve=>setTimeout(resolve,1500));
+      }
       if(target!==key())return;
       const merged=mergeScope(bridge.getScope().data,response);
       bridge.setScopeData(merged);

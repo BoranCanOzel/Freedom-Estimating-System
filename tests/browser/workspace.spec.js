@@ -1321,16 +1321,18 @@ test('project presence, tab highlights, collapse and recent views work for two u
 
 test('Scope fetch keeps per-takeoff review marks and never replaces estimate pages',async({page})=>{
   const data=workbook();data.lists[0].companies[0].projects[0].zztakeoffLink='https://www.zztakeoff.com/app/takeoff?projectId=north';
-  let revision=0,failed=false;
+  let revision=0,failed=false,polls=0;
   await page.route('**/api/zztakeoff/status',route=>route.fulfill({json:{connected:true}}));
-  await page.route('**/api/zztakeoff/scope',route=>{
-    if(failed)return route.fulfill({status:502,json:{error:'ZZTakeoff could not be reached. Your saved scope is unchanged.'}});
-    return route.fulfill({json:{source:'north',fetchedAt:'2026-09-30T12:00:00Z',items:[
+  await page.route('**/api/zztakeoff/scope/jobs',route=>{polls=0;return route.fulfill({status:202,json:{id:'test-job',state:'pending'}});});
+  await page.route('**/api/zztakeoff/scope/jobs/test-job',route=>{
+    if(polls++===0)return route.fulfill({json:{state:'pending',stage:'reading scope items'}});
+    if(failed)return route.fulfill({json:{state:'failed',error:'ZZTakeoff timed out while reading scope items. Your saved scope is unchanged.'}});
+    return route.fulfill({json:{state:'complete',result:{source:'north',fetchedAt:'2026-09-30T12:00:00Z',items:[
       {id:'a',name:revision?'Concrete slab revised':'Concrete slab',measurements:revision?'area: 180 SF':'area: 160 SF',group:'Level 1'},
       {id:'b',name:'Sawcut perimeter',measurements:'length: 80 LF',group:'Level 1'},
       {id:'c',name:'Extra slab',measurements:'area: 160 SF',group:'Alternate'},
       ...(revision?[]:[{id:'d',name:'Reference note',group:'Notes'}])
-    ]}});
+    ]}}});
   });
   await openWorkbook(page,data);
   const original=await page.evaluate(()=>JSON.stringify(window.estimator.getShared().lists[0].companies[0].projects.find(p=>p.id==='north').takeoffs[0].sheets));
@@ -1338,6 +1340,8 @@ test('Scope fetch keeps per-takeoff review marks and never replaces estimate pag
   await expect(page.locator('#scopeCard')).toBeVisible();
   await expect(page.locator('#scope-source')).toHaveValue(data.lists[0].companies[0].projects[0].zztakeoffLink);
   await page.locator('#scope-fetch').click();
+  await expect(page.locator('#scope-message')).toContainText('reading scope items');
+  await expect(page.locator('#scope-fetch')).toBeDisabled();
   await expect(page.locator('[data-scope-item]')).toHaveCount(4);
   await page.getByRole('button',{name:'Exclude Concrete slab',exact:true}).click();
   await page.getByRole('button',{name:'Ignore Reference note',exact:true}).click();
@@ -1356,7 +1360,7 @@ test('Scope fetch keeps per-takeoff review marks and never replaces estimate pag
   await page.getByRole('button',{name:'Exclude Concrete slab revised',exact:true}).click();
   await expect(page.locator('[data-scope-item="a"]')).toHaveAttribute('data-status','included');
   failed=true;await page.locator('#scope-fetch').click();
-  await expect(page.locator('#scope-message')).toContainText('could not be reached');
+  await expect(page.locator('#scope-message')).toContainText('timed out while reading scope items');
   await expect(page.locator('[data-scope-item]')).toHaveCount(4);
   await expect(page.locator('#server-status')).toHaveText('All changes saved');
   await page.reload();
@@ -1986,15 +1990,21 @@ test('service costs edit inline and preserve add-ons after reload',async({page})
 test('summary cost breakdown reconciles categories, fees and pie',async({page})=>{
   const data=workbook();
   const sh=data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0];
-  sh.rows[0].cost=100;sh.rows[0].markup=10;
+  sh.rows[0].cost=100;sh.rows[0].markup=10;sh.rows[0].flatAdd=20;sh.flatAddEnabled=true;
   sh.rows.push({id:'mat',kind:'material',name:'Concrete',count:2,time:1,days:1,cost:50,markup:0});
   await openWorkbook(page,data);
   await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'tn',sheet:'sn',view:'summary'}));
   const breakdown=page.locator('#sumCostBreakdown');
   await expect(breakdown).toContainText('Labor');await expect(breakdown).toContainText('Materials');
-  await expect(breakdown).toContainText('$216.30');
-  await expect(breakdown.locator('.cost-category').filter({hasText:'Fees'})).toContainText('$6.30');
-  await expect(breakdown.locator('svg path')).toHaveCount(4);
+  await expect(breakdown).toContainText('$236.90');
+  await expect(breakdown.locator('.cost-category').filter({hasText:'Fees'})).toContainText('$6.90');
+  const markup=breakdown.locator('.cost-category').filter({hasText:'Markup'});
+  const flat=breakdown.locator('.cost-category').filter({hasText:'Flat adds'});
+  await expect(markup).toContainText('$10.00');
+  await expect(flat).toContainText('$20.00');
+  expect(await flat.locator('i').evaluate(el=>getComputedStyle(el).backgroundColor)).not.toBe(await markup.locator('i').evaluate(el=>getComputedStyle(el).backgroundColor));
+  await expect(breakdown.locator('svg path')).toHaveCount(5);
+  await expect(breakdown.locator('svg path').filter({hasText:'Flat adds: $20.00'})).toHaveAttribute('fill','#dc2626');
 });
 
 test('refresh displays cached estimate before live sync and preserves early edits',async({page})=>{
