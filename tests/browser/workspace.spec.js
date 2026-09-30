@@ -230,6 +230,42 @@ test('section deletion offers keeping items or deleting the complete nested sect
   expect(await ids()).toEqual(['before','after']);
 });
 
+test('company names reject duplicates across lists while allowing edits and distinct names', async ({page}) => {
+  const data=workbook();
+  data.lists.push({id:'archive',name:'Archive',companies:[{id:'archived-company',name:'Other Customer',projects:[]}]});
+  await openWorkbook(page,data);await page.locator('#server-projects').click();
+  const companies=()=>page.evaluate(()=>window.estimator.getShared().lists.flatMap(list=>list.companies));
+  await page.locator('#addCompany').click();
+  const name=page.locator('#editor').getByLabel('Company name',{exact:true});
+  const error=page.locator('#company-name-error');
+  await page.locator('#editor').getByLabel('Phone',{exact:true}).fill('555-0123');
+  for(const value of ['Freedom Customer','  freedom   CUSTOMER  ','OTHER customer']){
+    await name.fill(value);await page.locator('#edSave').click();
+    await expect(error).toContainText('already exists');
+    await expect(name).toHaveAttribute('aria-invalid','true');
+    await expect(name).toBeFocused();
+    await expect(page.locator('#editor').getByLabel('Phone',{exact:true})).toHaveValue('555-0123');
+    expect((await companies()).length).toBe(2);
+  }
+  await expect(error).toContainText('Archive');
+  await name.fill('New customer');await expect(error).toBeHidden();
+  await page.locator('#edSave').click();await expect(page.locator('#editor')).toBeHidden();
+  const added=(await companies()).find(company=>company.name==='New customer');
+  expect(added.phone).toBe('555-0123');
+  await page.locator(`[data-company="${added.id}"]`).getByTitle('Edit this company',{exact:true}).click();
+  await name.fill('freedom customer');await page.locator('#edSave').click();
+  await expect(error).toContainText('already exists');
+  await name.fill('New customer');await page.locator('#edSave').click();
+  await expect(page.locator('#editor')).toBeHidden();
+  await page.locator('[data-company="co"]').getByTitle('Edit this company',{exact:true}).click();
+  await page.locator('#editor').getByLabel('Phone',{exact:true}).fill('555-0199');
+  await page.locator('#edSave').click();await expect(page.locator('#editor')).toBeHidden();
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  const saved=await companies();expect(saved.length).toBe(3);
+  expect(saved.find(company=>company.id==='co').phone).toBe('555-0199');
+});
+
 test('company deletion confirms, switches active takeoffs, and preserves an empty list', async ({page}) => {
   const data=workbook();
   data.lists[0].companies.push({id:'remaining',name:'Remaining customer',projects:[{id:'remaining-project',name:'Other job',takeoffs:[{id:'remaining-takeoff',name:'Other takeoff',sheets:[sheet('remaining-sheet','Remaining scope')]}]}]});
@@ -1004,7 +1040,8 @@ test('summary shows customer, job address maps and the active takeoff', async ({
   }
   await page.locator('#rail .tab-summary').click();
   const details=page.locator('#sumBlocks');
-  const headerMap=page.locator('#summaryMap');
+  const headerMap=pageMap;
+  await expect(page.locator('#summaryMap, #summaryMapHint, .summary-map-actions')).toHaveCount(0);
   await expect(page.locator('#summaryProjectName')).toHaveText('North job');
   const context=page.locator('#summaryContext');
   await expect(context).toBeVisible();
@@ -1012,7 +1049,7 @@ test('summary shows customer, job address maps and the active takeoff', async ({
   await expect(headerMap).toBeVisible();
   await expect(headerMap).toHaveAttribute('href','https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(company.projects[0].address));
   await expect(headerMap).toHaveAttribute('target','_blank');
-  await expect(page.locator('#summaryMapHint')).toBeHidden();
+  await expect(page.locator('#summaryMapHint')).toHaveCount(0);
   await expect(details.locator('.customer')).toContainText('Freedom Customer');
   await expect(details.locator('.customer')).toContainText('555-0100');
   await expect(details.locator('.customer')).toContainText('office@example.com');
@@ -1048,7 +1085,7 @@ test('summary shows customer, job address maps and the active takeoff', async ({
   await expect(page.locator('#workspace-map')).toHaveAttribute('aria-disabled','true');
   await expect(page.locator('#workspace-map')).not.toHaveAttribute('href',/.+/);
   await expect(headerMap).not.toHaveAttribute('href',/.+/);
-  await expect(page.locator('#summaryMapHint')).toBeVisible();
+  await expect(page.locator('#summaryMapHint')).toHaveCount(0);
   await expect(context).not.toContainText('12 Office Road');
   await expect(details.locator('.customer')).toContainText('Freedom Customer');
 });

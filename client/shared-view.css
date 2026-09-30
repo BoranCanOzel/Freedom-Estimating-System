@@ -26,7 +26,7 @@ body.shared-view{padding:16px;background:var(--paper);--share-accent:#6e94ad;}
 #shared-people button{padding:5px 9px;border:1px solid var(--rule);border-radius:4px;background:var(--calc);color:var(--ink);cursor:pointer}
 .shared-view #projects,.shared-view #library,.shared-view .proj-tab,.shared-view .lib-tab,.shared-view .rail,.shared-view .lib{display:none!important}
 .shared-loading>.sheet{visibility:hidden}
-.shared-view #sheetCard>.bar,.shared-view #summaryCard>.bar,.shared-view .summary-map-actions,.shared-view #status{display:none!important}
+.shared-view #sheetCard>.bar,.shared-view #summaryCard>.bar,.shared-view #status{display:none!important}
 .shared-view #summaryCard .sum-block:has(.lib-hint){display:none}
 .shared-view #summaryCard .sum-block.tk{display:none}
 .shared-view #summaryCard .sum-blocks:not(:has(.sum-block:not(.tk) .ro-line)){display:none}

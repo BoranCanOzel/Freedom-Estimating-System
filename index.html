@@ -1525,10 +1525,6 @@
   .summary-map-link{display:inline-flex;align-items:center;min-height:32px;margin:4px 0 8px;padding:6px 10px;border:1px solid var(--rule);border-radius:5px;background:var(--card);color:var(--ink);font:500 12px var(--f-sans);text-decoration:none}
   .summary-map-link:hover{border-color:var(--amber);background:var(--calc)}
   .summary-map-link:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
-  .summary-map-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
-  .summary-map-actions .summary-map-link{margin:0}
-  .summary-map-actions [aria-disabled="true"]{opacity:.55;cursor:default}
-  .summary-map-hint{font:12px var(--f-sans);color:var(--muted)}
   #summaryProjectName{overflow-wrap:anywhere}
   .summary-context{display:flex;flex-wrap:wrap;gap:8px 24px;margin:10px 0 0;font:13px var(--f-sans)}
   .summary-context>div{min-width:0;max-width:100%}
@@ -2939,10 +2935,6 @@
       <div class="eyebrow-row"><span class="eyebrow">Summary</span></div>
       <div class="sum-title" id="summaryProjectName">All options on this job</div>
       <dl id="summaryContext" class="summary-context" aria-label="Current project details"></dl>
-      <div class="summary-map-actions">
-        <a id="summaryMap" class="summary-map-link" target="_blank" rel="noopener noreferrer" aria-disabled="true">Map</a>
-        <span id="summaryMapHint" class="summary-map-hint">Add a job or customer address to open the map.</span>
-      </div>
     </div>
     <div class="scroll">
       <div class="sum-blocks" id="sumBlocks"></div>
@@ -6035,8 +6027,6 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     const wrap = document.getElementById('sumBlocks');
     wrap.innerHTML = '';
     const hit = findTakeoff(book.activeTakeoff);
-    const map = document.getElementById('summaryMap');
-    const mapHint = document.getElementById('summaryMapHint');
     const address = hit && (String(hit.pr.address || '').trim() || String(hit.co.address || '').trim());
     document.getElementById('summaryProjectName').textContent = String(hit?.pr.name || '').trim() || 'All options on this job';
     const context = document.getElementById('summaryContext');
@@ -6051,18 +6041,6 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         field.append(term, detail); context.appendChild(field);
       }
     }
-    if (address){
-      map.href = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(address);
-      map.removeAttribute('aria-disabled');
-      map.setAttribute('aria-label', 'Open ' + address + ' in Google Maps');
-      map.title = address;
-    } else {
-      map.removeAttribute('href');
-      map.setAttribute('aria-disabled', 'true');
-      map.setAttribute('aria-label', 'Map unavailable: add a job or customer address');
-      map.title = 'Add a job or customer address to open the map.';
-    }
-    mapHint.hidden = !!address;
     if (!hit) return;
     const co = hit.co, pr = hit.pr, tk = hit.tk;
 
@@ -9712,7 +9690,22 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     card.appendChild(blockHead(d, 'Company', 'coLocked', 'coOpen'));
     if (d.coOpen !== false){
       CO_FIELDS.forEach(([k, lab]) => {
-        card.appendChild(edField(lab, d[k], v => { d[k] = v; }));
+        const field = edField(lab, d[k], v => {
+          d[k] = v;
+          if (k === 'name'){
+            document.getElementById('company-name')?.removeAttribute('aria-invalid');
+            const error = document.getElementById('company-name-error');
+            if (error){ error.hidden = true; error.textContent = ''; }
+          }
+        });
+        card.appendChild(field);
+        if (k === 'name'){
+          const input = field.querySelector('input');
+          input.id = 'company-name'; input.setAttribute('aria-describedby', 'company-name-error');
+          const error = document.createElement('p');
+          error.id = 'company-name-error'; error.setAttribute('role', 'alert'); error.hidden = true;
+          card.appendChild(error);
+        }
         if (k === 'address') card.appendChild(mapsBtn(() => d.address));
       });
     }
@@ -10023,6 +10016,22 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       return;
     }
     if (edMode === 'company'){
+      const nameKey = name => String(name || '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase();
+      const key = nameKey(coDraft.name);
+      const duplicate = key && (book.lists || []).flatMap(list =>
+        (list.companies || []).map(company => ({company, list})))
+        .find(({company}) => company.id !== coDraft.id && nameKey(company.name) === key);
+      if (duplicate){
+        coDraft.coOpen = true; renderEditor();
+        const error = document.getElementById('company-name-error');
+        error.textContent = 'Company "' + duplicate.company.name + '" already exists' +
+          (duplicate.list.name ? ' in "' + duplicate.list.name + '"' : ' in this workbook') +
+          '. Use the existing company or choose a different name.';
+        error.hidden = false;
+        const input = document.getElementById('company-name');
+        input.setAttribute('aria-invalid', 'true'); input.focus();
+        return;
+      }
       const rec = Object.assign({}, coDraft, {id: coDraft.id || id()});
       rec.projects = rec.projects || [];
       const i = projectTree().findIndex(c => c.id === rec.id);
