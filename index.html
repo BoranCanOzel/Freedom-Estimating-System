@@ -3160,7 +3160,7 @@
     title: '',
     fees:[{id:id(), label:'Fee', pct:3}],
     units:[{id:id(), label:'SF', qty:''}],
-    widths:{}, hiddenCols:[],
+    widths:{}, hiddenCols:['round'],
     rows: [
       {id:id(), kind:'labor', name:'', count:1, time:1, days:1, cost:'', markup:0}
     ]
@@ -3519,7 +3519,7 @@
     name.value = row.name || '';
     name.placeholder = 'Name this section';
     name.setAttribute('aria-label','Section name');
-    name.addEventListener('input', () => { row.name = name.value; save(); });
+    name.addEventListener('input', () => { row.name = name.value; applyCollapse(); save(); });
     const secAdd = document.createElement('button');
     secAdd.type = 'button';
     secAdd.className = 'sec-add';
@@ -3554,8 +3554,11 @@
     const levelBadge = document.createElement('span');
     levelBadge.className = 'subsection-badge';
     levelBadge.hidden = true;
+    const titleGroup = document.createElement('div');
+    titleGroup.className = 'section-title-group';
+    titleGroup.append(levelBadge, name);
     wrap.append(secDup, makeGrip(tr, row, 'Drag to move this whole section, or drop on another option tab'),
-                caret, levelBadge, name, secAdd, subAdd, noteBtn);
+                caret, titleGroup, secAdd, subAdd, noteBtn);
     const stackCell = document.createElement('div');
     stackCell.className = 'item-wrap';
     stackCell.appendChild(wrap);
@@ -3912,6 +3915,7 @@
 
   function applyCollapse(){
     const stack = [];
+    const numbering = [];
     Array.from(body.children).forEach(tr => {
       if (tr.classList.contains('drag-source')) return;
       const row = rowById(tr.dataset.id);
@@ -3923,15 +3927,21 @@
       tr.classList.toggle('row-hidden', stack.some(r => r.collapsed));
       if (ending){
         const label = tr.querySelector('.sec-label');
-        if (label) label.textContent = depth > 0 ? 'Subsection subtotal' : 'Section subtotal';
+        if (label){
+          const name = stack.at(-1)?.name || (depth > 0 ? 'Subsection' : 'Section');
+          label.textContent = name + ' · Subtotal';
+          label.title = label.textContent;
+        }
         stack.pop(); return;
       }
       if (tr.dataset.type !== 'section') return;
+      numbering[depth] = (numbering[depth] || 0) + 1;
+      numbering.length = depth + 1;
       const levelBadge = tr.querySelector('.subsection-badge');
       if (levelBadge){
         levelBadge.hidden = depth === 0;
-        levelBadge.textContent = depth > 1 ? 'Subsection · ' + depth : 'Subsection';
-        levelBadge.title = 'Nested section, level ' + depth;
+        levelBadge.textContent = 'Subsection ' + numbering.join('.');
+        levelBadge.title = 'Inside ' + (stack.at(-1)?.name || 'section');
       }
       const on = !!row.collapsed;
       tr.classList.toggle('collapsed', on);
@@ -4512,7 +4522,10 @@
   }
 
   const HIDEABLE = {time:'Time', days:'Days', round:'Round'};
-  function colHidden(k, sh){ return ((sh || state).hiddenCols || []).includes(k); }
+  function colHidden(k, sh){
+    const sheet = sh || state;
+    return (k === 'round' && sheet.roundColumnVisible !== true) || (sheet.hiddenCols || []).includes(k);
+  }
   function leadKeys(){ return ['count','time','days','cost'].filter(k => !colHidden(k)).concat(state.flatAddEnabled ? ['flatAdd'] : []); }
 
   // a hidden multiplier drops out of the math entirely rather than zeroing it
@@ -4538,7 +4551,8 @@
       b.textContent = '+ ' + HIDEABLE[k];
       b.title = 'Show the ' + HIDEABLE[k] + ' column again';
       b.addEventListener('click', () => {
-        state.hiddenCols = state.hiddenCols.filter(x => x !== k);
+        state.hiddenCols = (state.hiddenCols || []).filter(x => x !== k);
+        if (k === 'round') state.roundColumnVisible = true;
         renderAll();
         save();
       });
@@ -4551,6 +4565,7 @@
       e.stopPropagation();
       const k = btn.dataset.hide;
       if (colHidden(k)) return;
+      if (k === 'round') state.roundColumnVisible = false;
       state.hiddenCols = (state.hiddenCols || []).concat([k]);
       renderAll();
       save();
@@ -5931,7 +5946,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       }
     }
     table.style.width = sum + 'px';
-    const notes = document.querySelector('.sum-notes');
+    const notes = document.querySelector('#summaryCard .sum-notes');
     if (notes) notes.style.width = sum + 'px';
   }
 
@@ -11858,7 +11873,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   const personalRoot = new Set(['view','active','activeTakeoff','activeList','activeLib',
     'theme','dark','zoom','libW','projW','edW','sumWidths','sumOpen','sumDetail',
     'statusHidden','fieldPicks','picsOn','gameCard','stOpen']);
-  const personalNested = new Set(['active','collapsed','shut','noteOpen','widths','hiddenCols','loadShut']);
+  const personalNested = new Set(['active','collapsed','shut','noteOpen','widths','hiddenCols','roundColumnVisible','loadShut']);
   const aliases = new Set(['sheets','companies','templates','folders','_app','_v']);
   let personal = new Map();
   function separate(value, path = [], capture = true){

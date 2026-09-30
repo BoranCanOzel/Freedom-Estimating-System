@@ -101,9 +101,6 @@ body.server-mode #sheetTable .h-adds .btn:hover{background:#ffb347;color:#241b10
 body.server-mode #sheetTable .sec-add{opacity:1;min-height:44px;min-width:88px;padding:10px 14px;font-size:13px;white-space:nowrap;border-radius:5px}
 body{--subsection-accent:#277c91}
 body.dark{--subsection-accent:#71c2d3}
-body #sheetTable tbody tr.section-head.tree-child:not(.dragging):not(.drop-preview) td{background:color-mix(in srgb,var(--subsection-accent) 12%,var(--card))!important;border-top:1px dashed var(--subsection-accent);border-bottom:1px solid var(--rule);box-shadow:none}
-body.medieval #sheetTable tbody tr.section-head.tree-child:not(.dragging):not(.drop-preview) td{background:#293e46!important}
-body.medieval .subsection-badge{background:#1d3038;color:#b3e4ed}
 body #sheetTable tbody tr.section-head.tree-child td.c-item,body #sheetTable tbody tr.section-foot.tree-child td.c-item{border-left:3px solid transparent}
 body #sheetTable tbody tr.section-head.tree-child td.c-item::after,body #sheetTable tbody tr.section-foot.tree-child td.c-item::after{content:"";position:absolute;left:-3px;top:0;bottom:8px;width:3px;background:var(--subsection-accent);pointer-events:none}
 body #sheetTable tr.section-head.tree-child .name-in{font-family:var(--f-sans);font-size:12.5px;font-weight:600;letter-spacing:normal;text-transform:none;color:var(--ink);text-shadow:none}
@@ -209,3 +206,48 @@ body.server-mode.medieval #sheetTable .h-adds .btn:hover{
 .cost-category span{font-size:12px;white-space:nowrap}.cost-category strong{font-size:16px;font-variant-numeric:tabular-nums}.cost-category small{color:var(--muted)}
 .cost-category i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
 .cost-pie{display:block;width:220px;max-width:100%;height:auto;margin:18px auto 0}
+
+/* Summary uses one gutter; nested blocks must not add another left inset. */
+body.server-mode #summaryCard{--summary-gutter:24px;--summary-frame:0px}
+body.server-mode.medieval #summaryCard{--summary-frame:12px}
+body.server-mode #summaryCard>.head{padding:20px var(--summary-gutter)}
+body.server-mode #summaryCard>.scroll{padding:20px calc(var(--summary-gutter) - var(--summary-frame)) 24px}
+body.server-mode #summaryCard .summary-context{gap:12px 28px;margin-top:14px}
+body.server-mode #summaryCard .summary-map-actions{margin-top:14px}
+body.server-mode #summaryCard .sum-blocks{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));align-items:stretch;gap:16px;padding:0;margin:0 0 20px}
+body.server-mode #summaryCard .sum-block{min-width:0;padding:16px;border-radius:8px}
+body.server-mode #summaryCard .sum-block-title{padding:0;margin:0 0 12px;font-size:13px}
+body.server-mode #summaryCard .sum-block-body{padding:0}
+body.server-mode #summaryCard .sum-block .ro-line{padding-left:0;padding-right:0}
+body.server-mode #summaryCard .sum-table{margin-top:0}
+body.server-mode #summaryCard .sum-notes{box-sizing:border-box;width:100%!important;padding:20px 0 0;margin:20px 0 0;background:transparent;border-top:1px solid var(--rule-hair)}
+body.server-mode #summaryCard .sum-notes .eyebrow{display:block;margin:0 0 10px}
+body.server-mode #summaryCard .sum-notes textarea{display:block;width:100%;margin:0;padding:12px 14px;border-radius:6px;min-height:88px}
+body.server-mode #summaryCard #sumCostBreakdown{padding:20px 0 0;margin-top:24px}
+body.server-mode #summaryCard #sumCostBreakdown h3{font-size:15px;margin-bottom:8px}
+body.server-mode #summaryCard #sumCostBreakdown p{line-height:1.5;margin-bottom:16px}
+body.server-mode #summaryCard>.bar{padding:12px var(--summary-gutter);gap:10px}
+@media(max-width:700px){body.server-mode #summaryCard{--summary-gutter:16px}body.server-mode #summaryCard>.head{padding-top:16px;padding-bottom:16px}body.server-mode #summaryCard .sum-blocks{gap:12px}}
+body.server-mode #summaryCard .eyebrow-row{gap:10px;flex-wrap:wrap;margin-bottom:12px}
+body.server-mode #summaryCard .eyebrow-row>.eyebrow{margin-right:auto}
+body.server-mode #summaryCard .eyebrow-row>.btn.ghost,body.server-mode #summaryCard .eyebrow-row>#workspace-map{margin-left:0}
+
+/* Subsections: quiet hierarchy, readable titles and a clear end to each group. */
+body #sheetTable .section-title-group{display:flex;flex-direction:column;justify-content:center;gap:3px;min-width:0;flex:1}
+body #sheetTable .section-title-group .name-in{width:100%;min-width:0;flex:none}
+body #sheetTable tr.section-head .item-cell{gap:6px;padding-top:8px;padding-bottom:8px}
+body #sheetTable tr.section-head.tree-child:not(.dragging):not(.drop-preview) td{background:color-mix(in srgb,var(--subsection-accent) 6%,var(--card))!important;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule-hair);box-shadow:none}
+body.medieval #sheetTable tbody tr.section-head.tree-child:not(.dragging):not(.drop-preview) td{background:#28343b!important}
+body #sheetTable tr.section-head.tree-child .subsection-badge{align-self:flex-start;padding:0;border:0;border-radius:0;background:transparent;color:var(--muted);font:500 10px var(--f-sans);letter-spacing:.02em}
+body #sheetTable tr.section-head.tree-child .name-in{font-size:13px;font-weight:600;line-height:1.4;padding-top:0;padding-bottom:0}
+body #sheetTable tr.section-head.tree-child .caret{color:var(--muted);border-radius:4px}
+body #sheetTable tr.section-head.tree-child .caret:hover{color:var(--ink);background:var(--calc)}
+body #sheetTable tbody tr.section-head.tree-child td.c-item::after,body #sheetTable tbody tr.section-foot.tree-child td.c-item::after{width:2px;opacity:.55;bottom:8px}
+body #sheetTable tr.tree-child .c-item::before{border-color:color-mix(in srgb,var(--subsection-accent) 35%,var(--rule));width:8px}
+body #sheetTable tr.section-foot.tree-child:not(.dragging):not(.drop-preview) td{background:color-mix(in srgb,var(--subsection-accent) 4%,var(--card))!important;border-top:1px solid var(--rule-hair);border-bottom:1px solid var(--rule);box-shadow:none}
+body.medieval #sheetTable tr.section-foot.tree-child:not(.dragging):not(.drop-preview) td{background:#d8d3c5!important}
+body #sheetTable tr.section-foot .sec-label{padding:9px 12px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:500 11px var(--f-sans);letter-spacing:normal;text-transform:none;color:var(--muted)}
+body #sheetTable tr.section-foot.tree-child .money{font-size:12px;color:var(--ink);text-shadow:none}
+body #sheetTable tr.section-head:focus-within .sec-add{opacity:1}
+body #sheetTable tr.section-head.tree-child .sec-add{background:transparent;border-color:var(--rule);color:var(--muted);text-shadow:none;box-shadow:none}
+body #sheetTable tr.section-head.tree-child .sec-add:hover{color:var(--ink);border-color:var(--subsection-accent)}

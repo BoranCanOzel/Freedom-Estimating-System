@@ -15,6 +15,8 @@ test('guests view all pages, save edits, and see conflicts without a login',asyn
   await expect(page.locator('#shared-page')).toHaveValue('');
   await expect(page.locator('#shared-prev')).toBeDisabled();
   await page.locator('#shared-next').click();await expect(page.locator('#shared-page-position')).toHaveText('Page 1 of 2');
+  await expect(page.locator('#thRound')).toBeHidden();
+  await expect(page.locator('#tdRoundTotal')).toBeHidden();
   await page.locator('#shared-next').click();await expect(page.locator('#shared-page-position')).toHaveText('Page 2 of 2');
   await expect(page.locator('#shared-next')).toBeDisabled();
   await page.locator('#shared-prev').click();await page.locator('#shared-prev').click();
@@ -71,6 +73,7 @@ test('guests view all pages, save edits, and see conflicts without a login',asyn
   await expect(page.locator('#summaryCard')).toBeVisible();
   await page.locator('#shared-page').selectOption('a');
   await expect(page.locator('#sheetTable tbody td.c-item').first()).toHaveCSS('position','sticky');
+  await expect(page.locator('#thRound')).toBeHidden();
   await page.locator('#title').fill('Guest scope');await page.locator('#title').blur();await expect(page.locator('#shared-save')).toBeEnabled();await page.locator('#shared-save').click();await expect(page.locator('#shared-status')).toHaveText('Changes saved.');
   await page.reload();
   await expect(page.locator('#summaryCard')).toBeVisible();

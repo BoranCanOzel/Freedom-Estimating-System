@@ -1448,6 +1448,13 @@ test('summary and printing include rounding and summary details', async ({page})
   sh.rows.push({id:'end',type:'sectionEnd'});
   tk.sheets.push({...sheet('other','Other option'),hiddenCols:['round']});
   await openWorkbook(page,data);
+  await expect(page.locator('#thRound')).toBeHidden();
+  await expect(page.locator('#tSub .v')).toHaveText('125.00');
+  await page.locator('#workspace-estimate > summary').click();
+  await page.locator('#hiddenCols').getByRole('button',{name:'+ Round',exact:true}).click();
+  await page.locator('#workspace-estimate > summary').press('Escape');
+  await expect(page.locator('#thRound')).toBeVisible();
+  await expect(page.locator('#tSub .v')).toHaveText('125.00');
   await page.locator('#rail .tab-summary').click();
   const row=page.locator('#sumTable .s-row').first();
   await expect(row.locator('.s-grand > .money .v')).toHaveText('128.75');
@@ -1476,6 +1483,10 @@ test('summary and printing include rounding and summary details', async ({page})
   expect(all).toContain('<th>Round</th>');
   expect(all).toContain('Rounded total');
   expect(all).toContain('Site preparation');
+  await page.locator('#thRound [data-hide="round"]').click();
+  await expect(page.locator('#thRound')).toBeHidden();
+  await page.evaluate(()=>window.estimator.print(true));
+  expect(await page.evaluate(()=>window.printCapture)).not.toContain('<th>Round</th>');
   await page.locator('#rail .tab-summary').click();
   await page.locator('#rail .tab[data-sheet]').first().click();
   await page.locator('#workspace-estimate > summary').click();
