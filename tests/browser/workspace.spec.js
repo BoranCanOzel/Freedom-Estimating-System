@@ -110,6 +110,8 @@ test('takeoff AI access generates a scoped package, updates live, and offers und
   await page.locator('#ai-access-generate').click();
   await expect(page.locator('#ai-access-connection')).toHaveValue(/Authorization: Bearer/);
   const connection=await page.locator('#ai-access-connection').inputValue();
+  expect(connection).toContain('Expires: Never');
+  expect(connection).toContain('Unlimited saves.');
   // Restricted browsers may omit the Clipboard API entirely.
   await page.evaluate(()=>{
     Object.defineProperty(navigator,'clipboard',{configurable:true,value:undefined});
@@ -136,18 +138,20 @@ test('takeoff AI access generates a scoped package, updates live, and offers und
   await expect(page.locator('#body .name-in').first()).toHaveValue('AI updated cutting');
   await page.locator('#takeoff-ai-access').click();
   await expect(page.locator('#ai-access-connection')).toHaveValue('');
+  await expect(page.locator('#ai-access-grants')).toContainText('Active');
+  await expect(page.locator('#ai-access-grants')).toContainText('never expires');
   await page.locator('#ai-access-changes summary').click();
   await page.getByRole('button',{name:'Undo AI change',exact:true}).click();
   await expect(page.locator('#ai-access-message')).toHaveText('AI change undone.');
   await page.locator('#ai-access-close').click();
   await expect(page.locator('#body .name-in').first()).toHaveValue('Concrete cutting');
   await page.locator('#takeoff-ai-access').click();
-  await page.locator('#ai-access-generate').click();
-  await expect(page.locator('#ai-access-connection')).toHaveValue(/Authorization: Bearer/);
-  const secondKey=/Authorization: Bearer ([a-f0-9]+)/.exec(await page.locator('#ai-access-connection').inputValue())[1];
+  const reread=await (await page.request.get('/api/ai/v1/takeoff',{headers})).json();
+  reread.takeoff.sheets[0].rows[0].name='AI second save';
+  expect((await page.request.post('/api/ai/v1/save',{headers,data:{revision:reread.revision,takeoff:reread.takeoff,requestId:'browser-second'}})).ok()).toBe(true);
   await page.getByRole('button',{name:'Revoke',exact:true}).click();
   await expect(page.locator('#ai-access-grants')).toContainText('Revoked');
-  expect((await page.request.get('/api/ai/v1/takeoff',{headers:{Authorization:'Bearer '+secondKey}})).status()).toBe(403);
+  expect((await page.request.get('/api/ai/v1/takeoff',{headers})).status()).toBe(403);
 });
 
 test('Ctrl selection edits multiple fields and drags nonadjacent items together', async ({page}) => {
