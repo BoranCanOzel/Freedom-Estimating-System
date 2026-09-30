@@ -38,6 +38,7 @@ test('Save as PDF downloads every takeoff option with readable pagination and co
   const first=takeoff.sheets[0];first.note='Option-specific scope note';first.flatAddEnabled=true;first.roundTotal=100;
   first.fees=Array.from({length:8},(_,i)=>({id:'fee'+i,label:'Custom fee '+i,pct:1}));
   first.units=Array.from({length:9},(_,i)=>({id:'unit'+i,label:'Measured unit '+i,qty:i+1}));
+  first.units[0]={id:'unit0',label:'SF',qty:160};
   first.rows=[{id:'section',type:'section',name:'Site preparation',note:'Section scope included',collapsed:true},
     ...Array.from({length:65},(_,i)=>({id:'item'+i,kind:'labor',name:`Export item ${String(i).padStart(3,'0')}`,count:1,time:1,days:1,cost:125,markup:5,flatAdd:10,note:'Detail visible even when collapsed. José’s crew — 25 m².'})),
     {id:'section-end',type:'sectionEnd'},
@@ -56,31 +57,57 @@ test('Save as PDF downloads every takeoff option with readable pagination and co
   const loading=getDocument({data:new Uint8Array(await readFile(await download.path())),useSystemFonts:false});
   const pdf=await loading.promise;
   expect(pdf.numPages).toBeGreaterThan(3);
-  let all='',hasImage=false;
+  let all='',hasImage=false,sfColumnVerified=false;
   for(let i=1;i<=pdf.numPages;i++){
     const pageData=await pdf.getPage(i),content=await pageData.getTextContent();
     const operators=await pageData.getOperatorList();hasImage||=operators.fnArray.some(op=>op===OPS.paintImageXObject||op===OPS.paintInlineImageXObject);
     const text=content.items.map(item=>item.str||'').join(' ');all+=text+'\n';
+    if(i===1){
+      const firstRow=content.items.find(item=>item.str==='1. North scope');
+      const totalRow=content.items.find(item=>item.str==='Complete takeoff total');
+      const amountsAt=row=>content.items.filter(item=>item.str?.startsWith('$')&&Math.abs(item.transform[5]-row.transform[5])<1);
+      const rowAmounts=amountsAt(firstRow),totalAmounts=amountsAt(totalRow);
+      expect(totalAmounts).toHaveLength(3);
+      totalAmounts.forEach((amount,index)=>expect(amount.transform[4]+amount.width).toBeCloseTo(rowAmounts[index].transform[4]+rowAmounts[index].width,1));
+    }
+    const sfHeader=content.items.find(item=>item.str==='SF price');
+    if(sfHeader){
+      const headerEdge=sfHeader.transform[4]+sfHeader.width;
+      const price=content.items.find(item=>item.str==='$0.95'&&Math.abs(item.transform[4]+item.width-headerEdge)<1);
+      if(price)sfColumnVerified=true;
+    }
     expect(text).toContain(`Page ${i} of ${pdf.numPages}`);
     for(const item of content.items.filter(item=>item.str?.trim())){
       expect(item.transform[4]).toBeGreaterThanOrEqual(35);
-      expect(item.transform[4]+item.width).toBeLessThanOrEqual(757);
+      expect(item.transform[4]+item.width).toBeLessThanOrEqual(pageData.view[2]-35);
       expect(item.transform[5]).toBeGreaterThan(10);
       expect(item.transform[5]+item.height).toBeLessThan(603);
     }
   }
   for(let i=0;i<65;i++)expect(all.split(`Export item ${String(i).padStart(3,'0')}`)).toHaveLength(2);
-  for(const expected of ['Site preparation','Section scope included','Takeoff description','Scope exclusions and clarifications.','Second option','Included component','$110.00','$113.30','END OF LONG NOTE','Custom fee 7','Measured unit 8','José’s crew','25 m²','Rounded option total'])expect(all).toContain(expected);
+  for(const expected of ['Site preparation','Section scope included','Takeoff description','Scope exclusions and clarifications.','Second option','Included component','$110.00','$113.30','END OF LONG NOTE','Custom fee 7','Measured unit 8','José’s crew','25 m²','North scope total'])expect(all).toContain(expected);
   expect(all).not.toContain('South takeoff');
   expect(all).not.toContain('Item / section reference');
   expect(all).not.toContain('Scope notes and details');
   expect(all).not.toContain('Additional pricing');
   expect(all).not.toContain('matching item numbers');
+  expect(all).not.toContain('Rounded line');
+  expect(all).not.toContain('— subtotal');
+  expect(all).not.toContain('Option total');
+  expect(all).not.toContain('Option summary');
+  expect(all).not.toContain('Option / scope');
+  expect(all).not.toContain('All options combined');
+  expect(all).not.toMatch(/Option \d+ ·/);
+  expect(all.split('North scope total')).toHaveLength(2);
+  expect(all).toContain('SF price');
+  expect(all).toContain('Qty 160');
+  expect(all).not.toContain('SF price / Qty');
+  expect(sfColumnVerified).toBe(true);
   expect(all).not.toContain('— quantities');
   expect(all.indexOf('Section scope included')).toBeLessThan(all.indexOf('Export item 000'));
   expect(all.indexOf('Detail visible even when collapsed.')).toBeLessThan(all.indexOf('Export item 001'));
   expect(all.match(/Detail visible even when collapsed\./g)).toHaveLength(65);
-  expect(all).toContain('Site reference photo');expect(all).toContain('No line items in this option.');expect(hasImage).toBe(true);
+  expect(all).toContain('Site reference photo');expect(all).toContain('No line items in this scope.');expect(hasImage).toBe(true);
   await loading.destroy();
   await page.locator('#rail .tab-summary').click();
   await expect(page.locator('#takeoff-share + #takeoff-pdf')).toBeVisible();

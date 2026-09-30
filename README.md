@@ -140,9 +140,9 @@ Drag library sections onto the lower half of a section header to place them insi
 
 ## Takeoff PDF export
 
-**Save as PDF**, next to **Share**, downloads the current takeoff directly. The US Letter landscape report includes customer/project context, an option summary, every option's line items and section subtotals, fees, unit pricing, rounded amounts, saved notes, component breakdowns, and embedded pictures. Collapsed rows, hidden details, theme, and screen zoom do not omit report content. Save an open editor before exporting.
+**Save as PDF**, next to **Share**, downloads the current takeoff directly. The landscape report includes customer/project context, an option summary, every scope's line items and named total, fees, unit pricing, rounded amounts, saved notes, component breakdowns, and embedded pictures. Collapsed rows, hidden details, theme, and screen zoom do not omit report content. Save an open editor before exporting.
 
-Each option has one item list; pricing fields that do not fit across the page wrap directly beneath their item. Headers and page numbers repeat. Notes print directly beneath their items or section headers, once. Section quantities appear with their unit prices in the section subtotal rows. The browser generates selectable PDF text using bundled Noto Sans fonts (license: `client/fonts/OFL.txt`). The PDF engine loads on demand and no estimate data is sent to an external conversion service. Run `npm ci --include=dev` and `npm run build` when deploying; the build also produces `dist/pdf-renderer.js`.
+Each option has one item list with dedicated pricing columns, including unit prices and quantities. Standard estimates fit US Letter landscape; unusually wide tables use wider pages to keep the text readable. Per-line rounding is omitted. Headers and page numbers repeat. Notes print directly beneath their items or section headers, once. Section subtotal rows are omitted; each scope has one total labeled with its name. The browser generates selectable PDF text using bundled Noto Sans fonts (license: `client/fonts/OFL.txt`). The PDF engine loads on demand and no estimate data is sent to an external conversion service. Run `npm ci --include=dev` and `npm run build` when deploying; the build also produces `dist/pdf-renderer.js`.
 
 ## AI Information
 
