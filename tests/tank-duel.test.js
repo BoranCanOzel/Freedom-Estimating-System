@@ -166,7 +166,7 @@ test('shield blocks a lethal hit without a crater and leaves misses alone',()=>{
   assert.equal(fireShot(ground,0,aim.angle,aim.power,positions,[false,false]).hit,1);
 });
 
-test('online shields enforce turns, survive misses, block once and reset in a new game',t=>{
+for (const outcome of ['hit','miss']) test(`online shield expires after one opponent ${outcome} and cannot be reused`,t=>{
   let now=100000;t.mock.method(Date,'now',()=>now);
   const make=name=>({name,peerId:name,readyState:1,messages:[],send(raw){this.messages.push(JSON.parse(raw));}});
   const players=[make('Alice'),make('Bob')],clients=new Set(players),duels=createDuels();
@@ -175,31 +175,33 @@ test('online shields enforce turns, survive misses, block once and reset in a ne
     const id=players[0].messages.at(-1).id;
     duels.handle(players[1],{action:'accept',id},clients);return id;
   };
-  const id=begin(),initial=players[0].messages.at(-1),defender=initial.turn;
+  const id=begin(),initial=players[0].messages.at(-1),attacker=initial.turn,defender=1-attacker;
   const shield=(player,round)=>duels.handle(players[player],{action:'shield',id,round},clients);
   const count=players[0].messages.length;
-  shield(1-defender,0);shield(defender,99);
+  shield(attacker,0);shield(defender,99);
   assert.equal(players[0].messages.length,count);
   shield(defender,0);
   assert.deepEqual(players[0].messages.at(-1),players[1].messages.at(-1));
   assert.equal(players[0].messages.at(-1).shields[defender],true);
   const activated=players[0].messages.length;shield(defender,0);
   assert.equal(players[0].messages.length,activated);
-  duels.handle(players[defender],{action:'fire',id,round:0,angle:defender===0?5:175,power:10},clients);
+  let aim={angle:attacker===0?5:175,power:10};
+  if(outcome==='hit'){
+    aim=null;
+    for(let angle=5;angle<=175&&!aim;angle++)for(let power=10;power<=100&&!aim;power++)
+      if(fireShot(initial.ground,attacker,angle,power,initial.positions).hit===defender)aim={angle,power};
+    assert.ok(aim);
+  }
+  duels.handle(players[attacker],{action:'fire',id,round:0,...aim},clients);
   let state=players[0].messages.at(-1);
-  assert.equal(state.shields[defender],true);
-  const inFlight=players[0].messages.length;shield(1-defender,1);
+  assert.equal(state.shot.deflected,outcome==='hit'?defender:undefined);
+  assert.equal(state.finished,false);assert.deepEqual(state.shields,[false,false]);
+  assert.equal(state.shieldUsed[defender],true);
+  const inFlight=players[0].messages.length;shield(attacker,1);
   assert.equal(players[0].messages.length,inFlight);
   now+=2000;
-  let aim;
-  for(let angle=5;angle<=175&&!aim;angle++)for(let power=10;power<=100&&!aim;power++)
-    if(fireShot(state.ground,state.turn,angle,power,state.positions).hit===defender)aim={angle,power};
-  assert.ok(aim);
-  duels.handle(players[state.turn],{action:'fire',id,round:state.round,...aim},clients);
-  state=players[0].messages.at(-1);
-  assert.equal(state.shot.deflected,defender);assert.equal(state.finished,false);
-  assert.equal(state.shields[defender],false);assert.equal(state.shieldUsed[defender],true);
-  now+=2000;const spent=players[0].messages.length;shield(defender,state.round);
+  duels.handle(players[defender],{action:'fire',id,round:1,angle:defender===0?5:175,power:10},clients);
+  now+=2000;const spent=players[0].messages.length;shield(defender,2);
   assert.equal(players[0].messages.length,spent);
   duels.handle(players[defender],{action:'leave',id},clients);
   now+=10000;const next=begin();

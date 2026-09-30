@@ -40,8 +40,9 @@ export function createDuels() {
       publish(game); return;
     }
     if (msg.action === 'shield') {
-      if (game.phase !== 'playing' || game.players[game.turn] !== ws || msg.round !== game.round || Date.now() < (game.nextShot || 0) || game.shieldUsed[game.turn]) return;
-      game.shields[game.turn] = true; game.shieldUsed[game.turn] = true;
+      const defender = 1 - game.turn;
+      if (game.phase !== 'playing' || game.players[defender] !== ws || msg.round !== game.round || Date.now() < (game.nextShot || 0) || game.shieldUsed[defender]) return;
+      game.shields[defender] = true; game.shieldUsed[defender] = true;
       for (const player of game.players) send(player, {event:'shield',id:game.id,round:game.round,shields:game.shields,shieldUsed:game.shieldUsed});
       return;
     }
@@ -65,7 +66,7 @@ export function createDuels() {
     if (game.phase !== 'playing' || game.players[game.turn] !== ws || Date.now() < (game.nextShot || 0) || msg.round !== game.round) return error('Wait for your turn.');
     if (!Number.isFinite(msg.angle) || msg.angle < 5 || msg.angle > 175 || !Number.isFinite(msg.power) || msg.power < 10 || msg.power > 100) return error('Choose a valid angle and power.');
     const shot = fireShot(game.ground, game.turn, msg.angle, msg.power, game.positions, game.shields);
-    if (shot.deflected != null) game.shields[shot.deflected] = false;
+    game.shields = [false,false];
     game.angles[game.turn] = msg.angle;
     game.ground = shot.ground; game.round++; game.turn = 1 - game.turn; game.nextShot = Date.now() + 1700;
     game.fuel = MOVE_FUEL;

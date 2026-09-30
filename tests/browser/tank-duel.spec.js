@@ -49,9 +49,9 @@ test('online players accept a tank duel, trade shots and leave without changing 
     const first=await alice.locator('#duel-fire').isEnabled()?alice:bob,second=first===alice?bob:alice;
     await expect(second.locator('#duel-fire')).toBeDisabled();
     await expect(second.locator('#duel-right')).toBeDisabled();
-    await expect(second.locator('#duel-shield')).toBeDisabled();
-    await first.locator('#duel-shield').click();
-    await expect(first.locator('#duel-shield')).toHaveText('Shield active');
+    await expect(first.locator('#duel-shield')).toBeDisabled();
+    await second.locator('#duel-shield').click();
+    await expect(second.locator('#duel-shield')).toHaveText('Shield active');
     await expect(first.locator('#duel-shield')).toBeDisabled();
     await first.locator('#duel-right').click();
     for(const page of [first,second])await expect(page.locator('#duel-fuel')).toHaveText('Turn fuel: 54/60');
@@ -69,6 +69,8 @@ test('online players accept a tank duel, trade shots and leave without changing 
     await first.locator('#duel-fire').click();
     await expect(second.locator('#duel-fire')).toBeEnabled();
     await expect(second.locator('#duel-fuel')).toHaveText('Turn fuel: 60/60');
+    await expect(second.locator('#duel-shield')).toHaveText('Shield spent');
+    await expect(second.locator('#duel-shield')).toBeDisabled();
     await expect(first.locator('#duel-fire')).toBeDisabled();
     await second.locator('#duel-angle').fill(second===alice?'5':'175');await second.locator('#duel-power').fill('10');
     await second.locator('#duel-fire').click();await expect(first.locator('#duel-fire')).toBeEnabled();
@@ -100,7 +102,7 @@ test('single player controls both tanks and remembers each aim without changing 
   await expect(page.locator('#duel-side')).toHaveText('Single player: You control both tanks');
   await expect(page.locator('#duel-status')).toContainText('Teal tank');
   await page.locator('#duel-shield').click();
-  await expect(page.locator('#duel-shield')).toHaveText('Shield active');
+  await expect(page.locator('#duel-shield')).toHaveText('Amber tank: Shield active');
   await expect(page.locator('#duel-shield')).toBeDisabled();
   await page.locator('#duel-right').focus();await page.keyboard.press('d');
   await expect(page.locator('#duel-fuel')).toHaveText('Turn fuel: 54/60');
@@ -122,7 +124,7 @@ test('single player controls both tanks and remembers each aim without changing 
   await expect(page.locator('#duel-fire')).toBeDisabled();
   await expect(page.locator('#duel-fire')).toBeEnabled();
   await expect(page.locator('#duel-status')).toContainText('Amber tank');
-  await expect(page.locator('#duel-shield')).toHaveText('Shield (1 charge)');
+  await expect(page.locator('#duel-shield')).toContainText('Shield (1 charge)');
   await expect(page.locator('#duel-shield')).toBeEnabled();
   await expect(page.locator('#duel-angle')).toHaveValue('135');
   await expect(page.locator('#duel-power')).toHaveValue('65');
@@ -137,7 +139,7 @@ test('single player controls both tanks and remembers each aim without changing 
   await expect(page.locator('#duel-power')).toHaveValue('10');
   await page.context().setOffline(true);
   await page.locator('#duel-restart').click();
-  await expect(page.locator('#duel-shield')).toHaveText('Shield (1 charge)');
+  await expect(page.locator('#duel-shield')).toContainText('Shield (1 charge)');
   await expect(page.locator('#duel-shield')).toBeEnabled();
   await expect(page.locator('#duel-fire')).toBeEnabled();
   await expect(page.locator('#duel-angle')).toHaveValue('45');
@@ -145,23 +147,15 @@ test('single player controls both tanks and remembers each aim without changing 
   await expect(page.locator('#duel-fuel')).toHaveText('Turn fuel: 60/60');
   await page.locator('#duel-shield').click();
   await page.screenshot({path:'test-results/tank-shield.png'});
-  await page.evaluate(()=>{
-    window.shieldDeflected=false;
-    const status=document.querySelector('#duel-status');
-    const observer=new MutationObserver(()=>{
-      if(status.textContent.includes('deflected the hit')){window.shieldDeflected=true;observer.disconnect();}
-    });
-    observer.observe(status,{childList:true,characterData:true,subtree:true});
-  });
-  await page.locator('#duel-angle').fill('90');await page.locator('#duel-power').fill('10');
+  await page.locator('#duel-angle').fill('5');await page.locator('#duel-power').fill('10');
   await page.locator('#duel-fire').click();
-  await expect.poll(()=>page.evaluate(()=>window.shieldDeflected)).toBe(true);
+  await expect(page.locator('#duel-shield')).toBeDisabled();
   await expect(page.locator('#duel-fire')).toBeEnabled();
-  await expect(page.locator('#duel-result')).not.toBeVisible();
+  await expect(page.locator('#duel-shield')).toHaveText('Teal tank: Shield (1 charge)');
   await page.locator('#duel-angle').fill('175');await page.locator('#duel-power').fill('10');
   await page.locator('#duel-fire').click();
   await expect(page.locator('#duel-fire')).toBeEnabled();
-  await expect(page.locator('#duel-shield')).toHaveText('Shield spent');
+  await expect(page.locator('#duel-shield')).toHaveText('Amber tank: Shield spent');
   await expect(page.locator('#duel-shield')).toBeDisabled();
   await page.locator('#duel-close').click();
   await expect(page.locator('#tank-duel')).toBeHidden();
@@ -198,9 +192,18 @@ test('a killing shot shows each online player their result and Okay exits the ga
       if(fireShot(state.ground,winner,aim,power,state.positions).hit===loser)solution={angle:aim,power};
     }
     expect(solution).toBeTruthy();
+    await pages[loser].locator('#duel-shield').click();
+    await expect(pages[loser].locator('#duel-shield')).toHaveText('Shield active');
     await pages[winner].locator('#duel-angle').fill(String(solution.angle));
     await pages[winner].locator('#duel-power').fill(String(solution.power));
     await pages[winner].locator('#duel-fire').click();
+    await expect(pages[loser].locator('#duel-fire')).toBeEnabled();
+    await expect(pages[loser].locator('#duel-shield')).toHaveText('Shield spent');
+    for(const page of pages)await expect(page.locator('#duel-result')).not.toBeVisible();
+    // The shield saved the defender, but is gone on the next turn.
+    await pages[loser].locator('#duel-angle').fill('90');
+    await pages[loser].locator('#duel-power').fill('10');
+    await pages[loser].locator('#duel-fire').click();
     await expect(pages[winner].getByRole('dialog',{name:'You win!'})).toBeVisible();
     await expect(pages[loser].getByRole('dialog',{name:'You lose',exact:true})).toBeVisible();
     for(const page of pages){

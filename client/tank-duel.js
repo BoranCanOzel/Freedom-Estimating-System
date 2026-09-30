@@ -24,7 +24,7 @@ export function setupTankDuel(getConnection) {
   panel.innerHTML = `<header><strong>DESERT DUEL</strong><span id="duel-status" role="status"></span><button id="duel-restart" type="button" hidden>New game</button><button id="duel-sound" type="button" aria-pressed="true">Sound on</button><button id="duel-close" type="button">Close</button></header>
     <div id="duel-invite"><p id="duel-invite-text"></p><button id="duel-accept" type="button">Accept duel</button><button id="duel-decline" type="button">Decline</button></div>
     <div id="duel-game" hidden><canvas width="1000" height="280" aria-label="Random desert battlefield with two tanks"></canvas>
-    <div class="duel-controls"><span id="duel-side"></span><button id="duel-left" type="button" aria-label="Move tank left">← A</button><button id="duel-right" type="button" aria-label="Move tank right">D →</button><div class="duel-fuel-display"><output id="duel-fuel" aria-label="Movement fuel"></output><div id="duel-fuel-meter" role="meter" aria-label="Remaining movement fuel" aria-valuemin="0" aria-valuemax="60"><span id="duel-fuel-fill"></span></div></div><label>Angle <input id="duel-angle" type="range" min="5" max="175" value="45"><output id="duel-angle-value">45°</output></label><label>Power <input id="duel-power" type="range" min="10" max="100" value="65"><output id="duel-power-value">65</output></label><button id="duel-shield" type="button" title="Once per game: deflect the next hit. Activate before firing." aria-pressed="false">Shield (1 charge)</button><button id="duel-fire" type="button">Fire!</button><span>Move before firing · Fuel resets each turn · First unshielded hit wins · 90° points straight up</span></div></div>
+    <div class="duel-controls"><span id="duel-side"></span><button id="duel-left" type="button" aria-label="Move tank left">← A</button><button id="duel-right" type="button" aria-label="Move tank right">D →</button><div class="duel-fuel-display"><output id="duel-fuel" aria-label="Movement fuel"></output><div id="duel-fuel-meter" role="meter" aria-label="Remaining movement fuel" aria-valuemin="0" aria-valuemax="60"><span id="duel-fuel-fill"></span></div></div><label>Angle <input id="duel-angle" type="range" min="5" max="175" value="45"><output id="duel-angle-value">45°</output></label><label>Power <input id="duel-power" type="range" min="10" max="100" value="65"><output id="duel-power-value">65</output></label><button id="duel-shield" type="button" title="Once per game: activate during the opponent's turn, before they fire. Expires after their shot, hit or miss." aria-pressed="false">Shield (1 charge)</button><button id="duel-fire" type="button">Fire!</button><span>Move before firing · Fuel resets each turn · First unshielded hit wins · 90° points straight up</span></div></div>
     <dialog id="duel-result" aria-labelledby="duel-result-title" aria-describedby="duel-result-message"><h2 id="duel-result-title"></h2><p id="duel-result-message"></p><button id="duel-result-okay" type="button">Okay</button></dialog>`;
   document.body.append(panel);
   const $ = id => panel.querySelector('#duel-' + id);
@@ -46,8 +46,9 @@ export function setupTankDuel(getConnection) {
         const moved = moveTank(state.ground, state.positions, player, extra.direction, state.fuel);
         state.positions[player] = moved.x; state.fuel = moved.fuel; controls(); animateMovement();
       } else if (action === 'shield') {
-        if (state.shieldUsed[player]) return false;
-        state.shields[player] = true; state.shieldUsed[player] = true;
+        const defender = 1 - player;
+        if (state.shieldUsed[defender]) return false;
+        state.shields[defender] = true; state.shieldUsed[defender] = true;
         controls(); draw(); animateShields(); sound('shield');
       } else if (action === 'aim') state.angles[player] = extra.angle;
       else if (action === 'fire') {
@@ -55,8 +56,7 @@ export function setupTankDuel(getConnection) {
         state.angles[player] = extra.angle; powers[player] = extra.power;
         const turn = 1-player, round = state.round+1;
         const winner = shot.hit === null ? null : 1-shot.hit;
-        const shields = [...state.shields];
-        if (shot.deflected != null) shields[shot.deflected] = false;
+        const shields = [false,false];
         api.receive({...state, shields, event:'state', ground:shot.ground, turn, you:turn, round,
           fuel:MOVE_FUEL, winner, finished:winner !== null || round >= 60,
           shot:{path:shot.path, impact:shot.impact, deflected:shot.deflected}});
@@ -119,9 +119,10 @@ export function setupTankDuel(getConnection) {
     const mine = state && state.turn === state.you && !state.finished && !animating;
     for (const control of ['angle','power','fire']) $(control).disabled = !mine;
     for (const control of ['left','right']) $(control).disabled = !mine || !state.fuel;
-    const shieldActive = state?.shields?.[state.you], shieldUsed = state?.shieldUsed?.[state.you];
-    $('shield').disabled = !mine || shieldUsed;
-    $('shield').textContent = shieldActive ? 'Shield active' : shieldUsed ? 'Shield spent' : 'Shield (1 charge)';
+    const defender = solo && state ? 1 - state.turn : state?.you;
+    const shieldActive = state?.shields?.[defender], shieldUsed = state?.shieldUsed?.[defender];
+    $('shield').disabled = !state || state.finished || animating || state.turn === defender || shieldUsed;
+    $('shield').textContent = (solo && state ? state.names[defender] + ': ' : '') + (shieldActive ? 'Shield active' : shieldUsed ? 'Shield spent' : 'Shield (1 charge)');
     $('shield').setAttribute('aria-pressed', String(!!shieldActive));
     renderFuel();
     if (!mine || !state.fuel) stopMoving();
@@ -229,7 +230,8 @@ export function setupTankDuel(getConnection) {
   $('result').addEventListener('cancel',event=>{event.preventDefault();closeGame();});
   $('restart').onclick=()=>api.singlePlayer();
   $('shield').onclick=()=>{
-    if(state && !animating && !state.finished && state.turn===state.you && !state.shieldUsed?.[state.you])
+    const defender = solo && state ? 1 - state.turn : state?.you;
+    if(state && !animating && !state.finished && state.turn!==defender && !state.shieldUsed?.[defender])
       send('shield',{round:state.round});
   };
   $('fire').onclick=()=>{
