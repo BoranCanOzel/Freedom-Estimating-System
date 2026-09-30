@@ -1090,6 +1090,44 @@ test('summary shows customer, job address maps and the active takeoff', async ({
   await expect(details.locator('.customer')).toContainText('Freedom Customer');
 });
 
+test('collapse and expand all detail applies across every page of the current takeoff',async({page})=>{
+  const data=workbook(),takeoff=data.lists[0].companies[0].projects[0].takeoffs[0];
+  takeoff.sheets.push(sheet('second','Second scope'),{id:'blank',title:'Blank scope',rows:[],fees:[],units:[]});
+  takeoff.sheets[0].note='First scope detail';
+  takeoff.sheets[1].note='Second scope detail';
+  takeoff.sheets[1].rows.unshift({id:'detail-section',type:'section',name:'Section',note:'Section detail'});
+  takeoff.sheets[1].rows.push({id:'detail-end',type:'sectionEnd',sid:'detail-section'});
+  await openWorkbook(page,data);
+  const shared=await page.evaluate(()=>window.estimator.getShared().lists);
+  const visit=async(sheetId)=>{
+    await page.locator(`#rail .tab[data-sheet="${sheetId}"]`).click();
+  };
+  await page.locator('#workspace-toggle-notes').click();
+  for(const id of ['sn','second']){
+    await visit(id);
+    await expect(page.locator('#sheetCard .item-note:visible')).toHaveCount(0);
+    await expect(page.locator('#workspace-toggle-notes')).toHaveText('Expand all detail');
+  }
+  // A page with no detail can still expand the other pages.
+  await visit('blank');
+  await expect(page.locator('#workspace-toggle-notes')).toBeVisible();
+  await page.locator('#workspace-view > summary').click();
+  await expect(page.locator('#toggleNotes')).toHaveText('Expand all detail');
+  await page.locator('#toggleNotes').click();
+  await page.locator('#workspace-view > summary').press('Escape');
+  for(const [id,count] of [['sn',2],['second',3]]){
+    await visit(id);
+    await expect(page.locator('#sheetCard .item-note:visible')).toHaveCount(count);
+    await expect(page.locator('#workspace-toggle-notes')).toHaveText('Collapse all detail');
+  }
+  await page.locator('#workspace-toggle-notes').click();
+  await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'ts',sheet:'ss',view:'sheet'}));
+  await expect(page.locator('#body .item-note').first()).toBeVisible();
+  await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'tn',sheet:'second',view:'sheet'}));
+  await expect(page.locator('#sheetCard .item-note:visible')).toHaveCount(0);
+  expect(await page.evaluate(()=>window.estimator.getShared().lists)).toEqual(shared);
+});
+
 test('menus preserve rounding, display, downloads, printing and keyboard access', async ({page}) => {
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await openWorkbook(page);

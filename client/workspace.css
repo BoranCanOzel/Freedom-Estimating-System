@@ -230,7 +230,10 @@ body.server-mode #summaryCard .eyebrow-row{gap:10px;flex-wrap:wrap;margin-bottom
 body.server-mode #summaryCard .eyebrow-row>.eyebrow{margin-right:auto}
 body.server-mode #summaryCard .eyebrow-row>.btn.ghost,body.server-mode #summaryCard .eyebrow-row>#workspace-map{margin-left:0}
 
-/* Keep subsection bars and item surfaces inside a gutter with L-shaped branches. */
+/* Continuous section rails connect each header to its subtotal through nested groups. */
+body{--section-line:#705B42;--subsection-line:#A08360}
+body.dark{--section-line:#AC8D68;--subsection-line:#D0AD7F}
+body.medieval{--section-line:#5E503C;--subsection-line:#9A7854}
 body{--subsection-surface:color-mix(in srgb,#277c91 6%,var(--card));--subsection-footer:color-mix(in srgb,#277c91 4%,var(--card))}
 body.dark{--subsection-surface:color-mix(in srgb,#71c2d3 6%,var(--card));--subsection-footer:color-mix(in srgb,#71c2d3 4%,var(--card))}
 body #sheetTable .section-title-group{display:flex;flex-direction:column;justify-content:center;gap:3px;min-width:0;flex:1}
@@ -246,7 +249,8 @@ body.medieval #sheetTable tr.section-head.tree-child .caret{color:#6B6254}
 body #sheetTable tr.section-head.tree-child .caret:hover{color:var(--ink);background:var(--calc)}
 body #sheetTable tbody tr.tree-child td.c-item{padding-left:calc(var(--section-depth) * 28px)!important;border-left:0}
 body #sheetTable tbody tr.tree-child td.c-item::before{content:"";position:absolute;left:0;top:0;bottom:0;width:calc(var(--section-depth) * 28px);height:auto;border:0;background:var(--card);pointer-events:none}
-body #sheetTable tbody tr.tree-child td.c-item::after{content:"";position:absolute;left:calc(var(--section-depth) * 28px - 17px);top:0;width:10px;height:50%;border-left:1px solid var(--rule-strong);border-bottom:1px solid var(--rule-strong);pointer-events:none}
+body #sheetTable tbody tr[data-section-rails] td.c-item{position:relative;border-left:0}
+body #sheetTable tbody tr[data-section-rails] td.c-item::after{content:"";position:absolute;left:0;top:-1px;bottom:-1px;width:var(--section-rails-width);height:auto;background:var(--section-rails);border:0;z-index:2;pointer-events:none}
 body #sheetTable tr.section-foot.tree-child:not(.dragging):not(.drop-preview) td{background:var(--subsection-footer)!important;border-top:1px solid var(--rule-hair);border-bottom:1px solid var(--rule);box-shadow:none}
 body.medieval #sheetTable tr.section-foot.tree-child:not(.dragging):not(.drop-preview) td{background:#d8d3c5!important}
 body #sheetTable tr.section-foot .sec-label{padding:9px 12px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:500 11px var(--f-sans);letter-spacing:normal;text-transform:none;color:var(--muted)}

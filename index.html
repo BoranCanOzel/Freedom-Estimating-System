@@ -3915,6 +3915,21 @@
       const depth = Math.max(0, stack.length - (ending ? 1 : 0));
       tr.style.setProperty('--section-depth', depth);
       tr.dataset.depth = depth;
+      const rails = stack.length + (tr.dataset.type === 'section' ? 1 : 0);
+      if (rails){
+        const stops = [];
+        for (let level = 0; level < rails; level++){
+          const x = level * 28;
+          if (level) stops.push('transparent ' + (x - 25) + 'px ' + x + 'px');
+          stops.push('var(' + (level ? '--subsection-line' : '--section-line') + ') ' + x + 'px ' + (x + 3) + 'px');
+        }
+        tr.dataset.sectionRails = rails;
+        tr.style.setProperty('--section-rails', 'linear-gradient(to right,' + stops.join(',') + ')');
+        tr.style.setProperty('--section-rails-width', ((rails - 1) * 28 + 3) + 'px');
+      } else {
+        delete tr.dataset.sectionRails;
+        tr.style.removeProperty('--section-rails'); tr.style.removeProperty('--section-rails-width');
+      }
       tr.classList.toggle('tree-child', depth > 0);
       tr.classList.toggle('row-hidden', stack.some(r => r.collapsed));
       if (ending){
@@ -6894,7 +6909,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       if (book.view === 'summary') sumLayout(); else { layout(); growAll(); }
     }, 120);
   });
-  function noteHolders(){ return state.rows.concat([state]); }
+  function noteHolders(){ return book.sheets.flatMap(sheet => sheet.rows.concat([sheet])); }
   function anyNotes(){ return noteHolders().some(r => r.note && r.note.trim()); }
   function anyNotesOpen(){
     return noteHolders().some(r => r.note && r.note.trim() && r.noteOpen !== false);
@@ -6906,6 +6921,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       if (!btn) continue;
       btn.hidden = !anyNotes();
       btn.textContent = anyNotesOpen() ? 'Collapse all detail' : 'Expand all detail';
+      btn.title = 'Show or hide detail on every option page in this takeoff';
       btn.setAttribute('aria-expanded',String(anyNotesOpen()));
     }
   }
