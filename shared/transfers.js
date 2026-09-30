@@ -32,7 +32,7 @@ export function transferChoices(raw, kind, fallback='Imported estimate') {
 
 export function exportTransfer(book,kind,record){
   const dependencies={};
-  for(const key of ['libs','catalog','wageGroups','customFields','statuses'])if(book[key]!==undefined)dependencies[key]=structuredClone(book[key]);
+  for(const key of ['libs','catalog','wageGroups','customFields','customFieldSettings','statuses'])if(book[key]!==undefined)dependencies[key]=structuredClone(book[key]);
   return {_app:'project-breakdown',_v:3,_scope:kind,data:structuredClone(record),dependencies};
 }
 
@@ -49,7 +49,21 @@ export function importTransfer(book,kind,record,target,dependencies={},uuid=()=>
   (parent[key] ||= []).push(bundle.record);
   for(const key of ['libs','wageGroups'])if(Array.isArray(bundle.dependencies[key]))(next[key] ||= []).push(...bundle.dependencies[key]);
   if(bundle.dependencies.catalog){next.catalog ||= {};for(const [key,value]of Object.entries(bundle.dependencies.catalog))if(Array.isArray(value))next.catalog[key]=[...(next.catalog[key]||[]),...value];}
-  if(bundle.dependencies.customFields){next.customFields ||= {};for(const [key,value]of Object.entries(bundle.dependencies.customFields))if(Array.isArray(value))next.customFields[key]=[...new Set([...(next.customFields[key]||[]),...value])];}
+  if(bundle.dependencies.customFields){
+    next.customFields ||= {};
+    for(const kind of ['company','project','takeoff']){
+      const fields=bundle.dependencies.customFields[kind];
+      if(!Array.isArray(fields))continue;
+      const existing=next.customFields[kind]||[];
+      for(const name of fields){
+        const config=bundle.dependencies.customFieldSettings?.[kind]?.[name];
+        if(existing.includes(name)||!config||['__proto__','constructor','prototype'].includes(name))continue;
+        next.customFieldSettings ||= {};next.customFieldSettings[kind] ||= {};
+        next.customFieldSettings[kind][name]=config;
+      }
+      next.customFields[kind]=[...new Set([...existing,...fields])];
+    }
+  }
   if(Array.isArray(bundle.dependencies.statuses))next.statuses=[...new Set([...(next.statuses||[]),...bundle.dependencies.statuses])];
   validateBook(next);return next;
 }

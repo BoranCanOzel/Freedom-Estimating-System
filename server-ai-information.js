@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
+import * as Y from 'yjs';
+import { readBook } from './shared/model.js';
 
-export function mountAiInformation({app,db,session}) {
+export function mountAiInformation({app,db,session,rooms}) {
   db.exec(`CREATE TABLE IF NOT EXISTS ai_information (id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL);
     INSERT OR IGNORE INTO ai_information VALUES (1,'{"items":[]}');`);
   const read=()=>{
@@ -9,6 +11,23 @@ export function mountAiInformation({app,db,session}) {
   };
   const authenticated=(req,res,next)=>session(req)?next():res.status(401).json({error:'Please sign in.'});
   app.get('/api/ai-information',authenticated,(req,res)=>res.json(read()));
+  app.get('/api/ai-information/estimates',authenticated,(_req,res)=>{
+    const estimates=[];
+    for(const workbook of db.prepare('SELECT id,name,state FROM projects ORDER BY name,id').iterate()){
+      const live=rooms.get(workbook.id)?.doc,doc=live||new Y.Doc();
+      try{
+        if(!live)Y.applyUpdate(doc,workbook.state);
+        const book=readBook(doc);
+        for(const list of book.lists||[])for(const company of list.companies||[])for(const project of company.projects||[])for(const takeoff of project.takeoffs||[]){
+          if(takeoff.aiData!==true)continue;
+          estimates.push({workbook:workbook.id,workbookName:workbook.name,list:list.id,listName:list.name||'Projects',
+            companyName:company.name||'Untitled customer',projectName:project.name||'Untitled project',
+            takeoff:takeoff.id,takeoffName:takeoff.name||'Untitled estimate',sheet:takeoff.sheets?.[0]?.id||'',pages:takeoff.sheets?.length||0});
+        }
+      }finally{if(!live)doc.destroy();}
+    }
+    res.json({estimates});
+  });
   app.put('/api/ai-information',authenticated,(req,res)=>{
     try {
       const {items,revision}=req.body||{};

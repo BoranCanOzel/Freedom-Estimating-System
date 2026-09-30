@@ -28,7 +28,7 @@ export function setupTransfers(bridge,getConnection,notify){
           const connection=getConnection();if(!connection?.ready)throw Error('Reconnect to the destination workbook first.');
           // Read again at submit time so concurrent edits are not overwritten.
           if(connection!==openedConnection)throw Error('The destination workbook changed. Reopen import.');
-          const dependencySource=raw.dependencies||Object.fromEntries(['libs','catalog','wageGroups','customFields','statuses'].filter(k=>raw[k]!==undefined).map(k=>[k,raw[k]]));
+          const dependencySource=raw.dependencies||Object.fromEntries(['libs','catalog','wageGroups','customFields','customFieldSettings','statuses'].filter(k=>raw[k]!==undefined).map(k=>[k,raw[k]]));
           const next=importTransfer(bridge.getShared(),kind,record,$('target').value,dependencySource);
           bridge.receive(next);connection.changed();notify('Imported '+kind+' as a new copy.');
         }

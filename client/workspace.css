@@ -133,6 +133,12 @@ body.server-mode .project-settings-tabs button[aria-selected=true]{color:var(--i
 .project-settings-section h3{font:600 16px var(--f-sans);color:var(--ink);margin:4px 0 7px}
 .project-settings-hint{font:12px/1.6 var(--f-sans);color:var(--muted);margin:0 0 16px}
 .project-settings-row{display:flex;gap:8px;align-items:center;margin-bottom:9px}
+.project-settings-field{padding:12px;margin-bottom:12px;border:1px solid var(--rule);border-radius:6px;background:var(--card)}
+.project-settings-label{display:flex;flex:1;min-width:0;flex-direction:column;gap:6px;font:500 12px var(--f-sans);color:var(--muted)}
+.project-settings-choices{margin-top:12px}
+.project-settings-choices .project-settings-hint{margin:6px 0 0}
+body.server-mode .project-settings-field select,body.server-mode .project-settings-field textarea{box-sizing:border-box;width:100%;min-width:0;padding:9px 10px;border:1px solid var(--rule);border-radius:4px;background:var(--paper);color:var(--ink);font:13px/1.5 var(--f-sans)}
+body.server-mode .project-settings-field textarea{resize:vertical}
 body.server-mode .project-settings-row input{flex:1;min-width:0;padding:9px 10px;border:1px solid var(--rule);border-radius:4px;background:var(--paper);color:var(--ink);font:13px var(--f-sans)}
 body.server-mode .project-settings-row .settings-remove{padding:4px 8px;border:0;background:transparent;color:var(--muted);font:18px var(--f-sans);cursor:pointer}
 .settings-remove:disabled{opacity:.3;cursor:default}

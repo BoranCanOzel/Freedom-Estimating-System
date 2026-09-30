@@ -11,7 +11,7 @@ export function setupPdfDownload(getContext,notify){
       const {renderPdf}=await import('/assets/pdf-renderer.js');
       const pdf=renderPdf(report);
       const filename=(report.name||'Takeoff').replace(/[<>:"/\\|?*\x00-\x1f]/g,'-').replace(/[. ]+$/g,'').slice(0,120)||'Takeoff';
-      pdf.save(filename+' - Takeoff.pdf');notify('Takeoff PDF saved.');
+      pdf.save(filename+' - Takeoff.pdf');
     }catch(error){notify(error.message,true);}finally{busy=false;button.textContent='Save as PDF';sync();}
   };
   for(const event of ['estimator:view','estimator:projects'])document.addEventListener(event,sync);sync();

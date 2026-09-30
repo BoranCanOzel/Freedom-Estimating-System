@@ -117,11 +117,15 @@ test('AI Data marks only the selected estimate and persists when toggled',async(
   await openWorkbook(page);
   const checkbox=page.getByRole('checkbox',{name:'AI Data',exact:true});
   await expect(checkbox).not.toBeChecked();
-  page.once('dialog',dialog=>dialog.dismiss());
   await checkbox.click();
+  const confirmation=page.getByRole('alertdialog',{name:'Confirm action'});
+  await expect(confirmation).toContainText('Use this estimate as AI reference data?');
   await expect(checkbox).not.toBeChecked();
-  page.once('dialog',dialog=>dialog.accept());
-  await checkbox.check();
+  await confirmation.getByRole('button',{name:'Cancel',exact:true}).click();
+  await expect(confirmation).toHaveCount(0);
+  await expect(checkbox).toBeFocused();
+  await checkbox.click();
+  await confirmation.getByRole('button',{name:'Enable AI Data',exact:true}).click();
   await expect(page.locator('#server-status')).toHaveText('All changes saved');
   await page.reload();
   await expect(checkbox).toBeChecked();
@@ -131,12 +135,50 @@ test('AI Data marks only the selected estimate and persists when toggled',async(
   await expect(checkbox).not.toBeChecked();
   await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'tn',sheet:'sn',view:'summary'}));
   await expect(checkbox).toBeChecked();
-  page.once('dialog',dialog=>dialog.accept());
-  await checkbox.uncheck();
+  await checkbox.click();
+  await expect(checkbox).toBeChecked();
+  await confirmation.press('Escape');
+  await expect(checkbox).toBeChecked();
+  await checkbox.click();
+  await confirmation.getByRole('button',{name:'Remove AI Data',exact:true}).click();
   await expect(page.locator('#server-status')).toHaveText('All changes saved');
   await page.reload();
   await expect(checkbox).not.toBeChecked();
   expect(await page.evaluate(()=>window.estimator.getShared().lists[0].companies[0].projects[0].takeoffs[0].aiData)).toBe(false);
+});
+
+test('AI Information lists checked estimates across workbooks and opens their exact location',async({page})=>{
+  await openWorkbook(page);
+  const suffix=Date.now().toString(),job='AI reference job '+suffix,estimate='AI reference estimate '+suffix;
+  const data=workbook();
+  const target=data.lists[0].companies[0].projects[1];target.name=job;target.takeoffs[0].name=estimate;target.takeoffs[0].aiData=true;
+  target.takeoffs[0].sheets.push(sheet('extra','Extra page'));
+  const created=await (await page.request.post('/api/projects',{data:{name:'AI references '+suffix,book:data}})).json();
+  await page.locator('#ai-information-open').click();
+  await page.getByRole('button',{name:'+ Text entry',exact:true}).click();
+  await page.locator('#ai-info-title').fill('Keep this unsaved draft');
+  await page.getByRole('tab',{name:'AI Data',exact:true}).click();
+  await page.locator('#ai-info-data-search').fill(suffix);
+  const record=page.locator('.ai-info-estimate');
+  await expect(record).toHaveCount(1);await expect(record).toContainText(job);await expect(record).toContainText('2 pages');
+  await expect(record).not.toContainText('North takeoff');
+  await page.getByRole('tab',{name:'Text library',exact:true}).click();
+  await expect(page.locator('#ai-info-title')).toHaveValue('Keep this unsaved draft');
+  await page.getByRole('tab',{name:'AI Data',exact:true}).click();
+  page.once('dialog',dialog=>dialog.accept());
+  await record.getByRole('button',{name:'Open estimate: '+estimate,exact:true}).click();
+  await expect(page.locator('#ai-information-page')).toBeHidden();
+  await expect.poll(()=>page.evaluate(()=>window.estimator.getLocation())).toMatchObject({list:'list',takeoff:'ts',view:'summary'});
+  await expect(page.locator('#server-title')).toHaveText('AI references '+suffix);
+  await expect(page.getByRole('checkbox',{name:'AI Data',exact:true})).toBeChecked();
+  await page.getByRole('checkbox',{name:'AI Data',exact:true}).click();
+  await page.getByRole('alertdialog',{name:'Confirm action'}).getByRole('button',{name:'Remove AI Data',exact:true}).click();
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.locator('#ai-information-open').click();
+  await expect(record).toHaveCount(0);
+  await expect(page.locator('#ai-info-data-count')).toContainText('0 of');
+  const results=await (await page.request.get('/api/ai-information/estimates')).json();
+  expect(results.estimates.some(item=>item.workbook===created.id)).toBe(false);
 });
 
 test('AI Information drag and drop moves folders with descendants, reorders and protects drafts',async({page})=>{
@@ -1083,6 +1125,66 @@ test('new pictured items follow Hide and Show without forcing existing rows open
   await add();
   await expect(rows).toHaveCount(2);
   await expect(rows.last().locator('.pic-strip')).toHaveClass(/open/);
+});
+
+test('custom dropdowns support company, project and takeoff values and survive reloads', async ({page}) => {
+  await openWorkbook(page);
+  await page.locator('#server-projects').click();
+  await page.locator('#projOptions').click();
+  const editor = page.locator('#edBody');
+  for (const [location, choices] of [['Project','North\nSouth\nSouth\n  West  \n'],['Company','Commercial\nResidential'],['Takeoff','Alex\nSam']]) {
+    await page.getByRole('tab',{name:location,exact:true}).click();
+    await editor.getByLabel('Field type',{exact:true}).selectOption('dropdown');
+    await editor.getByLabel('Dropdown choices',{exact:true}).fill(choices);
+    await editor.getByLabel('Field type',{exact:true}).focus();
+  }
+  await page.getByRole('tab',{name:'Project',exact:true}).click();
+  await expect(editor.getByLabel('Dropdown choices',{exact:true})).toHaveValue('North\nSouth\nWest');
+  await editor.getByLabel('Field name',{exact:true}).fill('Area');
+  await editor.getByLabel('Field type',{exact:true}).focus();
+  await page.screenshot({path:'test-results/custom-dropdown-settings.png',fullPage:true});
+  await page.locator('#edCancel').click();
+  await page.getByTitle('Edit this company',{exact:true}).click();
+  await editor.getByLabel('Account',{exact:true}).selectOption('Commercial');
+  await page.locator('#edSave').click();
+  await page.locator('[data-company="co"] > .p-head > .p-name').click();
+  await page.locator('[data-project="north"]').getByTitle('Edit this project',{exact:true}).click();
+  await expect(editor.getByLabel('Area',{exact:true})).toHaveValue('North');
+  await editor.getByLabel('Area',{exact:true}).selectOption('West');
+  await page.locator('#edCancel').click();
+  await page.locator('[data-project="north"]').getByTitle('Edit this project',{exact:true}).click();
+  await expect(editor.getByLabel('Area',{exact:true})).toHaveValue('North');
+  await editor.getByLabel('Area',{exact:true}).selectOption('West');
+  await page.locator('#edSave').click();
+  await page.locator('[data-project="north"] > .p-head > .p-name').click();
+  await page.locator('[data-takeoff="tn"]').getByTitle('Edit this takeoff',{exact:true}).click();
+  await editor.getByLabel('Estimator',{exact:true}).selectOption('Sam');
+  await page.locator('#edSave').click();
+  await page.locator('#projOptions').click();
+  await editor.getByLabel('Dropdown choices',{exact:true}).fill('North\nSouth');
+  await page.locator('#edCancel').click();
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  const saved = await page.evaluate(() => window.estimator.getShared());
+  const company = saved.lists[0].companies.find(c => c.id === 'co'), project = company.projects.find(p => p.id === 'north');
+  expect(company.custom.Account).toBe('Commercial');
+  expect(project.custom.Area).toBe('West');
+  expect(project.takeoffs[0].custom.Estimator).toBe('Sam');
+  expect(saved.customFieldSettings.project.Area).toEqual({type:'dropdown',options:['North','South']});
+  expect(saved.customFieldSettings.project.Region).toBeUndefined();
+  if (!await page.locator('#projOptions').isVisible()) await page.locator('#server-projects').click();
+  if (!await page.locator('[data-project="north"]').isVisible()) await page.locator('[data-company="co"] > .p-head > .p-name').click();
+  await page.locator('[data-project="north"]').getByTitle('Edit this project',{exact:true}).click();
+  await expect(editor.getByLabel('Area',{exact:true})).toHaveValue('West');
+  await expect(editor.getByLabel('Area',{exact:true}).locator('option:checked')).toHaveText('West (current value)');
+  await page.locator('#edCancel').click();
+  await page.locator('#projOptions').click();
+  await editor.getByLabel('Field type',{exact:true}).selectOption('text');
+  await expect(editor.getByLabel('Dropdown choices',{exact:true})).not.toBeVisible();
+  await page.locator('#edCancel').click();
+  await page.locator('[data-project="north"]').getByTitle('Edit this project',{exact:true}).click();
+  await expect(editor.getByRole('textbox',{name:'Area',exact:true})).toHaveValue('West');
 });
 
 test('one project drawer retains hierarchy, custom details and filters', async ({page}) => {

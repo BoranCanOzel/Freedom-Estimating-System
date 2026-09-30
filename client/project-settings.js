@@ -41,12 +41,15 @@ export function renderProjectSettings(host) {
   section.append(heading, hint); host.append(section);
   if (tab === 'fields') {
     heading.textContent = 'Custom details';
-    hint.textContent = 'Choose where a field belongs. Renaming a field keeps its existing values.';
+    hint.textContent = 'Choose text inputs or dropdowns for this workbook. Renaming a field keeps its existing values.';
     section.append(tabs([['company', 'Company'], ['project', 'Project'], ['takeoff', 'Takeoff']], kind,
       next => { kind = next; refresh(); }, 'Field location'));
     const fields = api.fields(kind), rows = el('div', '', 'project-settings-rows');
     fields.forEach((field, index) => {
+      const card = el('div', '', 'project-settings-field');
       const row = el('div', '', 'project-settings-row'), input = el('input');
+      const nameLabel = el('label', 'Field name', 'project-settings-label');
+      nameLabel.append(input);
       input.value = field; input.setAttribute('aria-label', 'Field name'); input.placeholder = 'Field name';
       input.onchange = () => {
         const name = input.value.trim();
@@ -56,7 +59,25 @@ export function renderProjectSettings(host) {
         api.renameField(kind, index, name); changed();
       };
       const remove = action('×', () => { api.removeField(kind, index); changed(); refresh(); }, 'Remove field ' + field);
-      remove.className = 'settings-remove'; row.append(input, remove); rows.append(row);
+      remove.className = 'settings-remove'; row.append(nameLabel, remove); card.append(row);
+      const config = api.fieldConfig(kind, field);
+      const typeLabel = el('label', 'Field type', 'project-settings-label'), type = el('select');
+      type.setAttribute('aria-label', 'Field type');
+      type.append(new Option('Text input', 'text'), new Option('Dropdown', 'dropdown'));
+      type.value = config.type; typeLabel.append(type); card.append(typeLabel);
+      const choicesLabel = el('label', 'Dropdown choices', 'project-settings-label'), choices = el('textarea');
+      choices.rows = 4; choices.placeholder = 'First choice\nSecond choice\nThird choice';
+      choices.value = config.options.join('\n'); choicesLabel.append(choices);
+      const help = el('p', 'Enter one choice per line. Existing values are kept if you remove a choice.', 'project-settings-hint');
+      const choicesBox = el('div', '', 'project-settings-choices'); choicesBox.append(choicesLabel, help);
+      choicesBox.hidden = type.value !== 'dropdown'; card.append(choicesBox);
+      const saveConfig = () => {
+        api.setFieldConfig(kind, fields[index], {type: type.value, options: choices.value.split('\n')});
+        changed();
+      };
+      type.onchange = () => { choicesBox.hidden = type.value !== 'dropdown'; saveConfig(); };
+      choices.onchange = () => { saveConfig(); choices.value = api.fieldConfig(kind, fields[index]).options.join('\n'); };
+      rows.append(card);
     });
     if (!fields.length) rows.append(el('p', 'No custom fields here yet.', 'project-settings-hint'));
     section.append(rows, action('+ Add field', () => {

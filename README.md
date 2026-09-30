@@ -107,7 +107,7 @@ Use **Ctrl+Z** to undo and **Ctrl+Y** or **Ctrl+Shift+Z** to redo (Command short
 | Item column header or calculator heading | Common add-item, add-section, add-option, and add-labor-group actions |
 | Scope of Work header | Larger Detail opener and a copy of Collapse/Expand all detail, synchronized with View |
 
-Project settings save automatically. Renaming a custom field retains existing detail values and its filter configuration. Theme and zoom are personal browser preferences that persist across workbook changes. The Scopes tab replaces the former gear icon for the option overview. Destructive actions that require confirmation use a modal dialog with Cancel and an action button; Escape cancels.
+Project settings save automatically. Custom fields for companies, projects, and takeoffs can use **Text input** or **Dropdown**. Set dropdown choices in advance, one per line; these definitions belong to the workbook and travel with exports. Existing values are kept when changing field types or removing choices. Renaming a custom field retains its choices, existing detail values, and filter configuration. Theme and zoom are personal browser preferences that persist across workbook changes. The Scopes tab replaces the former gear icon for the option overview. Destructive actions that require confirmation use a modal dialog with Cancel and an action button; Escape cancels.
 
 View → Shared cursor offers Classic (original), Pointer arrow, Crosshair, and Ring. It controls the cursor other collaborators see, leaving your local mouse pointer unchanged. This setting is stored per signed-in account in SQLite and loaded on sign-in across browsers; it does not change shared workbooks. After deploying this change, restart the Node project as well as building the client. An older running server rejects the new cursor options with “Choose a supported cursor style.”
 
@@ -147,6 +147,8 @@ Each option has one item list with dedicated pricing columns, including unit pri
 ## AI Information
 
 The top-bar **AI Information** page is a shared reference library across all workbooks. Signed-in users can create, nest, rename, move, and delete folders and plain-text entries. There are no file uploads or predefined categories. Save changes explicitly; conflicting saves preserve your draft and ask you to reload rather than overwrite newer information.
+
+Its **AI Data** tab lists every estimate with the AI Data checkbox enabled across all workbooks. Search by job, customer, estimate, or workbook, refresh the list, and open an estimate directly. The list uses live workbook state when available and preserves unsaved text-library drafts when switching tabs. This signed-in directory does not expand an AI token's takeoff permissions.
 
 The library is stored in the `ai_information` table in `projects.sqlite`, so include it in the full database backup. It is separate from workbook JSON exports and project snapshots. AI access keys receive read-only access to this library, including updates made after the key was created. Instructions and takeoff responses include the library first; `read_ai_information` (MCP) or `/api/ai/v1/information` (REST) retrieves it again. The connection instructions direct models to analyze relevant references before working; the server cannot verify a model's reasoning.
 

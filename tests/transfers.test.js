@@ -34,3 +34,18 @@ test('reject unsafe files and missing destinations without modifying workbook',(
  assert.throws(()=>transferChoices({hello:true},'takeoff'),/No customers/);
  assert.throws(()=>importTransfer(book,'takeoff',takeoff,'missing'),/destination/);
 });
+
+test('scoped transfers carry dropdown definitions without replacing destination fields',()=>{
+ const source={...book,customFields:{company:['Account'],project:['Region'],takeoff:['Estimator']},
+  customFieldSettings:{company:{Account:{type:'dropdown',options:['Commercial','Residential']}},
+   project:{Region:{type:'dropdown',options:['North','South']}},takeoff:{Estimator:{type:'dropdown',options:['Alex','Sam']}}}};
+ const exported=exportTransfer(source,'project',{...project,custom:{Region:'North'}});
+ const next=importTransfer(book,'project',exported.data,'c',exported.dependencies);
+ assert.deepEqual(next.customFieldSettings,source.customFieldSettings);
+ assert.equal(next.lists[0].companies[0].projects.at(-1).custom.Region,'North');
+ const destination={...book,customFields:{project:['Region'],takeoff:['Estimator']},customFieldSettings:{project:{Region:{type:'dropdown',options:['West']}}}};
+ const merged=importTransfer(destination,'project',exported.data,'c',exported.dependencies);
+ assert.deepEqual(merged.customFieldSettings.project.Region.options,['West']);
+ assert.equal(merged.customFieldSettings.takeoff,undefined); // Existing legacy text field stays a text field.
+ assert.deepEqual(merged.customFieldSettings.company,source.customFieldSettings.company);
+});

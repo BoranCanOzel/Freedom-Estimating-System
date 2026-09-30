@@ -110,7 +110,7 @@ export function createApp(options = {}) {
     }
     return rooms.get(id);
   }
-  const readAiInformation=mountAiInformation({app,db,session});
+  const readAiInformation=mountAiInformation({app,db,session,rooms});
   mountAiAccess({app,db,session,project,rooms,snapshot,readAiInformation});
   const sharePresence=mountShareAccess({app,db,session,project,rooms,snapshot,authChanged});
   app.get('/api/session', (req, res) => res.json({ user: session(req)?.name || null, passwordRequired: true }));

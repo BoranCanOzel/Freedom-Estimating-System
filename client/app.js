@@ -426,8 +426,11 @@ async function closeProject() {
   $('server-close').disabled = $('server-edit').disabled = $('server-export').disabled = true;
   browsing = true; recentMode = false; bridge.closeEditor(); syncProjectPanel(); status('No project open'); panel();
 }
-async function openProject(project) {
-  if (current?.id === project.id && connection?.ready) { browsing = recentMode = false; syncProjectPanel(); panel(false); return; }
+async function openProject(project, targetLocation) {
+  if (current?.id === project.id && connection?.ready) {
+    if(targetLocation&&!bridge.openLocation(targetLocation))throw Error('This estimate no longer exists. Refresh the AI Data list.');
+    browsing = recentMode = false; syncProjectPanel(); panel(false); return;
+  }
   await connection?.close(); connection = null;
   document.body.classList.remove('server-active');
   current = await api('/projects/' + project.id + '/open', { method: 'POST' });
@@ -436,7 +439,9 @@ async function openProject(project) {
   browsing = recentMode = false; syncProjectPanel();
   $('server-recent-user').replaceChildren();
   try { localStorage.setItem('freedom:last-workbook:' + user,current.id); } catch {}
-  connection = new LiveProject(current); await connection.start(); panel(false);
+  connection = new LiveProject(current);
+  if(targetLocation)connection.resumeLocation=targetLocation;
+  await connection.start(); panel(false);
 }
 async function createProject(name, book) {
   const project = await api('/projects', { method: 'POST', body: JSON.stringify({ name, book }) });
@@ -514,7 +519,7 @@ document.body.insertAdjacentHTML('afterbegin', `
   </form></dialog>`);
 document.body.classList.add('server-mode');
 workspace = setupWorkspace();
-setupAiInformation(api);
+setupAiInformation(api,item=>openProject({id:item.workbook},{list:item.list,takeoff:item.takeoff,sheet:item.sheet,view:'summary'}));
 const transfers=setupTransfers(bridge,()=>connection,message);
 const importDialog=document.createElement('dialog');importDialog.id='import-preview';
 importDialog.innerHTML='<form><h2>Import JSON</h2><p id="import-detected"></p><label>Import as <select id="import-kind"></select></label><p>A workbook creates a new saved workbook. Individual records are added as copies to a destination you select.</p><div class="server-dialog-actions"><button type="button">Cancel</button><button type="submit">Continue</button></div></form>';

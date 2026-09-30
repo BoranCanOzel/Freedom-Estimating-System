@@ -28,6 +28,8 @@ test('AI grants enforce scope, repeated saves, revisions, validation, live broad
     assert.equal((await call(admin,'POST',{list:'list',takeoff:'missing'})).status,404);
     const access=await grant(),key=access.key;assert.equal(access.expiresAt,null);
     assert.equal((await fetch(base+'/api/ai-information')).status,401);
+    assert.equal((await fetch(base+'/api/ai-information/estimates')).status,401);
+    assert.equal((await call('/api/ai-information/estimates','GET',undefined,key)).status,401);
     const empty=await (await call('/api/ai-information')).json();
     const items=[{id:'rates',parent:'',kind:'folder',title:'Production rates',text:''},{id:'cut',parent:'rates',kind:'entry',title:'Concrete cutting',text:'Use 15 LF per crew hour.'}];
     const library=await call('/api/ai-information','PUT',{revision:empty.revision,items});assert.equal(library.status,200);

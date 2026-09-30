@@ -900,12 +900,12 @@
     font-family:var(--f-mono);font-size:9.5px;letter-spacing:.1em;
     text-transform:uppercase;color:var(--muted);
   }
-  .ed-f input,.ed-f textarea{
+  .ed-f input,.ed-f textarea,.ed-f select{
     display:block;width:100%;margin-top:4px;border:1px solid var(--rule-strong);border-radius:3px;
     padding:6px 8px;font-family:var(--f-sans);font-size:13px;color:var(--ink);
     background:var(--card);text-transform:none;letter-spacing:0;resize:vertical;
   }
-  .ed-f input:focus,.ed-f textarea:focus{outline:2px solid var(--amber);outline-offset:-1px}
+  .ed-f input:focus,.ed-f textarea:focus,.ed-f select:focus{outline:2px solid var(--amber);outline-offset:-1px}
 
   .ed-card{
     border:1px solid var(--rule);border-radius:6px;padding:10px;background:var(--s15);
@@ -8548,6 +8548,11 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     const t = document.createElement('span');
     t.textContent = label;
 
+    if (edMode === 'project') {
+      head.append(car, t);
+      return head;
+    }
+
     const lock = document.createElement('button');
     lock.type = 'button';
     lock.className = 'blk-lock' + (d[keyLock] ? ' on' : '');
@@ -9599,7 +9604,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
   const CO_FIELDS = [['name','Company name'],['address','Address'],['phone','Phone'],
                      ['email','Email'],['fax','Fax'],['website','Website']];
-  const PR_FIELDS = [['name','Project name'],['address','Address'],['contacts','Contacts'],
+  const PR_FIELDS = [['name','Project name'],['address','Address'],['zztakeoffLink','ZZTakeoff link'],['contacts','Contacts'],
                      ['email','Email'],['fax','Fax']];
 
   function renderSubEd(box){
@@ -9678,7 +9683,26 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     box.appendChild(blockHead(d, 'More detail', 'customLocked', 'customOpen'));
     if (d.customOpen === false) return box;
     d.custom = d.custom || {};
-    list.forEach(f => box.appendChild(edField(f, d.custom[f], v => { d.custom[f] = v; })));
+    list.forEach(f => {
+      const config = customFieldConfig(kind, f);
+      if (config.type !== 'dropdown') {
+        box.appendChild(edField(f, d.custom[f], v => { d.custom[f] = v; }));
+        return;
+      }
+      const label = document.createElement('label');
+      label.className = 'ed-f';
+      label.appendChild(document.createTextNode(f));
+      const select = document.createElement('select'), value = String(d.custom[f] ?? '');
+      select.setAttribute('aria-label', f);
+      select.appendChild(new Option(config.options.length ? 'Select a value...' : 'No choices configured', ''));
+      // Keep older values visible when a field changes type or a choice is removed.
+      if (value && !config.options.includes(value)) select.appendChild(new Option(value + ' (current value)', value));
+      config.options.forEach(option => select.appendChild(new Option(option, option)));
+      select.value = value;
+      select.addEventListener('change', () => { d.custom[f] = select.value; });
+      label.appendChild(select);
+      box.appendChild(label);
+    });
     return box;
   }
 
@@ -9758,7 +9782,20 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     card.appendChild(blockHead(d, 'Project', 'prLocked', 'prOpen'));
     if (d.prOpen !== false){
       PR_FIELDS.forEach(([k, lab]) => {
-        card.appendChild(edField(lab, d[k], v => { d[k] = v; }));
+        const field=edField(lab, d[k], v => { d[k] = v; },k==='zztakeoffLink'?{ph:'https://...'}:undefined);
+        card.appendChild(field);
+        if(k==='zztakeoffLink'){
+          const input=field.querySelector('input');input.type='url';input.inputMode='url';input.spellcheck=false;
+          const open=document.createElement('button');open.type='button';open.className='btn alt tiny';open.textContent='Open ZZTakeoff';
+          const link=()=>{
+            const value=String(d[k]||'').trim();if(!value)return '';
+            try{const url=new URL(/^[a-z][a-z\d+.-]*:/i.test(value)?value:'https://'+value);return ['https:','http:'].includes(url.protocol)?url.href:'';}catch{return '';}
+          };
+          const sync=()=>{open.disabled=!link();open.title=link()||'Enter a valid web link to open ZZTakeoff';};
+          input.addEventListener('input',sync);sync();
+          open.onclick=()=>{const url=link();if(url)window.open(url,'_blank','noopener,noreferrer');};
+          card.appendChild(open);
+        }
         if (k === 'address') card.appendChild(mapsBtn(() => d.address));
       });
       const st = document.createElement('div');
@@ -11196,6 +11233,13 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     if (!Array.isArray(book.customFields[kind])) book.customFields[kind] = [];
     return book.customFields[kind];
   }
+  function customFieldConfig(kind, name){
+    const config = book.customFieldSettings?.[kind]?.[name];
+    return {
+      type: config?.type === 'dropdown' ? 'dropdown' : 'text',
+      options: Array.isArray(config?.options) ? [...new Set(config.options.filter(v => typeof v === 'string').map(v => v.trim()).filter(Boolean))] : []
+    };
+  }
 
   function activeList(){
     if (!Array.isArray(book.lists) || !book.lists.length){
@@ -11992,6 +12036,16 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     closeEditor,
     projectSettings: {
       fields: customFields, statuses, filters: filterFields,
+      fieldConfig: customFieldConfig,
+      setFieldConfig(kind, name, config){
+        if (!['company','project','takeoff'].includes(kind) || !customFields(kind).includes(name) || ['__proto__','constructor','prototype'].includes(name)) return;
+        book.customFieldSettings ||= {};
+        book.customFieldSettings[kind] ||= {};
+        book.customFieldSettings[kind][name] = {
+          type: config.type === 'dropdown' ? 'dropdown' : 'text',
+          options: [...new Set((config.options || []).map(v => String(v).trim()).filter(Boolean))]
+        };
+      },
       save(){ renderProjects(); save(); },
       renameField(kind, index, name){
         const list = customFields(kind), old = list[index];
@@ -12002,6 +12056,10 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
           }
         });
         list[index] = name;
+        const configs = book.customFieldSettings?.[kind];
+        if (configs && Object.hasOwn(configs, old)) {
+          configs[name] = configs[old]; delete configs[old];
+        }
         if (kind === 'project') {
           book.filterFields = filterFields().map(f => f === old ? name : f);
           if (book.fieldPicks && Object.hasOwn(book.fieldPicks, old)) {
@@ -12011,6 +12069,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       },
       removeField(kind, index){
         const old = customFields(kind).splice(index,1)[0];
+        if (book.customFieldSettings?.[kind]) delete book.customFieldSettings[kind][old];
         if (kind === 'project') book.filterFields = filterFields().filter(f => f !== old);
       },
       renameStatus(index, name){
@@ -12023,6 +12082,15 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     getShared(){ projectTree(); templates(); return separate(book); },
     getLocation(){ return {list:book.activeList,view:book.view, sheet:book.active, takeoff:book.activeTakeoff}; },
     aiDataEnabled(){ return findTakeoff(book.activeTakeoff)?.tk.aiData === true; },
+    confirmAiDataEnabled(enabled, anchor){
+      const takeoff=book.activeTakeoff,list=book.activeList;
+      if(!findTakeoff(takeoff))return;
+      confirmPop(anchor,enabled
+        ? 'Use this estimate as AI reference data? This includes all of its option pages.'
+        : 'Remove this estimate from AI reference data?',()=>{
+          if(book.activeList===list&&book.activeTakeoff===takeoff)this.setAiDataEnabled(enabled);
+        },enabled?'Enable AI Data':'Remove AI Data');
+    },
     setAiDataEnabled(enabled){
       const hit = findTakeoff(book.activeTakeoff);
       if (!hit) return;
