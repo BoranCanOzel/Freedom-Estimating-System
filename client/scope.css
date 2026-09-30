@@ -1,0 +1,29 @@
+.scope-description{color:var(--muted);font:13px/1.5 var(--f-sans);margin:8px 0 0}
+.scope-content{padding:20px 24px 28px}
+.scope-source,.scope-tools{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+.scope-source label{flex:1;min-width:240px}
+.scope-content label{display:flex;flex-direction:column;gap:6px;font:500 12px var(--f-sans);color:var(--muted)}
+.scope-content input,.scope-content select{padding:9px 10px;border:1px solid var(--rule);border-radius:4px;background:var(--card);color:var(--ink);font:13px var(--f-sans)}
+.scope-tools{margin:22px 0 14px;padding-top:18px;border-top:1px solid var(--rule)}
+#scope-count{margin-left:auto;color:var(--muted);font:12px var(--f-sans);padding-bottom:10px}
+#scope-message{font:13px/1.5 var(--f-sans);color:var(--ink);margin:12px 0}
+#scope-message:empty{display:none}
+.scope-empty{padding:40px 24px;text-align:center;border:1px dashed var(--rule);border-radius:6px;color:var(--muted)}
+.scope-empty h3{font:600 18px var(--f-sans);color:var(--ink);margin:0 0 10px}
+.scope-empty p{font:13px/1.6 var(--f-sans);max-width:580px;margin:auto}
+.scope-stamp{font:12px var(--f-sans);color:var(--muted)}
+.scope-table-scroll{overflow-x:auto}
+.scope-table{width:100%;border-collapse:collapse;table-layout:auto;font:13px var(--f-sans)}
+.scope-table th{text-align:left;padding:12px;background:var(--calc);color:var(--muted);font-weight:600;border-bottom:1px solid var(--rule)}
+.scope-table td{padding:14px 12px;border-bottom:1px solid var(--rule);vertical-align:middle;color:var(--ink)}
+.scope-table td:first-child{width:42%;min-width:190px;overflow-wrap:anywhere}
+.scope-table small{display:block;margin-top:5px;color:var(--muted)}
+.scope-measurements{white-space:pre-line;min-width:130px;font-variant-numeric:tabular-nums}
+.scope-status{display:inline-block;padding:4px 7px;background:var(--calc);border-radius:3px;font-size:11px;white-space:nowrap}
+.scope-table .scope-actions,.scope-table .scope-actions-heading{text-align:right;white-space:nowrap}
+.scope-actions .btn + .btn{margin-left:5px}
+.scope-actions [aria-pressed=true]{border-color:var(--amber)!important;color:var(--amber)!important;box-shadow:inset 0 0 0 1px var(--amber)}
+.scope-table tr[data-status=excluded] .scope-status,.scope-table tr[data-status=duplicate] .scope-status{color:var(--amber)}
+.scope-table tr[data-status=ignored] td:first-child{color:var(--muted)}
+@media(max-width:650px){.scope-content{padding:16px}.scope-source label{min-width:100%}#scope-count{margin-left:0}}
+@media print{.scope-source,.scope-tools,.scope-actions,.scope-actions-heading,#scope-message{display:none!important}}

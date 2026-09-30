@@ -49,7 +49,7 @@ export function setupProjectPresence(bridge) {
       }
       if (here?.takeoff === l.takeoff && here.list === l.list) {
         const selector = l.view === 'sheet' ? `[data-sheet="${CSS.escape(l.sheet)}"]`
-          : {summary:'.tab-summary',scopes:'.tab-opts-btn',load:'.tab-load',wage:'.tab-wage'}[l.view];
+          : {summary:'.tab-summary',scope:'.tab-scope',scopes:'.tab-opts-btn',load:'.tab-load',wage:'.tab-wage'}[l.view];
         let tab = selector && document.querySelector('#rail '+selector);
         if (!tab && ['load','wage'].includes(l.view)) tab = [...document.querySelectorAll('#rail .tab-calc')].find(t=>t.textContent.toLowerCase().startsWith(l.view));
         mark(tab,peer,l,true);

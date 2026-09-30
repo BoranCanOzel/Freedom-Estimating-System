@@ -1,0 +1,53 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { once } from 'node:events';
+import { createHash } from 'node:crypto';
+import { createApp } from '../server.js';
+
+test('ZZTakeoff OAuth is session bound and fetch only invokes the fixed read script',async()=>{
+  let challenge,called=false;
+  const zzFetch=async(url,options)=>{
+    if(url.endsWith('/oauth/register'))return Response.json({client_id:'test-client'});
+    if(url.endsWith('/oauth/token')){
+      assert.equal(createHash('sha256').update(options.body.get('code_verifier')).digest('base64url'),challenge);
+      return Response.json({access_token:'private-test-token',expires_in:3600});
+    }
+    assert.equal(url,'https://www.zztakeoff.com/mcp');
+    assert.equal(options.headers.Authorization,'Bearer private-test-token');
+    const request=JSON.parse(options.body);let result;
+    if(request.method==='initialize')result={protocolVersion:'2025-03-26'};
+    else if(request.method==='notifications/initialized')return new Response(null,{status:202});
+    else if(request.method==='tools/list')result={tools:[{name:'run_script',description:'Run a ZZTakeoff script',inputSchema:{properties:{code:{type:'string'}},required:['code']}}]};
+    else{
+      assert.equal(request.method,'tools/call');assert.equal(request.params.name,'run_script');
+      assert.match(request.params.arguments.code,/projectId !== "source"/);assert.doesNotMatch(request.params.arguments.code,/\.update\(/);
+      called=true;result={content:[{type:'text',text:JSON.stringify({projectId:'source',records:[{_id:'one',properties:{name:{value:'Slab'},area:{formatted:'160 SF'}}}]})}]};
+    }
+    return Response.json({jsonrpc:'2.0',id:request.id,result},{headers:{'mcp-session-id':'test-session'}});
+  };
+  const app=createApp({dataDir:await mkdtemp(join(tmpdir(),'freedom-zz-')),production:false,zzFetch});
+  app.server.listen(0,'127.0.0.1');await once(app.server,'listening');
+  const base='http://127.0.0.1:'+app.server.address().port;
+  try{
+    const login=async name=>{const response=await fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,password:'1313'})});return response.headers.get('set-cookie').split(';')[0];};
+    const cookie=await login('Scope tester'),other=await login('Other tester');
+    const call=(path,body,who=cookie)=>fetch(base+'/api/zztakeoff/'+path,{method:body===undefined?'GET':'POST',headers:{cookie:who,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
+    assert.equal((await fetch(base+'/api/zztakeoff/status')).status,401);
+    assert.equal((await call('scope',{link:'https://www.zztakeoff.com/app/takeoff?projectId=source'})).status,409);
+    const start=await (await call('connect',{})).json(),auth=new URL(start.url);
+    challenge=auth.searchParams.get('code_challenge');
+    const callback='callback?state='+auth.searchParams.get('state')+'&code=test-code';
+    assert.match(await (await call(callback,undefined,other)).text(),/expired/);
+    const complete=await (await call(callback)).text();assert.match(complete,/zztakeoff-connected/);assert.doesNotMatch(complete,/private-test-token/);
+    assert.deepEqual(await (await call('status')).json(),{connected:true});
+    assert.deepEqual(await (await call('status',undefined,other)).json(),{connected:false});
+    const scope=await (await call('scope',{link:'https://www.zztakeoff.com/app/takeoff?projectId=source'})).json();
+    assert.equal(scope.items[0].measurements,'area: 160 SF');assert.equal(called,true);
+    assert.match(await (await call(callback)).text(),/expired/);
+    assert.equal((await call('scope',{link:'https://elsewhere.example/?projectId=source'})).status,422);
+    await call('disconnect',{});assert.deepEqual(await (await call('status')).json(),{connected:false});
+  }finally{await app.close();}
+});

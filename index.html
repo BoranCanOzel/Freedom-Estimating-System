@@ -2890,6 +2890,8 @@
     </div>
   </div>
 
+  <div class="card" id="scopeCard" hidden></div>
+
   <div class="card" id="scopesCard" hidden>
     <div class="head">
       <div class="eyebrow-row"><span class="eyebrow">Scope of work</span></div>
@@ -5629,6 +5631,12 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     sum.addEventListener('click', () => { book.view = 'summary'; showView(); save(); });
     rail.insertBefore(sum, railEnd());
 
+    const scope = document.createElement('button');
+    scope.type = 'button'; scope.className = 'tab tab-scope'; scope.textContent = 'Scope';
+    scope.setAttribute('aria-selected', String(book.view === 'scope'));
+    scope.addEventListener('click', () => { book.view = 'scope'; showView(); save(); });
+    rail.insertBefore(scope, railEnd());
+
     book.sheets.forEach(sh => {
       const t = document.createElement('button');
       t.type = 'button';
@@ -5848,16 +5856,17 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     const pageActions = document.getElementById('workspace-page-actions');
     if (pageActions) pageActions.hidden = !hit;
     if (!hit){
-      ['sheetCard','summaryCard','scopesCard','loadCard','wageCard','libToggle'].forEach(id => document.getElementById(id).hidden = true);
+      ['sheetCard','summaryCard','scopeCard','scopesCard','loadCard','wageCard','libToggle'].forEach(id => document.getElementById(id).hidden = true);
       document.body.classList.remove('lib-open');
       document.dispatchEvent(new CustomEvent('estimator:view', {detail:{view:'empty'}}));
       return;
     }
     if (hit) hit.tk.active = book.active;
-    const known = ['summary','scopes','load','wage'];
+    const known = ['summary','scope','scopes','load','wage'];
     const v = known.indexOf(book.view) >= 0 ? book.view : 'sheet';
     document.getElementById('sheetCard').hidden = v !== 'sheet';
     document.getElementById('summaryCard').hidden = v !== 'summary';
+    document.getElementById('scopeCard').hidden = v !== 'scope';
     document.getElementById('scopesCard').hidden = v !== 'scopes';
     document.getElementById('loadCard').hidden = v !== 'load';
     document.getElementById('wageCard').hidden = v !== 'wage';
@@ -5868,7 +5877,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     else if (v === 'scopes') renderScopes();
     else if (v === 'load') renderLoad();
     else if (v === 'wage') renderWage();
-    else { renderAll(); if (document.body.classList.contains('lib-open')) renderLibrary(); }
+    else if (v === 'sheet') { renderAll(); if (document.body.classList.contains('lib-open')) renderLibrary(); }
     document.dispatchEvent(new CustomEvent('estimator:view', {detail:{view:v}}));
   }
 
@@ -6861,7 +6870,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       delete tk.loadCalc;
     });
     if (!book.sheets.some(s => s.id === book.active)) book.active = book.sheets[0].id;
-    if (['summary','scopes','sheet','load','wage'].indexOf(book.view) < 0) book.view = 'sheet';
+    if (['summary','scope','scopes','sheet','load','wage'].indexOf(book.view) < 0) book.view = 'sheet';
     state = book.sheets.find(s => s.id === book.active) || book.sheets[0];
   }
 
@@ -11973,7 +11982,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     if (resumeTakeoff) {
       bk.activeList = resumeList.id; bk.activeTakeoff = resumeTakeoff.id;
       if ((resumeTakeoff.sheets || []).some(s => s.id === location.sheet)) resumeTakeoff.active = bk.active = location.sheet;
-      bk.view = ['sheet','summary','scopes','load','wage'].includes(location.view) ? location.view : 'sheet';
+      bk.view = ['sheet','summary','scope','scopes','load','wage'].includes(location.view) ? location.view : 'sheet';
     }
     if (Array.isArray(bk.rows)) return {view:'sheet', active:null, sheets:[normalize(Object.assign(bk, {num:1}))]};
     const list = (bk.lists || []).find(l => l.id === bk.activeList) || (bk.lists || [])[0];
@@ -12125,7 +12134,18 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       const hit = findTakeoff(book.activeTakeoff);
       return hit ? String(hit.pr.address || '').trim() || String(hit.co.address || '').trim() : '';
     },
-    getZZTakeoffLink(){ return projectWebLink(findTakeoff(book.activeTakeoff)?.pr.zztakeoffLink); },
+    getZZTakeoffLink(){const hit=findTakeoff(book.activeTakeoff);return projectWebLink(hit?.tk.scopeLink ?? hit?.pr.zztakeoffLink);},
+    getScope(){
+      const hit=findTakeoff(book.activeTakeoff);
+      return {link:hit?.tk.scopeLink ?? hit?.pr.zztakeoffLink ?? '',data:hit?.tk.scopeData || null};
+    },
+    setScopeLink(value){const hit=findTakeoff(book.activeTakeoff);if(hit){hit.tk.scopeLink=value;save();}},
+    setScopeData(data){const hit=findTakeoff(book.activeTakeoff);if(hit){hit.tk.scopeData=structuredClone(data);save();}},
+    setScopeItemStatus(itemId,status){
+      if(!['included','excluded','ignored','duplicate'].includes(status))return;
+      const item=findTakeoff(book.activeTakeoff)?.tk.scopeData?.items?.find(item=>item.id===itemId);
+      if(item){item.status=status;save();}
+    },
     getEditorHistory(){
       if (document.getElementById('editor').hidden) return null;
       const draft = ({item:itemDraft, section:secDraft, scope:scopeDraft, part:partDraft,
@@ -12167,7 +12187,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       openTakeoff(hit.tk.id);
       const sh = book.sheets.find(s => s.id === location.sheet);
       if (sh) { book.active = hit.tk.active = sh.id; state = sh; }
-      book.view = ['sheet','summary','scopes','load','wage'].includes(location.view) ? location.view : 'sheet';
+      book.view = ['sheet','summary','scope','scopes','load','wage'].includes(location.view) ? location.view : 'sheet';
       showView(); renderProjects(); save(); return true;
     },
     exportBook(){ return structuredClone(book); },

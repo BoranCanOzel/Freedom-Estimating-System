@@ -1319,6 +1319,55 @@ test('project presence, tab highlights, collapse and recent views work for two u
   } finally {await context.close();}
 });
 
+test('Scope fetch keeps per-takeoff review marks and never replaces estimate pages',async({page})=>{
+  const data=workbook();data.lists[0].companies[0].projects[0].zztakeoffLink='https://www.zztakeoff.com/app/takeoff?projectId=north';
+  let revision=0,failed=false;
+  await page.route('**/api/zztakeoff/status',route=>route.fulfill({json:{connected:true}}));
+  await page.route('**/api/zztakeoff/scope',route=>{
+    if(failed)return route.fulfill({status:502,json:{error:'ZZTakeoff could not be reached. Your saved scope is unchanged.'}});
+    return route.fulfill({json:{source:'north',fetchedAt:'2026-09-30T12:00:00Z',items:[
+      {id:'a',name:revision?'Concrete slab revised':'Concrete slab',measurements:revision?'area: 180 SF':'area: 160 SF',group:'Level 1'},
+      {id:'b',name:'Sawcut perimeter',measurements:'length: 80 LF',group:'Level 1'},
+      {id:'c',name:'Extra slab',measurements:'area: 160 SF',group:'Alternate'},
+      ...(revision?[]:[{id:'d',name:'Reference note',group:'Notes'}])
+    ]}});
+  });
+  await openWorkbook(page,data);
+  const original=await page.evaluate(()=>JSON.stringify(window.estimator.getShared().lists[0].companies[0].projects.find(p=>p.id==='north').takeoffs[0].sheets));
+  await page.locator('#rail .tab-scope').click();
+  await expect(page.locator('#scopeCard')).toBeVisible();
+  await expect(page.locator('#scope-source')).toHaveValue(data.lists[0].companies[0].projects[0].zztakeoffLink);
+  await page.locator('#scope-fetch').click();
+  await expect(page.locator('[data-scope-item]')).toHaveCount(4);
+  await page.getByRole('button',{name:'Exclude Concrete slab',exact:true}).click();
+  await page.getByRole('button',{name:'Ignore Reference note',exact:true}).click();
+  await page.getByRole('button',{name:'Mark duplicate Extra slab',exact:true}).click();
+  await expect(page.locator('#scope-count')).toHaveText('1 included / 4 source items');
+  await page.locator('#scope-filter').selectOption('excluded');
+  await expect(page.locator('[data-scope-item]')).toHaveCount(1);
+  await page.locator('#scope-filter').selectOption('all');
+  await page.screenshot({path:'test-results/scope-review.png',fullPage:true});
+  revision++;
+  await page.locator('#scope-fetch').click();
+  await expect(page.locator('[data-scope-item="a"]')).toContainText('180 SF');
+  await expect(page.locator('[data-scope-item="a"]')).toHaveAttribute('data-status','excluded');
+  await expect(page.locator('[data-scope-item="c"]')).toHaveAttribute('data-status','duplicate');
+  await expect(page.locator('[data-scope-item="d"]')).toContainText('No longer in source');
+  await page.getByRole('button',{name:'Exclude Concrete slab revised',exact:true}).click();
+  await expect(page.locator('[data-scope-item="a"]')).toHaveAttribute('data-status','included');
+  failed=true;await page.locator('#scope-fetch').click();
+  await expect(page.locator('#scope-message')).toContainText('could not be reached');
+  await expect(page.locator('[data-scope-item]')).toHaveCount(4);
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();
+  await expect(page.locator('#scopeCard')).toBeVisible();
+  await expect(page.locator('[data-scope-item="c"]')).toHaveAttribute('data-status','duplicate');
+  expect(await page.evaluate(()=>JSON.stringify(window.estimator.getShared().lists[0].companies[0].projects.find(p=>p.id==='north').takeoffs[0].sheets))).toBe(original);
+  await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'ts',sheet:'ss',view:'scope'}));
+  await expect(page.locator('[data-scope-item]')).toHaveCount(0);
+  await expect(page.locator('#scope-source')).toHaveValue('');
+});
+
 test('summary shows customer, job address maps and the active takeoff', async ({page}) => {
   const data=workbook(), company=data.lists[0].companies[0];
   company.address='12 Office Road'; company.phone='555-0100'; company.email='office@example.com';
