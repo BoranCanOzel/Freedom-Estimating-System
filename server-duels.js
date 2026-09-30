@@ -10,7 +10,7 @@ export function createDuels() {
   }
   function publish(game, extra = {}) {
     game.players.forEach((ws, index) => send(ws, {event:'state', id:game.id, you:index,
-      names:game.players.map(p=>p.name), ground:game.ground, angles:game.angles, positions:game.positions, fuel:game.fuel, turn:game.turn, round:game.round, ...extra}));
+      names:game.players.map(p=>p.name), ground:game.ground, angles:game.angles, positions:game.positions, fuel:game.fuel, shields:game.shields, shieldUsed:game.shieldUsed, turn:game.turn, round:game.round, ...extra}));
   }
   function handle(ws, msg, clients) {
     const error = reason => send(ws, {event:'error', reason});
@@ -36,7 +36,14 @@ export function createDuels() {
       clearTimeout(game.timer); game.phase = 'playing'; game.ground = terrain();
       game.turn = Math.random() < .5 ? 0 : 1; game.round = 0; game.angles = [45,135];
       game.positions = [85,915]; game.fuel = MOVE_FUEL;
+      game.shields = [false,false]; game.shieldUsed = [false,false];
       publish(game); return;
+    }
+    if (msg.action === 'shield') {
+      if (game.phase !== 'playing' || game.players[game.turn] !== ws || msg.round !== game.round || Date.now() < (game.nextShot || 0) || game.shieldUsed[game.turn]) return;
+      game.shields[game.turn] = true; game.shieldUsed[game.turn] = true;
+      for (const player of game.players) send(player, {event:'shield',id:game.id,round:game.round,shields:game.shields,shieldUsed:game.shieldUsed});
+      return;
     }
     if (msg.action === 'move') {
       if (game.phase !== 'playing' || game.players[game.turn] !== ws || msg.round !== game.round || Date.now() < (game.nextShot || 0)) return;
@@ -57,13 +64,14 @@ export function createDuels() {
     if (msg.action !== 'fire') return;
     if (game.phase !== 'playing' || game.players[game.turn] !== ws || Date.now() < (game.nextShot || 0) || msg.round !== game.round) return error('Wait for your turn.');
     if (!Number.isFinite(msg.angle) || msg.angle < 5 || msg.angle > 175 || !Number.isFinite(msg.power) || msg.power < 10 || msg.power > 100) return error('Choose a valid angle and power.');
-    const shot = fireShot(game.ground, game.turn, msg.angle, msg.power, game.positions);
+    const shot = fireShot(game.ground, game.turn, msg.angle, msg.power, game.positions, game.shields);
+    if (shot.deflected != null) game.shields[shot.deflected] = false;
     game.angles[game.turn] = msg.angle;
     game.ground = shot.ground; game.round++; game.turn = 1 - game.turn; game.nextShot = Date.now() + 1700;
     game.fuel = MOVE_FUEL;
     const winner = shot.hit === null ? null : 1 - shot.hit;
     const finished = winner !== null || game.round >= 60;
-    publish(game, {shot:{path:shot.path,impact:shot.impact}, winner, finished});
+    publish(game, {shot:{path:shot.path,impact:shot.impact,deflected:shot.deflected}, winner, finished});
     if (finished) for (const player of game.players) active.delete(player);
   }
   return { handle, disconnect(ws) { const game = active.get(ws); if (game) finish(game, ws.name + ' disconnected. Duel ended.'); } };

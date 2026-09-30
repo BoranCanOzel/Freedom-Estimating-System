@@ -534,7 +534,7 @@ function confirmDelete(project){
   };
   deleteDialog.showModal();$('delete-workbook-confirm').focus();
 }
-tankDuel = setupTankDuel(() => connection, message);
+tankDuel = setupTankDuel(() => connection);
 $('workspace-tank-solo').onclick = () => { $('workspace-view').open = false; tankDuel.singlePlayer(); };
 const takeoffAccessContext=()=>{
   const location=bridge.getLocation();

@@ -7,6 +7,8 @@
 #tank-duel button:disabled{opacity:.45;cursor:default}
 #tank-duel button:focus-visible,#tank-duel input:focus-visible{outline:2px solid #ffcf87;outline-offset:3px}
 #tank-duel #duel-fire,#tank-duel #duel-accept{background:#c58c3e;color:#171f24}
+#tank-duel #duel-shield{border-color:#54bfff;background:#163d60;color:#d6f5ff;min-width:132px}
+#tank-duel #duel-shield[aria-pressed="true"]{opacity:1;background:#185881;box-shadow:0 0 12px #32b6ff55}
 #tank-duel canvas{order:1;display:block;width:100%;height:clamp(160px,28vh,300px);min-height:0;object-fit:fill;background:transparent}
 #tank-duel:has(#duel-game:not([hidden])){height:100dvh;max-height:100dvh}
 #tank-duel:has(#duel-game:not([hidden])) canvas{height:0;flex:1 1 0}
@@ -28,4 +30,8 @@
 #duel-invite{order:3;padding:0 16px 14px;background:#202b33f5;pointer-events:auto}#duel-invite button{margin-right:8px}
 .server-peer-actions{display:inline-flex;align-items:center;gap:2px}
 body.server-mode #server-bar .server-duel-challenge{padding:3px 5px;min-width:24px;color:var(--amber);background:transparent;border:0;font-size:15px}
-@media print{#tank-duel{display:none!important}}
+#duel-notice{position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:660;display:flex;align-items:center;gap:12px;box-sizing:border-box;max-width:calc(100vw - 32px);width:max-content;padding:12px 16px;border:1px solid #73838c;border-radius:7px;background:#202b33;color:#f6ead5;box-shadow:0 4px 18px #0004;font:13px/1.5 system-ui,sans-serif}
+#duel-notice[hidden]{display:none}
+#duel-notice button{flex:none;padding:5px 8px;border:1px solid #73838c;border-radius:4px;background:transparent;color:inherit;font:inherit;cursor:pointer}
+#duel-notice button:focus-visible{outline:2px solid #ffcf87;outline-offset:2px}
+@media print{#tank-duel,#duel-notice{display:none!important}}

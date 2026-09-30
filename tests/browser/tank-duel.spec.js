@@ -17,7 +17,19 @@ test('online players accept a tank duel, trade shots and leave without changing 
     await alice.getByRole('button',{name:/Challenge Tank Bob/}).click();
     await expect(bob.locator('#duel-accept')).toBeVisible();
     await expect(alice.locator('#duel-status')).toHaveText('Challenge sent');
+    const challenge = alice.getByRole('button',{name:/Challenge Tank Bob/});
+    await challenge.click();
+    await expect(alice.locator('#duel-notice')).toContainText('One of you already has a duel or invitation open.');
+    await expect(alice.locator('#server-message')).not.toContainText('duel or invitation');
+    await expect(alice.locator('#duel-notice')).toBeHidden({timeout:8000});
+    await challenge.click();
+    await expect(alice.locator('#duel-notice')).toBeVisible();
+    await alice.getByRole('button',{name:'Dismiss duel message'}).click();
+    await expect(alice.locator('#duel-notice')).toBeHidden();
+    await challenge.click();
+    await expect(alice.locator('#duel-notice')).toBeVisible();
     await bob.locator('#duel-accept').click();
+    await expect(alice.locator('#duel-notice')).toBeHidden();
     for(const page of [alice,bob])await expect(page.locator('#duel-game')).toBeVisible();
     const overlay = await alice.locator('#tank-duel').evaluate(el=>{
       const rect=el.getBoundingClientRect(),canvas=el.querySelector('canvas'),bounds=canvas.getBoundingClientRect();
@@ -37,6 +49,10 @@ test('online players accept a tank duel, trade shots and leave without changing 
     const first=await alice.locator('#duel-fire').isEnabled()?alice:bob,second=first===alice?bob:alice;
     await expect(second.locator('#duel-fire')).toBeDisabled();
     await expect(second.locator('#duel-right')).toBeDisabled();
+    await expect(second.locator('#duel-shield')).toBeDisabled();
+    await first.locator('#duel-shield').click();
+    await expect(first.locator('#duel-shield')).toHaveText('Shield active');
+    await expect(first.locator('#duel-shield')).toBeDisabled();
     await first.locator('#duel-right').click();
     for(const page of [first,second])await expect(page.locator('#duel-fuel')).toHaveText('Turn fuel: 54/60');
     await first.locator('#duel-right').focus();await first.keyboard.press('a');
@@ -83,6 +99,9 @@ test('single player controls both tanks and remembers each aim without changing 
   await page.getByRole('button',{name:'Tank game: single player'}).click();
   await expect(page.locator('#duel-side')).toHaveText('Single player: You control both tanks');
   await expect(page.locator('#duel-status')).toContainText('Teal tank');
+  await page.locator('#duel-shield').click();
+  await expect(page.locator('#duel-shield')).toHaveText('Shield active');
+  await expect(page.locator('#duel-shield')).toBeDisabled();
   await page.locator('#duel-right').focus();await page.keyboard.press('d');
   await expect(page.locator('#duel-fuel')).toHaveText('Turn fuel: 54/60');
   await page.evaluate(()=>{
@@ -103,6 +122,8 @@ test('single player controls both tanks and remembers each aim without changing 
   await expect(page.locator('#duel-fire')).toBeDisabled();
   await expect(page.locator('#duel-fire')).toBeEnabled();
   await expect(page.locator('#duel-status')).toContainText('Amber tank');
+  await expect(page.locator('#duel-shield')).toHaveText('Shield (1 charge)');
+  await expect(page.locator('#duel-shield')).toBeEnabled();
   await expect(page.locator('#duel-angle')).toHaveValue('135');
   await expect(page.locator('#duel-power')).toHaveValue('65');
   await expect(page.locator('#duel-fuel')).toHaveText('Turn fuel: 60/60');
@@ -116,11 +137,24 @@ test('single player controls both tanks and remembers each aim without changing 
   await expect(page.locator('#duel-power')).toHaveValue('10');
   await page.context().setOffline(true);
   await page.locator('#duel-restart').click();
+  await expect(page.locator('#duel-shield')).toHaveText('Shield (1 charge)');
+  await expect(page.locator('#duel-shield')).toBeEnabled();
   await expect(page.locator('#duel-fire')).toBeEnabled();
   await expect(page.locator('#duel-angle')).toHaveValue('45');
   await expect(page.locator('#duel-power')).toHaveValue('65');
   await expect(page.locator('#duel-fuel')).toHaveText('Turn fuel: 60/60');
+  await page.locator('#duel-shield').click();
+  await page.screenshot({path:'test-results/tank-shield.png'});
+  await page.locator('#duel-angle').fill('90');await page.locator('#duel-power').fill('10');
   await page.locator('#duel-fire').click();
+  await expect(page.locator('#duel-status')).toContainText('deflected the hit');
+  await expect(page.locator('#duel-fire')).toBeEnabled();
+  await expect(page.locator('#duel-result')).not.toBeVisible();
+  await page.locator('#duel-angle').fill('175');await page.locator('#duel-power').fill('10');
+  await page.locator('#duel-fire').click();
+  await expect(page.locator('#duel-fire')).toBeEnabled();
+  await expect(page.locator('#duel-shield')).toHaveText('Shield spent');
+  await expect(page.locator('#duel-shield')).toBeDisabled();
   await page.locator('#duel-close').click();
   await expect(page.locator('#tank-duel')).toBeHidden();
   expect(await page.evaluate(()=>window.estimator.getShared())).toEqual(before);
@@ -170,6 +204,15 @@ test('a killing shot shows each online player their result and Okay exits the ga
     await expect(pages[loser].locator('#duel-result')).toBeVisible();
     await pages[loser].getByRole('button',{name:'Okay',exact:true}).click();
     await expect(pages[loser].locator('#tank-duel')).toBeHidden();
+    // The completed match releases both players so the other player can invite again.
+    await bob.getByRole('button',{name:'Challenge '+names[0]+' to a tank duel'}).click();
+    await expect(alice.locator('#duel-accept')).toBeVisible();
+    await alice.locator('#duel-accept').click();
+    for(const page of pages){
+      await expect(page.locator('#duel-game')).toBeVisible();
+      await expect(page.locator('#duel-notice')).toBeHidden();
+    }
+    await bob.locator('#duel-close').click();
     expect(await alice.evaluate(()=>window.estimator.getShared())).toEqual(before);
     expect(errors).toEqual([]);
   }finally{await Promise.all(contexts.map(c=>c.close()));}

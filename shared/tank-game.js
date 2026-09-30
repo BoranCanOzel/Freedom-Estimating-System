@@ -1,6 +1,6 @@
 export const WIDTH = 1000, HEIGHT = 280;
 export const MOVE_FUEL = 60, MOVE_STEP = 6;
-export const MOVE_INTERVAL = 100, MAX_CLIMB_ANGLE = 50, MAX_STEP_HEIGHT = 6;
+export const MOVE_INTERVAL = 100, MAX_CLIMB_ANGLE = 80, MAX_STEP_HEIGHT = 6;
 
 export function groundHeight(ground, x) {
   x = Math.max(0, Math.min(WIDTH, x));
@@ -18,9 +18,9 @@ export function moveTank(ground, positions, player, direction, fuel) {
   for (let step = 0; step < Math.min(MOVE_STEP, fuel); step++) {
     const next = x + direction;
     if (next < 24 || next > WIDTH - 24 || Math.abs(next - positions[1-player]) < 42) break;
-    // Tracks bridge small ledges; steep faces and drops still stop the tank.
+    // Tracks climb up to 80 degrees and bridge small ledges, but not vertical walls.
     if (Math.abs(ground[next] - ground[x]) > MAX_STEP_HEIGHT ||
-        Math.abs(tankPose(ground, next).angle) > MAX_CLIMB_ANGLE * Math.PI / 180) break;
+        Math.abs(tankPose(ground, next).angle) > MAX_CLIMB_ANGLE * Math.PI / 180 + 1e-10) break;
     x = next; used++;
   }
   return {x, fuel: fuel - used};
@@ -40,7 +40,7 @@ export function terrain(random = Math.random) {
   return ground;
 }
 
-export function fireShot(ground, player, angle, power, positions = [85,915]) {
+export function fireShot(ground, player, angle, power, positions = [85,915], shields = [false,false]) {
   const x0 = positions[player], y0 = tankPose(ground, x0).y - 12;
   const radians = angle * Math.PI / 180;
   let x = x0 + Math.cos(radians) * 24, y = y0 - Math.sin(radians) * 24;
@@ -62,6 +62,9 @@ export function fireShot(ground, player, angle, power, positions = [85,915]) {
       break;
     }
   }
+  // A shield also catches a nearby blast that would otherwise destroy the tank.
+  // Deflected shells are harmless and leave the terrain intact.
+  if (hit !== null && shields[hit]) return {path, ground:[...ground], hit:null, impact, deflected:hit};
   const next = [...ground];
   if (impact) for (let i = Math.max(0, Math.floor(x - 25)); i <= Math.min(WIDTH, Math.ceil(x + 25)); i++) {
     next[i] = Math.min(HEIGHT - 8, Math.max(next[i], y + Math.sqrt(Math.max(0, 625 - (i - x) ** 2))));
