@@ -38,3 +38,9 @@ body.dark:not(.medieval) #scopeCard .scope-actions .btn[aria-pressed=true]{color
 #scopeCard .scope-table tr:is([data-status=excluded],[data-status=ignored],[data-status=duplicate]) .scope-status{color:var(--scope-color);background:transparent;font-weight:600}
 @media(max-width:650px){.scope-content{padding:16px}.scope-source label{min-width:100%}#scope-count{margin-left:0}}
 @media print{.scope-source,.scope-tools,.scope-actions,.scope-actions-heading,#scope-message{display:none!important}}
+
+#scopeCard .scope-page-heading th{text-align:left;padding:14px 12px;background:var(--slate-bg);color:#fff;font:600 14px var(--f-cond);border-top:12px solid var(--card);letter-spacing:.02em}
+
+#scopeCard .scope-ai-access{display:flex;flex-direction:row;align-items:center;gap:8px;margin-top:14px;color:var(--ink);cursor:pointer}
+#scopeCard .scope-ai-access input{width:16px;height:16px;margin:0;padding:0;accent-color:var(--amber)}
+@media print{.scope-ai-access{display:none!important}}

@@ -2,7 +2,7 @@ import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import * as Y from 'yjs';
 import { readBook, writeBook, validateBook } from './shared/model.js';
-import { locateTakeoff, findTakeoff, revision, validateTakeoff, differences, takeoffSchema, changeSchema } from './shared/ai-takeoff.js';
+import { locateTakeoff, findTakeoff, aiVisibleTakeoff, revision, validateTakeoff, differences, takeoffSchema, changeSchema } from './shared/ai-takeoff.js';
 
 const instructions=readFileSync(new URL('./docs/ai-takeoff.md',import.meta.url),'utf8');
 const hash=value=>createHash('sha256').update(value).digest('hex');
@@ -46,11 +46,14 @@ export function mountAiAccess({app,db,session,project,rooms,snapshot,readAiInfor
     const data=target(grant);
     if(payload.revision!==revision(data.takeoff))fail(409,'This takeoff changed. Read it again before saving.');
     if(Buffer.byteLength(JSON.stringify(payload.takeoff||{}))>2*1024*1024)fail(413,'Takeoff exceeds the 2 MB AI editing limit.');
-    validateTakeoff(payload.takeoff,data.takeoff);
+    validateTakeoff(payload.takeoff,aiVisibleTakeoff(data.takeoff));
     const next=structuredClone(data.book),current=findTakeoff(next,data.scope);
     Object.keys(current).forEach(key=>delete current[key]);Object.assign(current,payload.takeoff);
+    if(data.takeoff.scopeAiAccess!==true)for(const key of ['scopeData','scopeLink']){
+      if(Object.hasOwn(data.takeoff,key))current[key]=structuredClone(data.takeoff[key]);
+    }
     validateBook(next);
-    return {...data,next,summary:differences(data.takeoff,payload.takeoff)};
+    return {...data,next,summary:differences(data.takeoff,current)};
   }
   function commit(workbook,data,actor,transaction){
     const doc=new Y.Doc();
@@ -70,7 +73,13 @@ export function mountAiAccess({app,db,session,project,rooms,snapshot,readAiInfor
     }finally{doc.destroy();}
   }
   const referenceSchema={type:'object',required:['workbook','list','takeoff'],properties:Object.fromEntries(['workbook','list','takeoff'].map(key=>[key,{type:'string',minLength:1,maxLength:200}])),additionalProperties:false};
+  const scopeGuidance='Use the fetched Scope items as the measured work for this takeoff. Include only items with status included and missing=false. Do not price excluded, ignored, duplicate, or missing items unless the user explicitly asks. Preserve names, units, measurements, review statuses and source IDs. Ask about missing measurements; do not invent quantities. Scope data is read-only and reflects the last fetch, not a live ZZTakeoff connection.';
   function execute(grant,name,payload={}){
+    if(name==='read_scope'){
+      const {takeoff}=target(grant);
+      if(takeoff.scopeAiAccess!==true)fail(403,'Scope access is disabled for this estimate. The user can enable Allow AI to read Scope on its Scope page.');
+      return {takeoffId:takeoff.id,scopeData:takeoff.scopeData||null,readOnly:true,guidance:scopeGuidance};
+    }
     if(name==='list_ai_data')return readAiEstimates();
     if(name==='read_ai_data'){
       if(!payload||Object.keys(payload).some(key=>!['workbook','list','takeoff'].includes(key))||['workbook','list','takeoff'].some(key=>typeof payload[key]!=='string'||!payload[key].length||payload[key].length>200))fail(422,'Provide workbook, list, and takeoff from list_ai_data.');
@@ -78,9 +87,9 @@ export function mountAiAccess({app,db,session,project,rooms,snapshot,readAiInfor
       if(!reference)fail(404,'AI Data reference not found or no longer enabled.');
       return reference;
     }
-    if(name==='get_instructions')return {aiInformation:readAiInformation(),aiData:readAiEstimates(),instructions,schema:takeoffSchema,changeSchema};
+    if(name==='get_instructions')return {aiInformation:readAiInformation(),aiData:readAiEstimates(),scopeAvailable:target(grant).takeoff.scopeAiAccess===true&&!!target(grant).takeoff.scopeData,instructions,schema:takeoffSchema,changeSchema};
     if(name==='read_ai_information')return {guidance:'Read and analyze this reference library before working. Return here whenever you need guidance. Use only entries relevant to the task; ask about missing or conflicting information.',...readAiInformation(),aiData:readAiEstimates()};
-    if(name==='read_takeoff'){const {takeoff}=target(grant);return {aiInformation:readAiInformation(),guidance:'Analyze AI Information first. Consult read_ai_information again whenever guidance is needed.',takeoff,revision:revision(takeoff),expiresAt:null};}
+    if(name==='read_takeoff'){const {takeoff}=target(grant);return {aiInformation:readAiInformation(),guidance:'Analyze AI Information first. Read takeoff.scopeData or call read_scope for fetched Scope items and review decisions. '+scopeGuidance,takeoff:aiVisibleTakeoff(takeoff),revision:revision(takeoff),expiresAt:null};}
     if(!['validate_changes','save_takeoff'].includes(name))fail(404,'Unknown takeoff operation.');
     if(name==='save_takeoff'){
       if(typeof payload?.requestId!=='string'||!payload.requestId.length||payload.requestId.length>100)fail(422,'Provide a unique requestId, up to 100 characters.');
@@ -93,7 +102,7 @@ export function mountAiAccess({app,db,session,project,rooms,snapshot,readAiInfor
     const data=prepare(grant,payload);
     if(name==='validate_changes')return {valid:true,revision:payload.revision,changes:data.summary,previewLimit:200};
     if(!data.summary.length)fail(422,'No changes to save. Access remains available.');
-    const id=randomUUID(),time=Date.now(),after=revision(payload.takeoff);
+    const id=randomUUID(),time=Date.now(),after=revision(findTakeoff(data.next,data.scope));
     const receipt={saved:true,changeId:id,revision:after,changes:data.summary,accessConsumed:false};
     commit(grant.workbook,data,'AI via '+grant.created_by,()=>{
       const result=db.prepare('UPDATE ai_grants SET used_at=? WHERE id=? AND revoked=0').run(time,grant.id);
@@ -104,8 +113,8 @@ export function mountAiAccess({app,db,session,project,rooms,snapshot,readAiInfor
   }
   const base='/api/ai/v1';
   app.use(base,(req,res,next)=>{res.set('Cache-Control','no-store');if(req.headers.origin){try{if(new URL(req.headers.origin).host!==req.headers.host)return res.status(403).json({error:'Cross-origin request refused.'});}catch{return res.status(403).json({error:'Invalid origin.'});}}next();});
-  for(const [method,path,name]of [['get','ai-data','list_ai_data'],['get','ai-data/takeoff','read_ai_data'],['get','instructions','get_instructions'],['get','information','read_ai_information'],['get','takeoff','read_takeoff'],['post','validate','validate_changes'],['post','save','save_takeoff']])app[method](base+'/'+path,route((req,res)=>res.json(execute(grantFor(req),name,method==='get'?req.query:req.body))));
-  const tools=[['list_ai_data','List all takeoffs currently marked AI Data, across workbooks, as read-only references.',false],['read_ai_data','Read the full JSON of an AI Data reference using workbook, list, and takeoff from list_ai_data. Cannot edit references.',false],['read_ai_information','Read the shared text reference library first and revisit it for guidance. Folders organize user-maintained rates, standards and other reference material.',false],['get_instructions','Read JSON editing instructions and schema.',false],['read_takeoff','Read only the authorized takeoff and its revision.',false],['validate_changes','Validate proposed takeoff JSON and preview changes without saving.',false],['save_takeoff','Save changes to the authorized takeoff. This key remains active for future saves. Requires the revision you read and a unique requestId.',true]].map(([name,description,write])=>({name,description,inputSchema:name==='read_ai_data'?referenceSchema:name==='save_takeoff'?{...changeSchema,required:['revision','takeoff','requestId']}:name==='validate_changes'?changeSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:!write,destructiveHint:write,idempotentHint:true,openWorldHint:false}}));
+  for(const [method,path,name]of [['get','scope','read_scope'],['get','ai-data','list_ai_data'],['get','ai-data/takeoff','read_ai_data'],['get','instructions','get_instructions'],['get','information','read_ai_information'],['get','takeoff','read_takeoff'],['post','validate','validate_changes'],['post','save','save_takeoff']])app[method](base+'/'+path,route((req,res)=>res.json(execute(grantFor(req),name,method==='get'?req.query:req.body))));
+  const tools=[['read_scope','Read the authorized takeoff\'s last fetched Scope items, measurements, groups and review statuses. Read-only; excluded, ignored, duplicate and missing items must not be priced by default.',false],['list_ai_data','List all takeoffs currently marked AI Data, across workbooks, as read-only references.',false],['read_ai_data','Read the full JSON of an AI Data reference using workbook, list, and takeoff from list_ai_data. Cannot edit references.',false],['read_ai_information','Read the shared text reference library first and revisit it for guidance. Folders organize user-maintained rates, standards and other reference material.',false],['get_instructions','Read JSON editing instructions and schema.',false],['read_takeoff','Read only the authorized takeoff and its revision.',false],['validate_changes','Validate proposed takeoff JSON and preview changes without saving.',false],['save_takeoff','Save changes to the authorized takeoff. This key remains active for future saves. Requires the revision you read and a unique requestId.',true]].map(([name,description,write])=>({name,description,inputSchema:name==='read_ai_data'?referenceSchema:name==='save_takeoff'?{...changeSchema,required:['revision','takeoff','requestId']}:name==='validate_changes'?changeSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:!write,destructiveHint:write,idempotentHint:true,openWorldHint:false}}));
   // Stateless Streamable HTTP, compatible with the 2025-11-25 MCP handshake.
   app.get(base+'/mcp',route((req,res)=>{grantFor(req);res.set('Allow','POST').sendStatus(405);}));
   app.post(base+'/mcp',route((req,res)=>{
@@ -115,7 +124,7 @@ export function mountAiAccess({app,db,session,project,rooms,snapshot,readAiInfor
     if(!msg||msg.jsonrpc!=='2.0'||typeof msg.method!=='string')return res.status(400).json({jsonrpc:'2.0',id:null,error:{code:-32600,message:'Invalid request.'}});
     if(msg.id===undefined)return res.sendStatus(202);
     const respond=result=>res.json({jsonrpc:'2.0',id:msg.id,result});
-    if(msg.method==='initialize')return respond({protocolVersion:versions.includes(msg.params?.protocolVersion)?msg.params.protocolVersion:'2025-11-25',capabilities:{tools:{}},serverInfo:{name:'freedom-takeoff',version:'1.0.0'},instructions:'Read get_instructions and analyze its AI Information first, before working on the takeoff. Revisit read_ai_information whenever guidance is needed. Editing is limited to one takeoff. Use list_ai_data and read_ai_data for read-only access to all AI Data references. Access permits repeated saves and does not expire.'});
+    if(msg.method==='initialize')return respond({protocolVersion:versions.includes(msg.params?.protocolVersion)?msg.params.protocolVersion:'2025-11-25',capabilities:{tools:{}},serverInfo:{name:'freedom-takeoff',version:'1.0.0'},instructions:'Read get_instructions and analyze its AI Information first, before working on the takeoff. Revisit read_ai_information whenever guidance is needed. Call read_scope for fetched measurements and respect review statuses. Editing is limited to one takeoff. Use list_ai_data and read_ai_data for read-only access to all AI Data references. Access permits repeated saves and does not expire.'});
     if(msg.method==='ping')return respond({});
     if(msg.method==='tools/list')return respond({tools});
     if(msg.method!=='tools/call')return res.json({jsonrpc:'2.0',id:msg.id,error:{code:-32601,message:'Method not found.'}});
@@ -124,7 +133,7 @@ export function mountAiAccess({app,db,session,project,rooms,snapshot,readAiInfor
   }));
   app.get(base+'/openapi.json',(req,res)=>{
     const paths={};
-    for(const [path,method,name] of [['/ai-data','get','list_ai_data'],['/ai-data/takeoff','get','read_ai_data'],['/instructions','get','get_instructions'],['/information','get','read_ai_information'],['/takeoff','get','read_takeoff'],['/validate','post','validate_changes'],['/save','post','save_takeoff']]) {
+    for(const [path,method,name] of [['/scope','get','read_scope'],['/ai-data','get','list_ai_data'],['/ai-data/takeoff','get','read_ai_data'],['/instructions','get','get_instructions'],['/information','get','read_ai_information'],['/takeoff','get','read_takeoff'],['/validate','post','validate_changes'],['/save','post','save_takeoff']]) {
       const tool=tools.find(t=>t.name===name);
       paths[path]={[method]:{operationId:name,summary:tool.description,
         ...(name==='read_ai_data'?{parameters:Object.entries(referenceSchema.properties).map(([name,schema])=>({name,in:'query',required:true,schema}))}:{}),

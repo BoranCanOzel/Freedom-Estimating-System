@@ -1328,9 +1328,9 @@ test('Scope fetch keeps per-takeoff review marks and never replaces estimate pag
     if(polls++===0)return route.fulfill({json:{state:'pending',stage:'reading scope items'}});
     if(failed)return route.fulfill({json:{state:'failed',error:'ZZTakeoff timed out while reading scope items. Your saved scope is unchanged.'}});
     return route.fulfill({json:{state:'complete',result:{source:'north',fetchedAt:'2026-09-30T12:00:00Z',items:[
-      {id:'a',name:revision?'Concrete slab revised':'Concrete slab',measurements:revision?'area: 180 SF':'area: 160 SF',group:'Level 1'},
-      {id:'b',name:'Sawcut perimeter',measurements:'length: 80 LF',group:'Level 1'},
-      {id:'c',name:'Extra slab',measurements:'area: 160 SF',group:'Alternate'},
+      {id:'a',name:revision?'Concrete slab revised':'Concrete slab',measurements:revision?'area: 180 SF':'area: 160 SF',group:'Level 1',pages:[{id:'p1',name:'A1 - Floor plan'}]},
+      {id:'b',name:'Sawcut perimeter',measurements:'length: 80 LF',group:'Level 1',pages:[{id:'p1',name:'A1 - Floor plan'}]},
+      {id:'c',name:'Extra slab',measurements:'area: 160 SF',group:'Alternate',pages:[{id:'p2',name:'A2 - Details'}]},
       ...(revision?[]:[{id:'d',name:'Reference note',group:'Notes'}])
     ]}}});
   });
@@ -1338,11 +1338,17 @@ test('Scope fetch keeps per-takeoff review marks and never replaces estimate pag
   const original=await page.evaluate(()=>JSON.stringify(window.estimator.getShared().lists[0].companies[0].projects.find(p=>p.id==='north').takeoffs[0].sheets));
   await page.locator('#rail .tab-scope').click();
   await expect(page.locator('#scopeCard')).toBeVisible();
+  await expect(page.locator('#scope-ai-access')).not.toBeChecked();
+  await page.locator('#scope-ai-access').check();
   await expect(page.locator('#scope-source')).toHaveValue(data.lists[0].companies[0].projects[0].zztakeoffLink);
   await page.locator('#scope-fetch').click();
   await expect(page.locator('#scope-message')).toContainText('reading scope items');
   await expect(page.locator('#scope-fetch')).toBeDisabled();
   await expect(page.locator('[data-scope-item]')).toHaveCount(4);
+  await expect(page.locator('.scope-page-heading')).toHaveText(['A1 - Floor plan','A2 - Details','No page assigned']);
+  await page.locator('#scope-search').fill('A2 - Details');
+  await expect(page.locator('[data-scope-item]')).toHaveCount(1);
+  await page.locator('#scope-search').fill('');
   await page.getByRole('button',{name:'Exclude Concrete slab',exact:true}).click();
   await page.getByRole('button',{name:'Ignore Reference note',exact:true}).click();
   await page.getByRole('button',{name:'Mark duplicate Extra slab',exact:true}).click();
@@ -1366,10 +1372,12 @@ test('Scope fetch keeps per-takeoff review marks and never replaces estimate pag
   await page.reload();
   await expect(page.locator('#scopeCard')).toBeVisible();
   await expect(page.locator('[data-scope-item="c"]')).toHaveAttribute('data-status','duplicate');
+  await expect(page.locator('#scope-ai-access')).toBeChecked();
   expect(await page.evaluate(()=>JSON.stringify(window.estimator.getShared().lists[0].companies[0].projects.find(p=>p.id==='north').takeoffs[0].sheets))).toBe(original);
   await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'ts',sheet:'ss',view:'scope'}));
   await expect(page.locator('[data-scope-item]')).toHaveCount(0);
   await expect(page.locator('#scope-source')).toHaveValue('');
+  await expect(page.locator('#scope-ai-access')).not.toBeChecked();
 });
 
 test('summary shows customer, job address maps and the active takeoff', async ({page}) => {

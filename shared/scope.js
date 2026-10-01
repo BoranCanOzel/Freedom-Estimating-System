@@ -9,6 +9,7 @@ export function mergeScope(previous, incoming) {
     if (!item || typeof item.id !== 'string' || !item.id || seen.has(item.id) || typeof item.name !== 'string') throw Error('Each scope item needs a unique source ID and a name.');
     seen.add(item.id);
     return {id:item.id, name:item.name, measurements:String(item.measurements || ''), group:String(item.group || ''),
+      ...(Array.isArray(item.pages)?{pages:item.pages.map(page=>({id:String(page.id),name:String(page.name)}))}:{}),
       status:scopeStatuses.includes(old.get(item.id)?.status) ? old.get(item.id).status : 'included', missing:false};
   });
   for (const [id, item] of old) if (!seen.has(id)) items.push({...item, missing:true});

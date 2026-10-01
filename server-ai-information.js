@@ -1,3 +1,4 @@
+import { aiVisibleTakeoff } from './shared/ai-takeoff.js';
 import { createHash } from 'node:crypto';
 import * as Y from 'yjs';
 import { readBook } from './shared/model.js';
@@ -25,7 +26,7 @@ export function mountAiInformation({app,db,session,rooms}) {
           const metadata={workbook:workbook.id,workbookName:workbook.name,list:list.id,listName:list.name||'Projects',
             companyName:company.name||'Untitled customer',projectName:project.name||'Untitled project',
             takeoff:takeoff.id,takeoffName:takeoff.name||'Untitled estimate',sheet:takeoff.sheets?.[0]?.id||'',pages:takeoff.sheets?.length||0};
-          if(selector)return {reference:metadata,takeoff,readOnly:true};
+          if(selector)return {reference:metadata,takeoff:aiVisibleTakeoff(takeoff),readOnly:true};
           estimates.push(metadata);
         }
       }finally{if(!live)doc.destroy();}

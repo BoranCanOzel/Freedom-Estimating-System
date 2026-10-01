@@ -87,7 +87,7 @@ export function zzScope(records,projectId){
       seen.add(parent);if(names.get(parent))parents.unshift(names.get(parent));
       parent=byId.get(parent)?.parentId;
     }
-    items.push({id:record._id,name:String(property(properties.name)||record.name||'Unnamed item'),measurements:measurements.join('\n'),group:parents.join(' / ')});
+    items.push({id:record._id,name:String(property(properties.name)||record.name||'Unnamed item'),measurements:measurements.join('\n'),group:parents.join(' / '),...(Array.isArray(record.scopePages)&&record.scopePages.length?{pages:record.scopePages.map(p=>({id:String(p.id),name:String(p.name)}))}:{})});
   }
   return {source:projectId,fetchedAt:new Date().toISOString(),items};
 }
@@ -110,6 +110,38 @@ for (let page = 0; page < 100; page++) {
   if (!Array.isArray(result.records)) throw new Error('ZZTakeoff returned an unsupported takeoff list.');
   records.push(...result.records);
   if (!result.pagination || !result.pagination.more) {
+    function listAll(api, limit) {
+      const out=[]; let offset=0;
+      while(out.length<limit) {
+        const batch=api.list({}, {limit:100, skip:offset});
+        if (!Array.isArray(batch.records)) throw new Error('ZZTakeoff returned an unsupported page mapping.');
+        out.push(...batch.records);
+        if (!batch.pagination || !batch.pagination.more) return out;
+        if (!(batch.pagination.skip>offset)) throw new Error('ZZTakeoff page mapping pagination did not advance.');
+        offset=batch.pagination.skip;
+      }
+      throw new Error('ZZTakeoff page mapping exceeds the fetch limit. No partial scope was imported.');
+    }
+    const pages=listAll(Pages,10000), drawings=listAll(DrawObjects,100000);
+    const pageById=new Map(pages.map(p=>[p._id,p])), links=new Map();
+    for (const drawing of drawings) {
+      if (!drawing.takeoffId || !drawing.pageId || drawing.cutoutForId) continue;
+      if (!links.has(drawing.takeoffId)) links.set(drawing.takeoffId,new Set());
+      links.get(drawing.takeoffId).add(drawing.pageId);
+    }
+    const recordById=new Map(records.map(r=>[r._id,r]));
+    const text=p=>p && (p.formatted || p.result || p.value) || '';
+    for (const record of records) {
+      let owner=record; const seen=new Set();
+      while(owner && !links.has(owner._id) && !seen.has(owner._id)) {
+        seen.add(owner._id); owner=recordById.get(owner.parentId);
+      }
+      if (!owner || !links.has(owner._id)) continue;
+      record.scopePages=[...links.get(owner._id)].map(id=>{
+        const p=pageById.get(id);
+        return {id,name:p ? [text(p.properties && p.properties.number),text(p.properties && p.properties.name)].filter(Boolean).join(' - ') || 'Unnamed page' : 'Unavailable page',order:p && p.order};
+      }).sort((a,b)=>(Number(a.order)||0)-(Number(b.order)||0)||a.name.localeCompare(b.name));
+    }
     // MCP may render a script result inside prose instead of a JSON envelope.
     // URI encoding keeps quotes, newlines and marker-like item names unambiguous.
     return 'FREEDOM_SCOPE_V1:' + encodeURIComponent(JSON.stringify({projectId, records})) + ':END_FREEDOM_SCOPE_V1';

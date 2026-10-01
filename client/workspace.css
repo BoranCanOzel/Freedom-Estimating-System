@@ -114,7 +114,7 @@ body #sheetTable tr.section-head.tree-child .name-in::placeholder{color:var(--mu
 .subsection-badge{flex:none;padding:3px 6px;border:1px solid var(--rule);border-radius:4px;color:var(--muted);background:var(--card);font:600 10px var(--f-sans);letter-spacing:normal;white-space:nowrap;text-shadow:none}
 body.server-mode .sheet>.card{padding-bottom:8px}
 body.server-mode #sheetCard>.head{padding-top:7px;padding-bottom:5px}
-body.server-mode #sheetCard .eyebrow-row{min-height:32px}
+body.server-mode #sheetCard .eyebrow-row{min-height:32px;gap:10px;flex-wrap:wrap}
 body.server-mode #titleNote{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:32px;min-width:80px;padding:6px 10px;opacity:1;border:1px solid var(--rule);border-radius:5px;font:500 12px var(--f-sans);line-height:1;color:var(--ink)}
 body.server-mode #titleNote svg{width:14px;height:12px}
 body.server-mode #workspace-toggle-notes{margin-left:auto;min-height:32px;padding:6px 10px;border:1px solid var(--rule);border-radius:5px;background:transparent;color:var(--ink);font:500 12px var(--f-sans);cursor:pointer}
@@ -242,7 +242,7 @@ body.server-mode #summaryCard>.bar{padding:12px var(--summary-gutter);gap:10px}
 @media(max-width:700px){body.server-mode :is(#summaryCard,#scopeCard){--summary-gutter:16px}body.server-mode :is(#summaryCard,#scopeCard)>.head{padding-top:16px;padding-bottom:16px}body.server-mode #summaryCard .sum-blocks{gap:12px}}
 body.server-mode :is(#summaryCard,#scopeCard) .eyebrow-row{gap:10px;flex-wrap:wrap;margin-bottom:12px}
 body.server-mode :is(#summaryCard,#scopeCard) .eyebrow-row>.eyebrow{margin-right:auto}
-body.server-mode :is(#summaryCard,#scopeCard) .eyebrow-row>.btn.ghost,body.server-mode :is(#summaryCard,#scopeCard) .eyebrow-row>#workspace-map{margin-left:0}
+body.server-mode :is(#summaryCard,#scopeCard,#sheetCard) .eyebrow-row>.btn.ghost,body.server-mode :is(#summaryCard,#scopeCard,#sheetCard) .eyebrow-row>#workspace-map{margin-left:0}
 
 /* Continuous section rails connect each header to its subtotal through nested groups. */
 body{--section-line:#705B42;--subsection-line:#A08360}

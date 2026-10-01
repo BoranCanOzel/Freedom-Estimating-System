@@ -6,7 +6,7 @@ const statusLabels={included:'Included',excluded:'Excluded',ignored:'Ignored',du
 
 export function setupScope(api, context, bridge) {
   const card=document.getElementById('scopeCard');
-  card.innerHTML='<div class="head"><div class="eyebrow-row"><span class="eyebrow">Scope</span></div><div class="sum-title" id="scope-title"></div><p class="scope-description">Measured work from ZZTakeoff. Review each line before using it in your estimate.</p></div><div class="scroll scope-content"><div class="scope-source"><label>ZZTakeoff project link<input id="scope-source" type="url" placeholder="Paste the ZZTakeoff project link"></label><button type="button" class="btn" id="scope-fetch">Fetch from ZZTakeoff</button><button type="button" class="btn alt" id="scope-connect">Connect ZZTakeoff</button></div><p id="scope-message" role="status"></p><div class="scope-tools"><label>Find an item<input id="scope-search" type="search" placeholder="Search scope items"></label><label>Show<select id="scope-filter" aria-label="Scope status"><option value="all">All items</option><option value="included">Included</option><option value="excluded">Excluded</option><option value="ignored">Ignored</option><option value="duplicate">Duplicates</option><option value="missing">No longer in source</option></select></label><span id="scope-count"></span></div><div id="scope-results"></div></div>';
+  card.innerHTML='<div class="head"><div class="eyebrow-row"><span class="eyebrow">Scope</span></div><div class="sum-title" id="scope-title"></div><p class="scope-description">Measured work from ZZTakeoff. Review each line before using it in your estimate.</p></div><div class="scroll scope-content"><div class="scope-source"><label>ZZTakeoff project link<input id="scope-source" type="url" placeholder="Paste the ZZTakeoff project link"></label><button type="button" class="btn" id="scope-fetch">Fetch from ZZTakeoff</button><button type="button" class="btn alt" id="scope-connect">Connect ZZTakeoff</button></div><label class="scope-ai-access"><input type="checkbox" id="scope-ai-access"> Allow AI to read Scope</label><p id="scope-message" role="status"></p><div class="scope-tools"><label>Find an item<input id="scope-search" type="search" placeholder="Search scope items"></label><label>Show<select id="scope-filter" aria-label="Scope status"><option value="all">All items</option><option value="included">Included</option><option value="excluded">Excluded</option><option value="ignored">Ignored</option><option value="duplicate">Duplicates</option><option value="missing">No longer in source</option></select></label><span id="scope-count"></span></div><div id="scope-results"></div></div>';
   const $=id=>document.getElementById('scope-'+id);
   let identity='',busy=false,connection=null;
   const key=()=>{const c=context();return `${c.workbook}/${c.list}/${c.takeoff}`;};
@@ -14,6 +14,7 @@ export function setupScope(api, context, bridge) {
     if(bridge.getLocation().view!=='scope')return;
     if(identity!==key()){identity=key();$('search').value='';$('filter').value='all';$('message').textContent='';}
     const scope=bridge.getScope();
+    $('ai-access').checked=scope.aiAccess===true;
     $('title').textContent=context().name;
     if(document.activeElement!==$('source'))$('source').value=scope.link || '';
     $('fetch').disabled=busy || !context().workbook;
@@ -23,7 +24,7 @@ export function setupScope(api, context, bridge) {
     const items=scope.data?.items || [], included=items.filter(item=>!item.missing&&item.status==='included').length;
     $('count').textContent=`${included} included / ${items.filter(item=>!item.missing).length} source items`;
     const query=$('search').value.trim().toLowerCase(), filter=$('filter').value;
-    const visible=items.filter(item=>(!query||`${item.name} ${item.group} ${item.measurements}`.toLowerCase().includes(query))&&(filter==='all'||(filter==='missing'?item.missing:!item.missing&&item.status===filter)));
+    const visible=items.filter(item=>(!query||`${item.name} ${item.group} ${item.measurements} ${(item.pages||[]).map(p=>p.name).join(" ")}`.toLowerCase().includes(query))&&(filter==='all'||(filter==='missing'?item.missing:!item.missing&&item.status===filter)));
     const results=$('results');results.replaceChildren();
     if(!items.length){
       const empty=el('div','','scope-empty');empty.append(el('h3','Bring your measured scope into this takeoff'),el('p','Connect ZZTakeoff, add the project link, then fetch its items. Each line can be excluded, ignored, or marked as a duplicate.'));results.append(empty);return;
@@ -32,8 +33,18 @@ export function setupScope(api, context, bridge) {
     stamp.textContent=scope.data.fetchedAt?'Last fetched '+new Date(scope.data.fetchedAt).toLocaleString():'';results.append(stamp);
     if(!visible.length){results.append(el('p','No items match this view.','scope-empty'));return;}
     const table=el('table','','sum-table scope-table');table.innerHTML='<thead><tr><th scope="col">Scope item</th><th scope="col">Measurements</th><th scope="col">Status</th><th scope="col" class="scope-actions-heading">Review</th></tr></thead>';
-    const body=el('tbody');table.append(body);
+    const groups=new Map();
     for(const item of visible){
+      const pages=item.pages||[],key=JSON.stringify(pages.map(p=>p.id).sort());
+      if(!groups.has(key))groups.set(key,{pages,items:[]});
+      groups.get(key).items.push(item);
+    }
+    for(const {pages,items:pageItems} of groups.values()){
+      const body=el('tbody');table.append(body);
+      const header=el('tr','','scope-page-heading'),cell=el('th');cell.colSpan=4;cell.scope='rowgroup';
+      cell.textContent=pages.length?(pages.length>1?'Shared across pages: ':'')+pages.map(p=>p.name).join(' / '):'No page assigned';
+      header.append(cell);body.append(header);
+      for(const item of pageItems){
       const row=el('tr');row.dataset.scopeItem=item.id;row.dataset.status=item.status;
       const name=el('td');name.append(el('strong',item.name));if(item.group)name.append(el('small',item.group));
       const status=el('td');status.append(el('span',item.missing?'No longer in source':statusLabels[item.status]||'Included','scope-status'));
@@ -51,8 +62,10 @@ export function setupScope(api, context, bridge) {
       }
       row.append(name,el('td',item.measurements||'Not supplied','scope-measurements'),status,actions);body.append(row);
     }
+    }
     const scroll=el('div','','scope-table-scroll');scroll.append(table);results.append(scroll);
   }
+  $('ai-access').onchange=()=>{bridge.setScopeAiAccess($('ai-access').checked);render();};
   $('search').oninput=render;$('filter').onchange=render;
   $('source').onchange=()=>{bridge.setScopeLink($('source').value.trim());render();};
   async function checkConnection(){try{connection=await api('/zztakeoff/status');render();}catch{/* Fetch displays authentication errors when needed. */}}

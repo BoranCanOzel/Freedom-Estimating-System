@@ -12138,8 +12138,9 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     getZZTakeoffLink(){const hit=findTakeoff(book.activeTakeoff);return projectWebLink(hit?.tk.scopeLink ?? hit?.pr.zztakeoffLink);},
     getScope(){
       const hit=findTakeoff(book.activeTakeoff);
-      return {link:hit?.tk.scopeLink ?? hit?.pr.zztakeoffLink ?? '',data:hit?.tk.scopeData || null};
+      return {link:hit?.tk.scopeLink ?? hit?.pr.zztakeoffLink ?? '',data:hit?.tk.scopeData || null,aiAccess:hit?.tk.scopeAiAccess===true};
     },
+    setScopeAiAccess(enabled){const hit=findTakeoff(book.activeTakeoff);if(hit){hit.tk.scopeAiAccess=enabled===true;save();}},
     setScopeLink(value){const hit=findTakeoff(book.activeTakeoff);if(hit){hit.tk.scopeLink=value;save();}},
     setScopeData(data){const hit=findTakeoff(book.activeTakeoff);if(hit){hit.tk.scopeData=structuredClone(data);save();}},
     setScopeItemStatus(itemId,status){

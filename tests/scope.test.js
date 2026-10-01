@@ -36,7 +36,7 @@ test('ZZTakeoff errors distinguish browser waits, DNS, TLS and interrupted conne
 test('generated scope code executes as a synchronous script, checks the project and fetches every page',()=>{
   const script=new Script('(function () {\n'+scopeScript('source')+'\n})()');
   const calls=[];
-  const context={Projects:{getCurrent:()=>({_id:'source'})},Takeoffs:{list(query,options){
+  const context={Pages:{list:()=>({records:[]})},DrawObjects:{list:()=>({records:[]})},Projects:{getCurrent:()=>({_id:'source'})},Takeoffs:{list(query,options){
     calls.push(options.skip);
     return {records:[{_id:options.skip?'second':'first'}],pagination:{more:options.skip===0,skip:100,limit:100}};
   }}};
@@ -44,7 +44,7 @@ test('generated scope code executes as a synchronous script, checks the project 
   assert.deepEqual(scopePayload({content:[{type:'text',text:result}]},'source'),{projectId:'source',records:[{_id:'first'},{_id:'second'}]});
   assert.deepEqual(calls,[0,100]);
   assert.equal(result.then,undefined);
-  assert.throws(()=>script.runInNewContext({...context,Projects:{getCurrent:()=>({_id:'wrong'})}}),/connected ZZTakeoff tab is on project wrong, but the saved link is for project source/);
+  assert.throws(()=>script.runInNewContext({...context,Pages:{list:()=>({records:[]})},DrawObjects:{list:()=>({records:[]})},Projects:{getCurrent:()=>({_id:'wrong'})}}),/connected ZZTakeoff tab is on project wrong, but the saved link is for project source/);
   assert.deepEqual(calls,[0,100]);
   assert.throws(()=>script.runInNewContext({...context,Takeoffs:{list:()=>({records:[],pagination:{more:true,skip:0}})}}),/did not advance/);
 });
@@ -54,12 +54,12 @@ test('scope reads the current project separately from drawing context and refuse
   const drawingContext={activeTool:null,page:{_id:'page'},cursor:null,zoom:1,selectedTakeoff:null,selectedDrawObjects:[]};
   const result=script.runInNewContext({
     getContext:()=>assert.fail('Drawing context cannot identify the project'),
-    Projects:{getCurrent:()=>({_id:'source',properties:{name:{value:'Concrete'}}})},
+    Pages:{list:()=>({records:[]})},DrawObjects:{list:()=>({records:[]})},Projects:{getCurrent:()=>({_id:'source',properties:{name:{value:'Concrete'}}})},
     Takeoffs:{list:()=>({records:[],pagination:{more:false}})}
   });
   assert.equal(scopePayload({content:[{type:'text',text:result}]},'source').projectId,'source');
   for(const value of [null,{},drawingContext]){
-    assert.throws(()=>script.runInNewContext({Projects:{getCurrent:()=>value},Takeoffs:{list:()=>assert.fail('Must not read unverified project')}}),error=>{
+    assert.throws(()=>script.runInNewContext({Pages:{list:()=>({records:[]})},DrawObjects:{list:()=>({records:[]})},Projects:{getCurrent:()=>value},Takeoffs:{list:()=>assert.fail('Must not read unverified project')}}),error=>{
       assert.match(error.message,/ZZ_SCOPE_CONTEXT/);
       assert.match(zzScopeError(error.message),/No project is open/);return true;
     });
@@ -108,7 +108,7 @@ test('scope unwraps nested and JSON-encoded MCP results without importing logs o
 test('scope extracts its encoded payload from prose without losing names or quantities',()=>{
   const records=[{_id:'a',properties:{name:{value:'Slab "A"\nCaf\u00e9 / 50% :END_FREEDOM_SCOPE_V1'},area:{formatted:'160 SF'}}}];
   const script=new Script('(function () {\n'+scopeScript('source')+'\n})()');
-  const output=script.runInNewContext({Projects:{getCurrent:()=>({_id:'source'})},Takeoffs:{list:()=>({records,pagination:{more:false}})}});
+  const output=script.runInNewContext({Pages:{list:()=>({records:[]})},DrawObjects:{list:()=>({records:[]})},Projects:{getCurrent:()=>({_id:'source'})},Takeoffs:{list:()=>({records,pagination:{more:false}})}});
   const expected={projectId:'source',records};
   for(const text of [output,'Script completed.\nResult: '+output+'\nElapsed: 12ms','Result:\n```\n'+output+'\n```',JSON.stringify({success:true,result:output})]){
     assert.deepEqual(scopePayload({isError:false,content:[{type:'text',text}]},'source'),expected);
@@ -134,4 +134,23 @@ test('scope imports ZZ measurement slots and units instead of assembly dimension
   assert.equal(items[2].measurements,'count: 0 EA');
   assert.equal(items[3].measurements,'');
   assert.equal(items[4].measurements,'qty: 4 EA');
+});
+
+test('scope maps drawing pages and assembly children without repeating shared quantities',()=>{
+  const script=new Script('(function () {\n'+scopeScript('source')+'\n})()');
+  const result=script.runInNewContext({
+    Projects:{getCurrent:()=>({_id:'source'})},
+    Pages:{list:()=>({records:[{_id:'p2',order:2,properties:{number:{value:'A2'},name:{value:'Details'}}},{_id:'p1',order:1,properties:{number:{value:'A1'},name:{value:'Plan'}}}]})},
+    DrawObjects:{list:(_query,{skip})=>skip?{records:[{_id:'d2',takeoffId:'assembly',pageId:'p2'}]}:{records:[{_id:'d1',takeoffId:'assembly',pageId:'p1'},{_id:'cut',takeoffId:'assembly',pageId:'ignored',cutoutForId:'d1'}],pagination:{more:true,skip:2}}},
+    Takeoffs:{list:()=>({records:[{_id:'assembly',properties:{name:{value:'Slab'},'measurement 1':{key:'area',result:160,units:'SF'}}},{_id:'child',parentId:'assembly',properties:{name:{value:'Concrete'}}},{_id:'unassigned',properties:{}}]})}
+  });
+  const payload=scopePayload({content:[{type:'text',text:result}]},'source');
+  const scope=zzScope(payload.records,'source');
+  assert.equal(scope.items.length,3);
+  assert.deepEqual(scope.items[0].pages,[{id:'p1',name:'A1 - Plan'},{id:'p2',name:'A2 - Details'}]);
+  assert.deepEqual(scope.items[1].pages,scope.items[0].pages);
+  assert.equal(scope.items[0].measurements,'area: 160 SF');
+  assert.equal(scope.items[2].pages,undefined);
+  const merged=mergeScope({source:'source',items:[{...scope.items[0],status:'excluded'}]},scope);
+  assert.deepEqual(merged.items[0].pages,scope.items[0].pages);assert.equal(merged.items[0].status,'excluded');
 });
