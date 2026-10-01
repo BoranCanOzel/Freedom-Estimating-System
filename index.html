@@ -12097,7 +12097,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       const takeoff=book.activeTakeoff,list=book.activeList;
       if(!findTakeoff(takeoff))return;
       confirmPop(anchor,enabled
-        ? 'Use this estimate as AI reference data? This includes all of its option pages.'
+        ? 'Allow active AI access keys to read this estimate as reference data? This includes the full JSON of all its option pages.'
         : 'Remove this estimate from AI reference data?',()=>{
           if(book.activeList===list&&book.activeTakeoff===takeoff)this.setAiDataEnabled(enabled);
         },enabled?'Enable AI Data':'Remove AI Data');

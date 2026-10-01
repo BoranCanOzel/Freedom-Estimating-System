@@ -1,3 +1,5 @@
+import * as Y from 'yjs';
+import { readBook, writeBook } from '../shared/model.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp } from 'node:fs/promises';
@@ -79,7 +81,7 @@ test('AI grants enforce scope, repeated saves, revisions, validation, live broad
     assert.equal((await call(api+'/validate','POST',{revision:original.revision,takeoff:original.takeoff},fresh.key)).status,200);
     const rpc=async(method,params)=>{const response=await call(api+'/mcp','POST',{jsonrpc:'2.0',id:1,method,params},fresh.key);assert.equal(response.status,200);return response.json();};
     assert.equal((await rpc('initialize',{protocolVersion:'2025-11-25'})).result.protocolVersion,'2025-11-25');
-    assert.equal((await rpc('tools/list')).result.tools.length,5);
+    assert.equal((await rpc('tools/list')).result.tools.length,7);
     assert.equal(JSON.parse((await rpc('tools/call',{name:'read_takeoff',arguments:{}})).result.content[0].text).takeoff.id,'one');
     await call(admin+'/'+fresh.id,'DELETE');assert.equal((await call(api+'/takeoff','GET',undefined,fresh.key)).status,403);
     const permanent=await grant();inspect=new DatabaseSync(join(dataDir,'projects.sqlite'));
@@ -141,4 +143,48 @@ test('permanent AI keys migrate legacy receipts, survive restarts and serialize 
     const audit=new DatabaseSync(join(dataDir,'projects.sqlite'));
     try{assert.equal(audit.prepare('SELECT count(*) AS count FROM ai_changes WHERE grant_id=?').get(access.id).count,2);}finally{audit.close();}
   }finally{await app.close();}
+});
+
+test('AI keys read only enabled reference JSONs across workbooks and lose access when unchecked',async()=>{
+  const app=createApp({dataDir:await mkdtemp(join(tmpdir(),'freedom-ai-data-')),production:false});
+  app.server.listen(0,'127.0.0.1');await once(app.server,'listening');
+  const base='http://127.0.0.1:'+app.server.address().port;
+  let ws,doc;
+  try{
+    const login=await fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Reference tester',password:'1313'})});
+    const cookie=login.headers.get('set-cookie').split(';')[0];
+    const call=(path,method='GET',body,key)=>fetch(base+path,{method,headers:{'Content-Type':'application/json',...(key?{Authorization:'Bearer '+key}:{cookie})},body:body===undefined?undefined:JSON.stringify(body)});
+    const create=async(items)=>(await (await call('/api/projects','POST',{name:'References',book:{lists:[{id:'list',companies:[{id:'co',projects:[{id:'pr',takeoffs:items}]}]}]}})).json()).id;
+    const target=await create([takeoff('target')]);
+    const admin='/api/projects/'+target+'/ai-access';
+    const grant=await (await call(admin,'POST',{list:'list',takeoff:'target'})).json();
+    // A key created before the reference exists can discover it without regeneration.
+    const reference={...takeoff('reference'),aiData:true,note:'Reference scope'};
+    const workbook=await create([reference,takeoff('private')]);
+    const api='/api/ai/v1',args={workbook,list:'list',takeoff:'reference'},path=api+'/ai-data/takeoff?'+new URLSearchParams(args);
+    assert.equal((await fetch(base+api+'/ai-data')).status,401);
+    const index=await (await call(api+'/ai-data','GET',undefined,grant.key)).json();
+    assert.deepEqual(index.estimates.map(e=>e.takeoff),['reference']);
+    assert.deepEqual((await (await call(api+'/instructions','GET',undefined,grant.key)).json()).aiData,index);
+    const read=await (await call(path,'GET',undefined,grant.key)).json();assert.deepEqual(read.takeoff,reference);assert.equal(read.readOnly,true);
+    assert.equal((await call(path.replace('takeoff=reference','takeoff=private'),'GET',undefined,grant.key)).status,404);
+    assert.equal((await call(api+'/ai-data/takeoff','GET',undefined,grant.key)).status,422);
+    const rpc=async(name,arguments_={})=>(await (await call(api+'/mcp','POST',{jsonrpc:'2.0',id:1,method:'tools/call',params:{name,arguments:arguments_}},grant.key)).json()).result;
+    assert.deepEqual(JSON.parse((await rpc('read_ai_data',args)).content[0].text).takeoff,reference);
+    assert.deepEqual(JSON.parse((await rpc('list_ai_data')).content[0].text),index);
+    const original=await (await call(api+'/takeoff','GET',undefined,grant.key)).json();
+    assert.equal((await call(api+'/save','POST',{revision:original.revision,takeoff:reference,requestId:'cannot-edit-reference'},grant.key)).status,422);
+    const spec=await (await call(api+'/openapi.json')).json();assert.equal(spec.paths['/ai-data/takeoff'].get.parameters.length,3);
+    ws=new WebSocket(base.replace('http','ws')+'/live/'+workbook,{headers:{cookie}});
+    const [bytes]=await once(ws,'message');doc=new Y.Doc();Y.applyUpdate(doc,Buffer.from(JSON.parse(bytes.toString()).state,'base64'));
+    const before=readBook(doc),after=structuredClone(before);after.lists[0].companies[0].projects[0].takeoffs[0].aiData=false;
+    const vector=Y.encodeStateVector(doc);writeBook(doc,before,after);
+    const ack=new Promise(resolve=>ws.on('message',bytes=>{if(JSON.parse(bytes.toString()).type==='ack')resolve();}));
+    ws.send(JSON.stringify({type:'update',seq:1,update:Buffer.from(Y.encodeStateAsUpdate(doc,vector)).toString('base64')}));await ack;
+    assert.equal((await call(path,'GET',undefined,grant.key)).status,404);
+    assert.deepEqual((await (await call(api+'/ai-data','GET',undefined,grant.key)).json()).estimates,[]);
+    assert.equal((await rpc('read_ai_data',args)).isError,true);
+    await call(admin+'/'+grant.id,'DELETE');
+    assert.equal((await call(api+'/ai-data','GET',undefined,grant.key)).status,403);
+  }finally{ws?.terminate();doc?.destroy();await app.close();}
 });

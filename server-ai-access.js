@@ -7,7 +7,7 @@ import { locateTakeoff, findTakeoff, revision, validateTakeoff, differences, tak
 const instructions=readFileSync(new URL('./docs/ai-takeoff.md',import.meta.url),'utf8');
 const hash=value=>createHash('sha256').update(value).digest('hex');
 const fail=(status,message)=>{throw Object.assign(new Error(message),{status});};
-export function mountAiAccess({app,db,session,project,rooms,snapshot,readAiInformation}) {
+export function mountAiAccess({app,db,session,project,rooms,snapshot,readAiInformation,readAiEstimates}) {
   db.exec(`CREATE TABLE IF NOT EXISTS ai_grants (
     id TEXT PRIMARY KEY, key_hash TEXT UNIQUE NOT NULL, workbook TEXT NOT NULL REFERENCES projects(id), scope TEXT NOT NULL,
     created_by TEXT NOT NULL, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, revoked INTEGER NOT NULL DEFAULT 0,
@@ -69,9 +69,17 @@ export function mountAiAccess({app,db,session,project,rooms,snapshot,readAiInfor
       try{snapshot(workbook);}catch{console.error('AI edit saved; filesystem snapshot could not be written.');}
     }finally{doc.destroy();}
   }
+  const referenceSchema={type:'object',required:['workbook','list','takeoff'],properties:Object.fromEntries(['workbook','list','takeoff'].map(key=>[key,{type:'string',minLength:1,maxLength:200}])),additionalProperties:false};
   function execute(grant,name,payload={}){
-    if(name==='get_instructions')return {aiInformation:readAiInformation(),instructions,schema:takeoffSchema,changeSchema};
-    if(name==='read_ai_information')return {guidance:'Read and analyze this reference library before working. Return here whenever you need guidance. Use only entries relevant to the task; ask about missing or conflicting information.',...readAiInformation()};
+    if(name==='list_ai_data')return readAiEstimates();
+    if(name==='read_ai_data'){
+      if(!payload||Object.keys(payload).some(key=>!['workbook','list','takeoff'].includes(key))||['workbook','list','takeoff'].some(key=>typeof payload[key]!=='string'||!payload[key].length||payload[key].length>200))fail(422,'Provide workbook, list, and takeoff from list_ai_data.');
+      const reference=readAiEstimates(payload);
+      if(!reference)fail(404,'AI Data reference not found or no longer enabled.');
+      return reference;
+    }
+    if(name==='get_instructions')return {aiInformation:readAiInformation(),aiData:readAiEstimates(),instructions,schema:takeoffSchema,changeSchema};
+    if(name==='read_ai_information')return {guidance:'Read and analyze this reference library before working. Return here whenever you need guidance. Use only entries relevant to the task; ask about missing or conflicting information.',...readAiInformation(),aiData:readAiEstimates()};
     if(name==='read_takeoff'){const {takeoff}=target(grant);return {aiInformation:readAiInformation(),guidance:'Analyze AI Information first. Consult read_ai_information again whenever guidance is needed.',takeoff,revision:revision(takeoff),expiresAt:null};}
     if(!['validate_changes','save_takeoff'].includes(name))fail(404,'Unknown takeoff operation.');
     if(name==='save_takeoff'){
@@ -96,8 +104,8 @@ export function mountAiAccess({app,db,session,project,rooms,snapshot,readAiInfor
   }
   const base='/api/ai/v1';
   app.use(base,(req,res,next)=>{res.set('Cache-Control','no-store');if(req.headers.origin){try{if(new URL(req.headers.origin).host!==req.headers.host)return res.status(403).json({error:'Cross-origin request refused.'});}catch{return res.status(403).json({error:'Invalid origin.'});}}next();});
-  for(const [method,path,name]of [['get','instructions','get_instructions'],['get','information','read_ai_information'],['get','takeoff','read_takeoff'],['post','validate','validate_changes'],['post','save','save_takeoff']])app[method](base+'/'+path,route((req,res)=>res.json(execute(grantFor(req),name,req.body))));
-  const tools=[['read_ai_information','Read the shared text reference library first and revisit it for guidance. Folders organize user-maintained rates, standards and other reference material.',false],['get_instructions','Read JSON editing instructions and schema.',false],['read_takeoff','Read only the authorized takeoff and its revision.',false],['validate_changes','Validate proposed takeoff JSON and preview changes without saving.',false],['save_takeoff','Save changes to the authorized takeoff. This key remains active for future saves. Requires the revision you read and a unique requestId.',true]].map(([name,description,write])=>({name,description,inputSchema:name==='save_takeoff'?{...changeSchema,required:['revision','takeoff','requestId']}:name==='validate_changes'?changeSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:!write,destructiveHint:write,idempotentHint:true,openWorldHint:false}}));
+  for(const [method,path,name]of [['get','ai-data','list_ai_data'],['get','ai-data/takeoff','read_ai_data'],['get','instructions','get_instructions'],['get','information','read_ai_information'],['get','takeoff','read_takeoff'],['post','validate','validate_changes'],['post','save','save_takeoff']])app[method](base+'/'+path,route((req,res)=>res.json(execute(grantFor(req),name,method==='get'?req.query:req.body))));
+  const tools=[['list_ai_data','List all takeoffs currently marked AI Data, across workbooks, as read-only references.',false],['read_ai_data','Read the full JSON of an AI Data reference using workbook, list, and takeoff from list_ai_data. Cannot edit references.',false],['read_ai_information','Read the shared text reference library first and revisit it for guidance. Folders organize user-maintained rates, standards and other reference material.',false],['get_instructions','Read JSON editing instructions and schema.',false],['read_takeoff','Read only the authorized takeoff and its revision.',false],['validate_changes','Validate proposed takeoff JSON and preview changes without saving.',false],['save_takeoff','Save changes to the authorized takeoff. This key remains active for future saves. Requires the revision you read and a unique requestId.',true]].map(([name,description,write])=>({name,description,inputSchema:name==='read_ai_data'?referenceSchema:name==='save_takeoff'?{...changeSchema,required:['revision','takeoff','requestId']}:name==='validate_changes'?changeSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:!write,destructiveHint:write,idempotentHint:true,openWorldHint:false}}));
   // Stateless Streamable HTTP, compatible with the 2025-11-25 MCP handshake.
   app.get(base+'/mcp',route((req,res)=>{grantFor(req);res.set('Allow','POST').sendStatus(405);}));
   app.post(base+'/mcp',route((req,res)=>{
@@ -107,7 +115,7 @@ export function mountAiAccess({app,db,session,project,rooms,snapshot,readAiInfor
     if(!msg||msg.jsonrpc!=='2.0'||typeof msg.method!=='string')return res.status(400).json({jsonrpc:'2.0',id:null,error:{code:-32600,message:'Invalid request.'}});
     if(msg.id===undefined)return res.sendStatus(202);
     const respond=result=>res.json({jsonrpc:'2.0',id:msg.id,result});
-    if(msg.method==='initialize')return respond({protocolVersion:versions.includes(msg.params?.protocolVersion)?msg.params.protocolVersion:'2025-11-25',capabilities:{tools:{}},serverInfo:{name:'freedom-takeoff',version:'1.0.0'},instructions:'Read get_instructions and analyze its AI Information first, before working on the takeoff. Revisit read_ai_information whenever guidance is needed. Access is limited to one takeoff, permits repeated saves, and does not expire.'});
+    if(msg.method==='initialize')return respond({protocolVersion:versions.includes(msg.params?.protocolVersion)?msg.params.protocolVersion:'2025-11-25',capabilities:{tools:{}},serverInfo:{name:'freedom-takeoff',version:'1.0.0'},instructions:'Read get_instructions and analyze its AI Information first, before working on the takeoff. Revisit read_ai_information whenever guidance is needed. Editing is limited to one takeoff. Use list_ai_data and read_ai_data for read-only access to all AI Data references. Access permits repeated saves and does not expire.'});
     if(msg.method==='ping')return respond({});
     if(msg.method==='tools/list')return respond({tools});
     if(msg.method!=='tools/call')return res.json({jsonrpc:'2.0',id:msg.id,error:{code:-32601,message:'Method not found.'}});
@@ -116,9 +124,10 @@ export function mountAiAccess({app,db,session,project,rooms,snapshot,readAiInfor
   }));
   app.get(base+'/openapi.json',(req,res)=>{
     const paths={};
-    for(const [path,method,name] of [['/instructions','get','get_instructions'],['/information','get','read_ai_information'],['/takeoff','get','read_takeoff'],['/validate','post','validate_changes'],['/save','post','save_takeoff']]) {
+    for(const [path,method,name] of [['/ai-data','get','list_ai_data'],['/ai-data/takeoff','get','read_ai_data'],['/instructions','get','get_instructions'],['/information','get','read_ai_information'],['/takeoff','get','read_takeoff'],['/validate','post','validate_changes'],['/save','post','save_takeoff']]) {
       const tool=tools.find(t=>t.name===name);
       paths[path]={[method]:{operationId:name,summary:tool.description,
+        ...(name==='read_ai_data'?{parameters:Object.entries(referenceSchema.properties).map(([name,schema])=>({name,in:'query',required:true,schema}))}:{}),
         ...(method==='post'?{requestBody:{required:true,content:{'application/json':{schema:tool.inputSchema}}}}:{}),
         responses:{200:{description:'Operation result',content:{'application/json':{schema:{type:'object'}}}}}}};
     }

@@ -111,9 +111,9 @@ export function createApp(options = {}) {
     }
     return rooms.get(id);
   }
-  const readAiInformation=mountAiInformation({app,db,session,rooms});
+  const {readAiInformation,readAiEstimates}=mountAiInformation({app,db,session,rooms});
   mountZZTakeoff({app,db,session,fetchImpl:options.zzFetch});
-  mountAiAccess({app,db,session,project,rooms,snapshot,readAiInformation});
+  mountAiAccess({app,db,session,project,rooms,snapshot,readAiInformation,readAiEstimates});
   const sharePresence=mountShareAccess({app,db,session,project,rooms,snapshot,authChanged});
   app.get('/api/session', (req, res) => res.json({ user: session(req)?.name || null, passwordRequired: true }));
   app.post('/api/login', (req, res) => {

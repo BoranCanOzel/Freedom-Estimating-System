@@ -11,23 +11,28 @@ export function mountAiInformation({app,db,session,rooms}) {
   };
   const authenticated=(req,res,next)=>session(req)?next():res.status(401).json({error:'Please sign in.'});
   app.get('/api/ai-information',authenticated,(req,res)=>res.json(read()));
-  app.get('/api/ai-information/estimates',authenticated,(_req,res)=>{
+  function readAiEstimates(selector){
     const estimates=[];
     for(const workbook of db.prepare('SELECT id,name,state FROM projects ORDER BY name,id').iterate()){
+      if(selector&&selector.workbook!==workbook.id)continue;
       const live=rooms.get(workbook.id)?.doc,doc=live||new Y.Doc();
       try{
         if(!live)Y.applyUpdate(doc,workbook.state);
         const book=readBook(doc);
         for(const list of book.lists||[])for(const company of list.companies||[])for(const project of company.projects||[])for(const takeoff of project.takeoffs||[]){
           if(takeoff.aiData!==true)continue;
-          estimates.push({workbook:workbook.id,workbookName:workbook.name,list:list.id,listName:list.name||'Projects',
+          if(selector&&(selector.list!==list.id||selector.takeoff!==takeoff.id))continue;
+          const metadata={workbook:workbook.id,workbookName:workbook.name,list:list.id,listName:list.name||'Projects',
             companyName:company.name||'Untitled customer',projectName:project.name||'Untitled project',
-            takeoff:takeoff.id,takeoffName:takeoff.name||'Untitled estimate',sheet:takeoff.sheets?.[0]?.id||'',pages:takeoff.sheets?.length||0});
+            takeoff:takeoff.id,takeoffName:takeoff.name||'Untitled estimate',sheet:takeoff.sheets?.[0]?.id||'',pages:takeoff.sheets?.length||0};
+          if(selector)return {reference:metadata,takeoff,readOnly:true};
+          estimates.push(metadata);
         }
       }finally{if(!live)doc.destroy();}
     }
-    res.json({estimates});
-  });
+    return selector?null:{estimates};
+  }
+  app.get('/api/ai-information/estimates',authenticated,(_req,res)=>res.json(readAiEstimates()));
   app.put('/api/ai-information',authenticated,(req,res)=>{
     try {
       const {items,revision}=req.body||{};
@@ -51,5 +56,5 @@ export function mountAiInformation({app,db,session,rooms}) {
       res.json(read());
     }catch(error){res.status(422).json({error:error.message});}
   });
-  return read;
+  return {readAiInformation:read,readAiEstimates};
 }
