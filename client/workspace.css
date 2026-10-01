@@ -268,3 +268,12 @@ body #sheetTable tr.section-foot.tree-child .money{font-size:12px;color:var(--in
 body #sheetTable tr.section-head:focus-within .sec-add{opacity:1}
 body #sheetTable tr.section-head.tree-child .sec-add{background:transparent;border-color:var(--rule);color:var(--muted);text-shadow:none;box-shadow:none}
 body #sheetTable tr.section-head.tree-child .sec-add:hover{color:var(--ink);border-color:var(--muted)}
+
+/* Pinned category folders reuse the library's ordinary folder drop targets. */
+#libMainFolders{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;padding:12px 10px;flex:none;border-top:1px solid var(--rule);background:var(--slate-bg)}
+#libMainFolders .lib-main-folder{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-width:0;margin:0;padding:9px 3px;border:1px solid transparent;border-radius:6px;background:transparent;color:#f2cb54;cursor:pointer;font:600 11px var(--f-sans);text-align:center;line-height:1.3;white-space:normal}
+#libMainFolders .lib-main-folder svg{width:29px;height:31px;flex:none}
+#libMainFolders .lib-main-folder small{font-size:10px;font-weight:400;color:#e3d5a5}
+#libMainFolders .lib-main-folder:hover,#libMainFolders .lib-main-folder[aria-pressed=true]{background:#f2cb541a;border-color:#f2cb5480}
+#libMainFolders .lib-main-folder.folder-drop{background:#f2cb5433;border-color:#f2cb54;box-shadow:inset 0 0 0 1px #f2cb54}
+#libMainFolders .lib-main-folder:focus-visible{outline:2px solid #f2cb54;outline-offset:1px}

@@ -1302,8 +1302,8 @@ test('Scope fetch keeps per-takeoff review marks and never replaces estimate pag
   const original=await page.evaluate(()=>JSON.stringify(window.estimator.getShared().lists[0].companies[0].projects.find(p=>p.id==='north').takeoffs[0].sheets));
   await page.locator('#rail .tab-scope').click();
   await expect(page.locator('#scopeCard')).toBeVisible();
-  await expect(page.locator('#scope-ai-access')).not.toBeChecked();
-  await page.locator('#scope-ai-access').check();
+  await expect(page.locator('#scope-ai-access')).toBeChecked();
+  await page.locator('#scope-ai-access').uncheck();
   await expect(page.locator('#scope-source')).toHaveValue(data.lists[0].companies[0].projects[0].zztakeoffLink);
   await page.locator('#scope-fetch').click();
   await expect(page.locator('#scope-message')).toContainText('reading scope items');
@@ -1336,12 +1336,12 @@ test('Scope fetch keeps per-takeoff review marks and never replaces estimate pag
   await page.reload();
   await expect(page.locator('#scopeCard')).toBeVisible();
   await expect(page.locator('[data-scope-item="c"]')).toHaveAttribute('data-status','duplicate');
-  await expect(page.locator('#scope-ai-access')).toBeChecked();
+  await expect(page.locator('#scope-ai-access')).not.toBeChecked();
   expect(await page.evaluate(()=>JSON.stringify(window.estimator.getShared().lists[0].companies[0].projects.find(p=>p.id==='north').takeoffs[0].sheets))).toBe(original);
   await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'ts',sheet:'ss',view:'scope'}));
   await expect(page.locator('[data-scope-item]')).toHaveCount(0);
   await expect(page.locator('#scope-source')).toHaveValue('');
-  await expect(page.locator('#scope-ai-access')).not.toBeChecked();
+  await expect(page.locator('#scope-ai-access')).toBeChecked();
 });
 
 test('summary shows customer, job address maps and the active takeoff', async ({page}) => {
@@ -2066,4 +2066,34 @@ test('AI Information times out stalled requests and enables retry without a new 
   await page.unroute('**/api/ai-information');
   await page.getByRole('button',{name:'Reload library',exact:true}).click();
   await expect(page.locator('#ai-info-status')).toHaveText('Library loaded.');
+});
+
+test('main library icon folders accept dragged items and allow moving them back out',async({page})=>{
+  const data=workbook();data.templates={items:[{id:'crew',name:'Test crew',kind:'labor',cost:25}],sections:[],scopes:[]};
+  await openWorkbook(page,data);await page.locator('#libToggle').click();
+  await page.locator('#library').evaluate(el=>Promise.all(el.getAnimations().map(animation=>animation.finished)));
+  const dock=page.locator('#libMainFolders');
+  await expect(dock.getByRole('button')).toHaveCount(4);
+  for(const name of ['Labor','Disposal','Blades','Concrete Pour'])await expect(dock.getByRole('button',{name:name+' folder',exact:true})).toBeVisible();
+  const drag=async(target)=>{
+    const source=await page.locator('#libAll .tpl-name').filter({hasText:'Test crew'}).boundingBox(),dest=await target.boundingBox();
+    await page.mouse.move(source.x+source.width/2,source.y+source.height/2);await page.mouse.down();
+    await page.mouse.move(dest.x+dest.width/2,dest.y+dest.height/2,{steps:16});await page.mouse.up();
+  };
+  const folder=()=>page.evaluate(()=>window.estimator.exportBook().templates.items.find(t=>t.id==='crew').folder||'');
+  for(const name of ['Labor','Disposal','Blades','Concrete Pour']){
+    await drag(dock.getByRole('button',{name:name+' folder',exact:true}));
+    await expect.poll(folder).toBe(name);
+    await dock.getByRole('button',{name:name+' folder',exact:true}).click();
+    await expect(page.locator('#libAll .tpl-name').filter({hasText:'Test crew'})).toBeVisible();
+  }
+  await page.screenshot({path:'test-results/library-main-folders.png',fullPage:true});
+  await drag(page.locator('#libAll .crumb').filter({hasText:/^Library$/}));
+  await expect.poll(folder).toBe('');
+  await page.locator('#libAll .crumb').filter({hasText:/^Library$/}).click();
+  await expect(page.locator('#libAll .tpl-name').filter({hasText:'Test crew'})).toBeVisible();
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();await page.locator('#libToggle').click();
+  await expect(page.locator('#libMainFolders button')).toHaveCount(4);
+  await expect.poll(folder).toBe('');
 });

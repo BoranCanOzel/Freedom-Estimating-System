@@ -3068,7 +3068,8 @@
     </div>
 
   </div>
-  <div class="lib-foot">Drag a template onto the sheet to place it.</div>
+  <nav id="libMainFolders" aria-label="Main library folders"></nav>
+  <div class="lib-foot">Drag onto a folder to organize, or onto the sheet to place an item.</div>
 </aside>
 
 <div id="libGhost" class="lib-ghost" hidden></div>
@@ -7616,6 +7617,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
     refreshFolderList();
     renderTree(document.getElementById('libAll'), allTemplates());
+    renderMainLibraryFolders(allTemplates());
 
     const cap = document.getElementById('libCapture');
     cap.innerHTML = '';
@@ -7661,9 +7663,25 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
   /* ---------- folders ---------- */
   const folderShut = new Set();
+  const MAIN_LIBRARY_FOLDERS = [
+    {name:'Labor',icon:'<path d="M5 14v-3a7 7 0 0 1 14 0v3M9 5v6m6-6v6M3 14h18v4H3zM7 21h10"/>'},
+    {name:'Disposal',icon:'<path d="M3 7h18M5 7l2 12h10l2-12M9 7V4h6v3M9 10l1 6m5-6-1 6M6 21h2m8 0h2"/>'},
+    {name:'Blades',icon:'<path d="m12 2 2 3 4-1v4l4 2-3 3 1 4-4 1-2 4-3-3-4 1-1-4-4-2 3-3-1-4 4-1z"/><circle cx="12" cy="12" r="3"/>'},
+    {name:'Concrete Pour',icon:'<path d="m3 17 8-3 10 3-8 4zM6 8l5 2 5-5-5-3zM11 10l2 5m1-7 3 7M3 17v3l10 3 8-4v-2"/>'}
+  ];
+  function renderMainLibraryFolders(entries){
+    const dock=document.getElementById('libMainFolders');dock.replaceChildren();
+    for(const folder of MAIN_LIBRARY_FOLDERS){
+      const button=document.createElement('button');button.type='button';button.className='folder-head lib-main-folder';button.dataset.folder=folder.name;
+      button.setAttribute('aria-label',folder.name+' folder');button.setAttribute('aria-pressed',String(underFolder(libPath,folder.name)));
+      button.title='Open '+folder.name+' or drop items here';
+      button.innerHTML='<svg viewBox="0 0 24 26" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+folder.icon+'</svg><span>'+folder.name+'</span><small>'+entries.filter(e=>underFolder(e.t.folder||'',folder.name)).length+'</small>';
+      button.addEventListener('click',()=>{libPath=folder.name;renderLibrary();});dock.append(button);
+    }
+  }
 
   function folderNames(list){
-    const set = new Set();
+    const set = new Set(MAIN_LIBRARY_FOLDERS.map(folder=>folder.name));
     const add = p => {
       const parts = String(p).split('/').map(x => x.trim()).filter(Boolean);
       parts.forEach((_, i) => set.add(parts.slice(0, i + 1).join('/')));   // imply the parents
@@ -7967,7 +7985,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     box.appendChild(trail);
 
     const kids = childFolders(names, libPath);
-    kids.forEach(p => box.appendChild(folderRow(p, entries)));
+    kids.filter(p=>libPath||!MAIN_LIBRARY_FOLDERS.some(folder=>folder.name===p)).forEach(p => box.appendChild(folderRow(p, entries)));
 
     const mine = entries.filter(e => (e.t.folder || '') === libPath);
     mine.forEach(e => box.appendChild(cardFor(e)));
@@ -12035,7 +12053,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     getZZTakeoffLink(){const hit=findTakeoff(book.activeTakeoff);return projectWebLink(hit?.tk.scopeLink ?? hit?.pr.zztakeoffLink);},
     getScope(){
       const hit=findTakeoff(book.activeTakeoff);
-      return {link:hit?.tk.scopeLink ?? hit?.pr.zztakeoffLink ?? '',data:hit?.tk.scopeData || null,aiAccess:hit?.tk.scopeAiAccess===true};
+      return {link:hit?.tk.scopeLink ?? hit?.pr.zztakeoffLink ?? '',data:hit?.tk.scopeData || null,aiAccess:hit?.tk.scopeAiAccess!==false};
     },
     setScopeAiAccess(enabled){const hit=findTakeoff(book.activeTakeoff);if(hit){hit.tk.scopeAiAccess=enabled===true;save();}},
     setScopeLink(value){const hit=findTakeoff(book.activeTakeoff);if(hit){hit.tk.scopeLink=value;save();}},

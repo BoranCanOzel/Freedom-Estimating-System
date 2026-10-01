@@ -12,7 +12,7 @@ Reference access is read-only and checked on every request. Unchecking AI Data r
 
 ## Fetched Scope items
 
-**Scope sharing is off by default for each estimate.** The user must enable **Allow AI to read Scope** on that estimate's Scope page. When disabled, scopeData and scopeLink are omitted from all AI takeoff reads, including AI Data references, and read_scope returns 403. The AI cannot change scopeAiAccess. Saving other edits preserves hidden Scope data automatically. A Scope-only 403 does not revoke the takeoff key.
+**Scope sharing is on by default for each estimate.** A missing scopeAiAccess field means enabled. The user can uncheck **Allow AI to read Scope** on that estimate's Scope page to disable it; an explicit false remains disabled. When disabled, scopeData and scopeLink are omitted from all AI takeoff reads, including AI Data references, and read_scope returns 403. The AI cannot change scopeAiAccess. Saving other edits preserves hidden Scope data automatically. A Scope-only 403 does not revoke the takeoff key.
 
 When enabled, call `read_scope` (MCP) or GET `/api/ai/v1/scope` with the same Bearer key to read the authorized takeoff's fetched Scope. The response includes `scopeData` with source ID, last fetch time, and every item's name, group, source pages (IDs and names), measurements, status and missing flag. This is also available as `takeoff.scopeData` in `read_takeoff`. A null scope means no scope has been fetched; an empty items array means the saved fetch contained no items. This endpoint reads saved data and does not connect to ZZTakeoff.
 

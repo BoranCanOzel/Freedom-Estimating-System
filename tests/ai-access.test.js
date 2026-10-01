@@ -22,7 +22,7 @@ test('AI grants enforce scope, repeated saves, revisions, validation, live broad
     const cookie=login.headers.get('set-cookie').split(';')[0];
     const call=(path,method='GET',body,key)=>fetch(base+path,{method,headers:{'Content-Type':'application/json',...(key?{Authorization:'Bearer '+key}:{cookie})},body:body===undefined?undefined:JSON.stringify(body)});
     const scopeData={source:'zz-project',fetchedAt:'2026-10-01T10:00:00Z',items:['included','excluded','ignored','duplicate'].map((status,i)=>({id:'scope-'+i,name:'Measured '+status,group:'Concrete',measurements:'160 SF',status,missing:i===3}))};
-    const scoped={...takeoff('one'),scopeAiAccess:true,scopeLink:'https://www.zztakeoff.com/app/takeoff?projectId=zz-project',scopeData};
+    const scoped={...takeoff('one'),scopeLink:'https://www.zztakeoff.com/app/takeoff?projectId=zz-project',scopeData};
     const book={lists:[{id:'list',companies:[{id:'co',name:'Private customer',projects:[{id:'pr',name:'Job',takeoffs:[scoped,takeoff('two')]}]}]}],libs:[]};
     const created=await (await call('/api/projects','POST',{name:'AI workbook',book})).json();
     const admin='/api/projects/'+created.id+'/ai-access',api='/api/ai/v1';
@@ -85,7 +85,7 @@ test('AI grants enforce scope, repeated saves, revisions, validation, live broad
     assert.equal((await call(admin+'/changes/'+receipt.changeId+'/undo','POST')).status,200);
     const fresh=await grant();assert.deepEqual((await (await call(api+'/takeoff','GET',undefined,fresh.key)).json()).takeoff,original.takeoff);
     const otherAccess=await grant('two');
-    assert.equal((await call(api+'/scope','GET',undefined,otherAccess.key)).status,403);
+    assert.equal((await (await call(api+'/scope','GET',undefined,otherAccess.key)).json()).scopeData,null);
     const otherRead=await (await call(api+'/takeoff','GET',undefined,otherAccess.key)).json();otherRead.takeoff.name='Other takeoff changed';
     assert.equal((await call(api+'/save','POST',{revision:otherRead.revision,takeoff:otherRead.takeoff,requestId:'other'},otherAccess.key)).status,200);
     // Changing another takeoff does not invalidate this takeoff's revision.
@@ -201,7 +201,7 @@ test('AI keys read only enabled reference JSONs across workbooks and lose access
   }finally{ws?.terminate();doc?.destroy();await app.close();}
 });
 
-test('Scope sharing defaults off across AI reads and hidden data survives AI saves',async()=>{
+test('Explicitly disabled Scope stays private across AI reads and hidden data survives AI saves',async()=>{
   const app=createApp({dataDir:await mkdtemp(join(tmpdir(),'freedom-private-scope-')),production:false});
   app.server.listen(0,'127.0.0.1');await once(app.server,'listening');
   const base='http://127.0.0.1:'+app.server.address().port;
@@ -209,7 +209,7 @@ test('Scope sharing defaults off across AI reads and hidden data survives AI sav
     const login=await fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Scope tester',password:'1313'})});
     const cookie=login.headers.get('set-cookie').split(';')[0];
     const call=(path,method='GET',body,key)=>fetch(base+path,{method,headers:{'Content-Type':'application/json',...(key?{Authorization:'Bearer '+key}:{cookie})},body:body===undefined?undefined:JSON.stringify(body)});
-    const hidden={...takeoff('one'),aiData:true,scopeLink:'https://private-scope-link',scopeData:{source:'private-source',items:[{id:'secret',name:'private-scope-name',status:'included'}]}};
+    const hidden={...takeoff('one'),aiData:true,scopeAiAccess:false,scopeLink:'https://private-scope-link',scopeData:{source:'private-source',items:[{id:'secret',name:'private-scope-name',status:'included'}]}};
     const book={lists:[{id:'list',companies:[{id:'co',projects:[{id:'pr',takeoffs:[hidden]}]}]}]};
     const workbook=await (await call('/api/projects','POST',{name:'Private Scope',book})).json();
     const grant=await (await call('/api/projects/'+workbook.id+'/ai-access','POST',{list:'list',takeoff:'one'})).json();

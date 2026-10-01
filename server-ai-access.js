@@ -49,7 +49,7 @@ export function mountAiAccess({app,db,session,project,rooms,snapshot,readAiInfor
     validateTakeoff(payload.takeoff,aiVisibleTakeoff(data.takeoff));
     const next=structuredClone(data.book),current=findTakeoff(next,data.scope);
     Object.keys(current).forEach(key=>delete current[key]);Object.assign(current,payload.takeoff);
-    if(data.takeoff.scopeAiAccess!==true)for(const key of ['scopeData','scopeLink']){
+    if(data.takeoff.scopeAiAccess===false)for(const key of ['scopeData','scopeLink']){
       if(Object.hasOwn(data.takeoff,key))current[key]=structuredClone(data.takeoff[key]);
     }
     validateBook(next);
@@ -77,7 +77,7 @@ export function mountAiAccess({app,db,session,project,rooms,snapshot,readAiInfor
   function execute(grant,name,payload={}){
     if(name==='read_scope'){
       const {takeoff}=target(grant);
-      if(takeoff.scopeAiAccess!==true)fail(403,'Scope access is disabled for this estimate. The user can enable Allow AI to read Scope on its Scope page.');
+      if(takeoff.scopeAiAccess===false)fail(403,'Scope access is disabled for this estimate. The user can enable Allow AI to read Scope on its Scope page.');
       return {takeoffId:takeoff.id,scopeData:takeoff.scopeData||null,readOnly:true,guidance:scopeGuidance};
     }
     if(name==='list_ai_data')return readAiEstimates();
@@ -87,7 +87,7 @@ export function mountAiAccess({app,db,session,project,rooms,snapshot,readAiInfor
       if(!reference)fail(404,'AI Data reference not found or no longer enabled.');
       return reference;
     }
-    if(name==='get_instructions')return {aiInformation:readAiInformation(),aiData:readAiEstimates(),scopeAvailable:target(grant).takeoff.scopeAiAccess===true&&!!target(grant).takeoff.scopeData,instructions,schema:takeoffSchema,changeSchema};
+    if(name==='get_instructions')return {aiInformation:readAiInformation(),aiData:readAiEstimates(),scopeAvailable:target(grant).takeoff.scopeAiAccess!==false&&!!target(grant).takeoff.scopeData,instructions,schema:takeoffSchema,changeSchema};
     if(name==='read_ai_information')return {guidance:'Read and analyze this reference library before working. Return here whenever you need guidance. Use only entries relevant to the task; ask about missing or conflicting information.',...readAiInformation(),aiData:readAiEstimates()};
     if(name==='read_takeoff'){const {takeoff}=target(grant);return {aiInformation:readAiInformation(),guidance:'Analyze AI Information first. Read takeoff.scopeData or call read_scope for fetched Scope items and review decisions. '+scopeGuidance,takeoff:aiVisibleTakeoff(takeoff),revision:revision(takeoff),expiresAt:null};}
     if(!['validate_changes','save_takeoff'].includes(name))fail(404,'Unknown takeoff operation.');

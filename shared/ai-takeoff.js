@@ -18,7 +18,7 @@ export function locateTakeoff(book, listId, takeoffId) {
 }
 export function aiVisibleTakeoff(takeoff){
   const visible=structuredClone(takeoff);
-  if(takeoff.scopeAiAccess!==true){delete visible.scopeData;delete visible.scopeLink;}
+  if(takeoff.scopeAiAccess===false){delete visible.scopeData;delete visible.scopeLink;}
   return visible;
 }
 const idSchema={type:'string',minLength:1,maxLength:160};
@@ -26,7 +26,7 @@ const numeric={anyOf:[{type:'number'},{type:'string',pattern:'^$|^-?[0-9]+(\\.[0
 export const takeoffSchema={type:'object',required:['id','name','sheets'],properties:{
   id:idSchema,name:{type:'string'},note:{type:'string'},custom:{type:'object'},
   aiData:{type:'boolean',readOnly:true,description:'Whether this estimate is selected as reference data for AI models. Missing means false.'},
-  scopeAiAccess:{type:'boolean',readOnly:true,description:'User-controlled Scope sharing. Missing means false; AI cannot change it.'},
+  scopeAiAccess:{type:'boolean',readOnly:true,description:'User-controlled Scope sharing. Missing means true; AI cannot change it.'},
   scopeLink:{type:'string',readOnly:true,description:'Saved ZZTakeoff link. Preserve unchanged.'},
   scopeData:{type:['object','null'],readOnly:true,description:'Last fetched measured Scope and review decisions. Preserve unchanged.',properties:{source:{type:'string'},fetchedAt:{type:'string'},items:{type:'array',items:{type:'object',properties:{id:{type:'string'},name:{type:'string'},group:{type:'string'},pages:{type:'array',items:{type:'object',properties:{id:{type:'string'},name:{type:'string'}}}},measurements:{type:'string'},status:{enum:['included','excluded','ignored','duplicate']},missing:{type:'boolean'}}}}}},
   sheets:{type:'array',minItems:1,items:{type:'object',required:['id','rows'],properties:{id:idSchema,title:{type:'string'},flatAddEnabled:{type:'boolean'},rows:{type:'array',items:{type:'object',required:['id'],properties:{id:idSchema,type:{enum:['item','section','sectionEnd']},name:{type:'string'},kind:{type:'string'},count:numeric,time:numeric,days:numeric,cost:numeric,markup:numeric,flatAdd:numeric,note:{type:'string'},sid:idSchema}}}}}}
