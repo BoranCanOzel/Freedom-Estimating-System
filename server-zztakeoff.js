@@ -110,20 +110,41 @@ throw new Error('This project exceeds the 10,000-item fetch limit. No partial sc
 })()`;
 }
 
-// The MCP tool returns executeScript's {success, result, logs, ...} envelope.
-// Also accept direct payloads used by MCP clients that unwrap structured results.
+// Decode transport wrappers, never search takeoff records or log messages for data.
 export function scopePayload(response,projectId){
-  const candidates=[response?.structuredContent];
-  for(const block of response?.content||[])if(block.type==='text'){
-    try{candidates.push(JSON.parse(block.text));}catch{/* Non-JSON status text is not scope data. */}
+  const pending=[{value:response,path:'response',depth:0}],payloads=[],shapes=[];
+  const type=value=>value===null?'null':Array.isArray(value)?'array':typeof value;
+  while(pending.length&&shapes.length<40){
+    const {value,path,depth}=pending.shift();
+    if(depth>8)continue;
+    if(typeof value==='string'){
+      let text=value.trim();
+      const fenced=text.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+      if(fenced)text=fenced[1];
+      try{pending.push({value:JSON.parse(text),path:path+'.json',depth:depth+1});}
+      catch{shapes.push(path+':text');}
+      continue;
+    }
+    if(!value||typeof value!=='object'||Array.isArray(value)){shapes.push(path+':'+type(value));continue;}
+    // Describe only known protocol fields, never arbitrary upstream names or values.
+    const fields=['structuredContent','content','success','isError','error','result','data','output','returnValue','projectId','records','logs'];
+    const known=fields.filter(key=>Object.hasOwn(value,key));
+    shapes.push(path+':{'+known.map(key=>key+':'+type(value[key])).join(',')+'}');
+    if(value.success===false||value.isError===true)throw fail(zzScopeError(value.error)||'ZZTakeoff could not complete the scope script. No saved items were changed.');
+    if(Object.hasOwn(value,'projectId')||Object.hasOwn(value,'records')){
+      payloads.push(value);continue;
+    }
+    for(const key of ['structuredContent','result','data','output','returnValue']){
+      if(Object.hasOwn(value,key))pending.push({value:value[key],path:path+'.'+key,depth:depth+1});
+    }
+    if(Array.isArray(value.content))for(const block of value.content.slice(0,20)){
+      if(block?.type==='text')pending.push({value:block.text,path:path+'.content.text',depth:depth+1});
+    }
   }
-  for(const candidate of candidates){
-    if(!candidate||typeof candidate!=='object')continue;
-    if(candidate.success===false)throw fail(zzScopeError(candidate.error)||'ZZTakeoff could not complete the scope script. No saved items were changed.');
-    const data=candidate.success===true?candidate.result:candidate;
-    if(data?.projectId===projectId&&Array.isArray(data.records)&&data.records.length<=10000)return data;
-  }
-  throw fail('ZZTakeoff returned an unsupported scope response. No saved items were changed.');
+  // Validate after examining envelopes so a failed result cannot be accepted via another block.
+  if(payloads.length&&payloads.every(data=>data.projectId===projectId&&Array.isArray(data.records)&&data.records.length<=10000))return payloads[0];
+  const diagnostic=shapes.join('; ').slice(0,1800);
+  throw fail('ZZTakeoff returned an unsupported scope response. No saved items were changed. Response format (reader v2): '+diagnostic);
 }
 
 export function scriptTool(tools){

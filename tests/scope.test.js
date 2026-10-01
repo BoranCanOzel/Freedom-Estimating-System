@@ -82,3 +82,25 @@ test('scope accepts ZZTakeoff execution envelopes and rejects failed or mismatch
     assert.doesNotMatch(error.message,/private upstream data/);return true;
   });
 });
+
+test('scope unwraps nested and JSON-encoded MCP results without importing logs or failed envelopes',()=>{
+  const payload={projectId:'source',records:[{_id:'a'}]};
+  for(const wrapped of [
+    {result:{success:true,result:payload}},
+    {success:true,result:JSON.stringify(payload)},
+    {data:{output:{returnValue:payload}}},
+    {content:[{type:'text',text:'```json\n'+JSON.stringify({success:true,result:payload})+'\n```'}]}
+  ]){
+    assert.deepEqual(scopePayload({structuredContent:wrapped},'source'),payload);
+    assert.deepEqual(scopePayload({content:[{type:'text',text:JSON.stringify(wrapped)}]},'source'),payload);
+  }
+  for(const response of [
+    {structuredContent:{success:true,logs:[JSON.stringify(payload)]}},
+    {structuredContent:payload,content:[{type:'text',text:JSON.stringify({success:false,error:'private detail'})}]},
+    {structuredContent:{result:{projectId:'wrong',records:[]}}}
+  ])assert.throws(()=>scopePayload(response,'source'));
+  assert.throws(()=>scopePayload({structuredContent:{secret:'private value',result:null},content:[{type:'text',text:'private token'}]},'source'),error=>{
+    assert.match(error.message,/reader v2.*result:null/);
+    assert.doesNotMatch(error.message,/private|secret/);return true;
+  });
+});

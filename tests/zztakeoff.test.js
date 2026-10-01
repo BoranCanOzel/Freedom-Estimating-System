@@ -32,7 +32,7 @@ test('ZZTakeoff OAuth is session bound and fetch only invokes the fixed read scr
         Projects:{getCurrent:()=>({_id:'source'})},
         Takeoffs:{list:()=>({records:[{_id:'one',properties:{name:{value:'Slab'},area:{formatted:'160 SF'}}}],pagination:{more:false}})}
       },{timeout:1000});
-      called=true;result={content:[{type:'text',text:JSON.stringify({success:true,result:payload,logs:[],elapsed:12})}]};
+      called=true;result={content:[{type:'text',text:JSON.stringify({result:{success:true,result:JSON.stringify(payload),logs:[],elapsed:12}})}]};
     }
     if(stream){
       const data=': ping\r\n\r\ndata: '+JSON.stringify({jsonrpc:'2.0',id:request.id,result})+'\r\n\r\n';
