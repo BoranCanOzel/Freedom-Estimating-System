@@ -90,9 +90,19 @@ export function scopeScript(projectId){
   // ZZTakeoff scripts are synchronous; only UI components use await. An IIFE
   // returns the payload as the script's completion value without a top-level return.
   return `(function () {
-const context = getContext();
-const projectId = context.projectId || (context.project && (context.project._id || context.project.id));
-if (projectId !== ${JSON.stringify(projectId)}) throw new Error('Open the linked project in your connected ZZTakeoff tab, then fetch again.');
+let context = getContext();
+if (typeof context === 'string') {
+  try { context = JSON.parse(context); } catch (_) { throw new Error('ZZ_SCOPE_CONTEXT: ZZTakeoff returned unreadable project context.'); }
+}
+context = context || {};
+const projectId = context.projectId || (typeof context.project === 'string' ? context.project : context.project && (context.project._id || context.project.id));
+if (typeof projectId !== 'string' || !projectId) {
+  // Report field names only, never the full context (which may contain account data).
+  const fields = Object.keys(context).slice(0,30).join(', ') || '(none)';
+  const projectFields = context.project && typeof context.project === 'object' ? Object.keys(context.project).slice(0,20).join(', ') : '(none)';
+  throw new Error('ZZ_SCOPE_CONTEXT: No active project ID was supplied in the expected context fields. Context fields: ' + fields + '. Project fields: ' + projectFields + '.');
+}
+if (projectId !== ${JSON.stringify(projectId)}) throw new Error('ZZ_SCOPE_PROJECT: The connected ZZTakeoff tab is on project ' + projectId + ', but the saved link is for project ' + ${JSON.stringify(projectId)} + '. Select the matching ZZTakeoff tab or update the saved link.');
 const records = []; let skip = 0;
 for (let page = 0; page < 100; page++) {
   const result = Takeoffs.list({}, {limit:100, skip});
@@ -114,6 +124,12 @@ export function scriptTool(tools){
     return field && /run|execute/i.test(tool.name) && /script|javascript/i.test(tool.name+' '+tool.description) && required.every(name=>name===field)
       ? {name:tool.name,field} : null;
   }).find(Boolean);
+}
+
+export function zzScopeError(text){
+  // Only expose our own narrow diagnostics, not arbitrary upstream logs or context.
+  const message=String(text||'').match(/ZZ_SCOPE_(?:CONTEXT|PROJECT):[^\r\n]{1,1200}/)?.[0];
+  return message ? message.replace(/^ZZ_SCOPE_(?:CONTEXT|PROJECT):\s*/, '').replace(/[\u0000-\u001f]/g,' ') : '';
 }
 
 export function mountZZTakeoff({app,db,session,fetchImpl=fetch}){
@@ -202,7 +218,7 @@ export function mountZZTakeoff({app,db,session,fetchImpl=fetch}){
       if(notification){await response.body?.cancel();return;}
       let result;
       try{result=await readMcpResponse(response,id);}catch(error){throw zzTransportError(error,stage);}
-      if(!result||result.error)throw fail('ZZTakeoff could not run the read request. Check the connected project and your permissions.');
+      if(!result||result.error)throw fail(zzScopeError(result?.error?.message)||'ZZTakeoff could not run the read request. Check the connected project and your permissions.');
       return result.result;
     }
     const init=await call('initialize',{protocolVersion:protocol,capabilities:{},clientInfo:{name:'Freedom Estimating',version:'1.0'}});
@@ -216,7 +232,7 @@ export function mountZZTakeoff({app,db,session,fetchImpl=fetch}){
     const runner=scriptTool(tools);
     if(!runner)throw fail('ZZTakeoff is connected, but its available tools need an integration update before scope can be fetched. Your saved scope is unchanged.',409);
     const result=await call('tools/call',{name:runner.name,arguments:{[runner.field]:scopeScript(projectId)}});
-    if(result.isError)throw fail('ZZTakeoff could not read the linked project. Open it in your connected ZZTakeoff tab and allow read access, then try again.');
+    if(result.isError)throw fail(zzScopeError((result.content||[]).filter(block=>block.type==='text').map(block=>block.text).join('\n'))||'ZZTakeoff could not read the linked project. Open it in your connected ZZTakeoff tab and allow read access, then try again.');
     let data=result.structuredContent;
     if(!data?.records)for(const content of result.content||[])if(content.type==='text'){try{const parsed=JSON.parse(content.text);if(parsed.records){data=parsed;break;}}catch{}}
     if(data?.projectId!==projectId||!Array.isArray(data.records)||data.records.length>10000)throw fail('ZZTakeoff returned an unsupported scope response. No saved items were changed.');

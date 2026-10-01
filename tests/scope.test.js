@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Script } from 'node:vm';
 import { mergeScope } from '../shared/scope.js';
-import { zzProject, zzScope, scriptTool, scopeScript, zzTransportError } from '../server-zztakeoff.js';
+import { zzProject, zzScope, scriptTool, scopeScript, zzTransportError, zzScopeError } from '../server-zztakeoff.js';
 
 test('scope refresh preserves decisions by source ID and retains missing items for review',()=>{
   const old={source:'project',items:[{id:'a',name:'Old name',status:'excluded'},{id:'b',name:'Removed',status:'duplicate'}]};
@@ -44,7 +44,22 @@ test('generated scope code executes as a synchronous script, checks the project 
   assert.deepEqual(JSON.parse(JSON.stringify(result)),{projectId:'source',records:[{_id:'first'},{_id:'second'}]});
   assert.deepEqual(calls,[0,100]);
   assert.equal(result.then,undefined);
-  assert.throws(()=>script.runInNewContext({...context,getContext:()=>({projectId:'wrong'})}),/Open the linked project/);
+  assert.throws(()=>script.runInNewContext({...context,getContext:()=>({projectId:'wrong'})}),/connected ZZTakeoff tab is on project wrong, but the saved link is for project source/);
   assert.deepEqual(calls,[0,100]);
   assert.throws(()=>script.runInNewContext({...context,Takeoffs:{list:()=>({records:[],pagination:{more:true,skip:0}})}}),/did not advance/);
+});
+
+test('scope project check distinguishes missing context from a real mismatch without reading items',()=>{
+  const script=new Script(scopeScript('source'));
+  for(const value of [{project:{_id:'source'}},{project:'source'},JSON.stringify({projectId:'source'})]){
+    const result=script.runInNewContext({getContext:()=>value,Takeoffs:{list:()=>({records:[],pagination:{more:false}})}});
+    assert.equal(result.projectId,'source');
+  }
+  for(const value of [{workspaceId:'private-workspace',view:{projectId:'source'},secret:'never disclose'},null]){
+    assert.throws(()=>script.runInNewContext({getContext:()=>value,Takeoffs:{list:()=>assert.fail('Must not read unverified project')}}),error=>{
+      assert.match(error.message,/ZZ_SCOPE_CONTEXT/);assert.doesNotMatch(error.message,/private-workspace|never disclose/);
+      assert.match(zzScopeError(error.message),/No active project ID/);return true;
+    });
+  }
+  assert.equal(zzScopeError('private upstream log'),'');
 });
