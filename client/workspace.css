@@ -220,11 +220,11 @@ body.server-mode.medieval #sheetTable .h-adds .btn:hover{
 .cost-category i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
 .cost-pie{display:block;width:220px;max-width:100%;height:auto;margin:18px auto 0}
 
-/* Summary uses one gutter; nested blocks must not add another left inset. */
-body.server-mode #summaryCard{--summary-gutter:24px;--summary-frame:0px}
-body.server-mode.medieval #summaryCard{--summary-frame:12px}
-body.server-mode #summaryCard>.head{padding:20px var(--summary-gutter)}
-body.server-mode #summaryCard>.scroll{padding:20px calc(var(--summary-gutter) - var(--summary-frame)) 24px}
+/* Summary and Scope use one gutter; nested blocks must not add another left inset. */
+body.server-mode :is(#summaryCard,#scopeCard){--summary-gutter:24px;--summary-frame:0px}
+body.server-mode.medieval :is(#summaryCard,#scopeCard){--summary-frame:12px}
+body.server-mode :is(#summaryCard,#scopeCard)>.head{padding:20px var(--summary-gutter)}
+body.server-mode :is(#summaryCard,#scopeCard)>.scroll{padding:20px calc(var(--summary-gutter) - var(--summary-frame)) 24px}
 body.server-mode #summaryCard .summary-context{gap:12px 28px;margin-top:14px}
 body.server-mode #summaryCard .sum-blocks{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));align-items:stretch;gap:16px;padding:0;margin:0 0 20px}
 body.server-mode #summaryCard .sum-block{min-width:0;padding:16px;border-radius:8px}
@@ -239,10 +239,10 @@ body.server-mode #summaryCard #sumCostBreakdown{padding:20px 0 0;margin-top:24px
 body.server-mode #summaryCard #sumCostBreakdown h3{font-size:15px;margin-bottom:8px}
 body.server-mode #summaryCard #sumCostBreakdown p{line-height:1.5;margin-bottom:16px}
 body.server-mode #summaryCard>.bar{padding:12px var(--summary-gutter);gap:10px}
-@media(max-width:700px){body.server-mode #summaryCard{--summary-gutter:16px}body.server-mode #summaryCard>.head{padding-top:16px;padding-bottom:16px}body.server-mode #summaryCard .sum-blocks{gap:12px}}
-body.server-mode #summaryCard .eyebrow-row{gap:10px;flex-wrap:wrap;margin-bottom:12px}
-body.server-mode #summaryCard .eyebrow-row>.eyebrow{margin-right:auto}
-body.server-mode #summaryCard .eyebrow-row>.btn.ghost,body.server-mode #summaryCard .eyebrow-row>#workspace-map{margin-left:0}
+@media(max-width:700px){body.server-mode :is(#summaryCard,#scopeCard){--summary-gutter:16px}body.server-mode :is(#summaryCard,#scopeCard)>.head{padding-top:16px;padding-bottom:16px}body.server-mode #summaryCard .sum-blocks{gap:12px}}
+body.server-mode :is(#summaryCard,#scopeCard) .eyebrow-row{gap:10px;flex-wrap:wrap;margin-bottom:12px}
+body.server-mode :is(#summaryCard,#scopeCard) .eyebrow-row>.eyebrow{margin-right:auto}
+body.server-mode :is(#summaryCard,#scopeCard) .eyebrow-row>.btn.ghost,body.server-mode :is(#summaryCard,#scopeCard) .eyebrow-row>#workspace-map{margin-left:0}
 
 /* Continuous section rails connect each header to its subtotal through nested groups. */
 body{--section-line:#705B42;--subsection-line:#A08360}

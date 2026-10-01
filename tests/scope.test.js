@@ -36,7 +36,7 @@ test('ZZTakeoff errors distinguish browser waits, DNS, TLS and interrupted conne
 test('generated scope code executes as a synchronous script, checks the project and fetches every page',()=>{
   const script=new Script(scopeScript('source'));
   const calls=[];
-  const context={getContext:()=>({projectId:'source'}),Takeoffs:{list(query,options){
+  const context={Projects:{getCurrent:()=>({_id:'source'})},Takeoffs:{list(query,options){
     calls.push(options.skip);
     return {records:[{_id:options.skip?'second':'first'}],pagination:{more:options.skip===0,skip:100,limit:100}};
   }}};
@@ -44,21 +44,24 @@ test('generated scope code executes as a synchronous script, checks the project 
   assert.deepEqual(JSON.parse(JSON.stringify(result)),{projectId:'source',records:[{_id:'first'},{_id:'second'}]});
   assert.deepEqual(calls,[0,100]);
   assert.equal(result.then,undefined);
-  assert.throws(()=>script.runInNewContext({...context,getContext:()=>({projectId:'wrong'})}),/connected ZZTakeoff tab is on project wrong, but the saved link is for project source/);
+  assert.throws(()=>script.runInNewContext({...context,Projects:{getCurrent:()=>({_id:'wrong'})}}),/connected ZZTakeoff tab is on project wrong, but the saved link is for project source/);
   assert.deepEqual(calls,[0,100]);
   assert.throws(()=>script.runInNewContext({...context,Takeoffs:{list:()=>({records:[],pagination:{more:true,skip:0}})}}),/did not advance/);
 });
 
-test('scope project check distinguishes missing context from a real mismatch without reading items',()=>{
+test('scope reads the current project separately from drawing context and refuses an unopened project',()=>{
   const script=new Script(scopeScript('source'));
-  for(const value of [{project:{_id:'source'}},{project:'source'},JSON.stringify({projectId:'source'})]){
-    const result=script.runInNewContext({getContext:()=>value,Takeoffs:{list:()=>({records:[],pagination:{more:false}})}});
-    assert.equal(result.projectId,'source');
-  }
-  for(const value of [{workspaceId:'private-workspace',view:{projectId:'source'},secret:'never disclose'},null]){
-    assert.throws(()=>script.runInNewContext({getContext:()=>value,Takeoffs:{list:()=>assert.fail('Must not read unverified project')}}),error=>{
-      assert.match(error.message,/ZZ_SCOPE_CONTEXT/);assert.doesNotMatch(error.message,/private-workspace|never disclose/);
-      assert.match(zzScopeError(error.message),/No active project ID/);return true;
+  const drawingContext={activeTool:null,page:{_id:'page'},cursor:null,zoom:1,selectedTakeoff:null,selectedDrawObjects:[]};
+  const result=script.runInNewContext({
+    getContext:()=>assert.fail('Drawing context cannot identify the project'),
+    Projects:{getCurrent:()=>({_id:'source',properties:{name:{value:'Concrete'}}})},
+    Takeoffs:{list:()=>({records:[],pagination:{more:false}})}
+  });
+  assert.equal(result.projectId,'source');
+  for(const value of [null,{},drawingContext]){
+    assert.throws(()=>script.runInNewContext({Projects:{getCurrent:()=>value},Takeoffs:{list:()=>assert.fail('Must not read unverified project')}}),error=>{
+      assert.match(error.message,/ZZ_SCOPE_CONTEXT/);
+      assert.match(zzScopeError(error.message),/No project is open/);return true;
     });
   }
   assert.equal(zzScopeError('private upstream log'),'');

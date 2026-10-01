@@ -8,14 +8,16 @@
 #scope-count{margin-left:auto;color:var(--muted);font:12px var(--f-sans);padding-bottom:10px}
 #scope-message{font:13px/1.5 var(--f-sans);color:var(--ink);margin:12px 0}
 #scope-message:empty{display:none}
-.scope-empty{padding:40px 24px;text-align:center;border:1px dashed var(--rule);border-radius:6px;color:var(--muted)}
-.scope-empty h3{font:600 18px var(--f-sans);color:var(--ink);margin:0 0 10px}
+.scope-empty{padding:40px 24px;text-align:center;border:1px solid var(--rule);border-radius:8px;background:var(--card);color:var(--muted)}
+.scope-empty h3{font:600 18px var(--f-cond);color:var(--ink);margin:0 0 10px}
 .scope-empty p{font:13px/1.6 var(--f-sans);max-width:580px;margin:auto}
 .scope-stamp{font:12px var(--f-sans);color:var(--muted)}
 .scope-table-scroll{overflow-x:auto}
-.scope-table{width:100%;border-collapse:collapse;table-layout:auto;font:13px var(--f-sans)}
-.scope-table th{text-align:left;padding:12px;background:var(--calc);color:var(--muted);font-weight:600;border-bottom:1px solid var(--rule)}
-.scope-table td{padding:14px 12px;border-bottom:1px solid var(--rule);vertical-align:middle;color:var(--ink)}
+.sum-table.scope-table{width:100%;table-layout:auto;font:13px var(--f-sans)}
+.scope-table thead th:first-child{border-top-left-radius:10px}
+.scope-table thead th:last-child{border-top-right-radius:10px}
+.sum-table.scope-table tbody tr{cursor:default}
+.sum-table.scope-table td{padding:14px 12px;vertical-align:middle;color:var(--ink)}
 .scope-table td:first-child{width:42%;min-width:190px;overflow-wrap:anywhere}
 .scope-table small{display:block;margin-top:5px;color:var(--muted)}
 .scope-measurements{white-space:pre-line;min-width:130px;font-variant-numeric:tabular-nums}

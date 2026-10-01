@@ -90,17 +90,11 @@ export function scopeScript(projectId){
   // ZZTakeoff scripts are synchronous; only UI components use await. An IIFE
   // returns the payload as the script's completion value without a top-level return.
   return `(function () {
-let context = getContext();
-if (typeof context === 'string') {
-  try { context = JSON.parse(context); } catch (_) { throw new Error('ZZ_SCOPE_CONTEXT: ZZTakeoff returned unreadable project context.'); }
-}
-context = context || {};
-const projectId = context.projectId || (typeof context.project === 'string' ? context.project : context.project && (context.project._id || context.project.id));
+// getContext() contains drawing state only. Projects.getCurrent() identifies the open project.
+const project = Projects.getCurrent();
+const projectId = project && project._id;
 if (typeof projectId !== 'string' || !projectId) {
-  // Report field names only, never the full context (which may contain account data).
-  const fields = Object.keys(context).slice(0,30).join(', ') || '(none)';
-  const projectFields = context.project && typeof context.project === 'object' ? Object.keys(context.project).slice(0,20).join(', ') : '(none)';
-  throw new Error('ZZ_SCOPE_CONTEXT: No active project ID was supplied in the expected context fields. Context fields: ' + fields + '. Project fields: ' + projectFields + '.');
+  throw new Error('ZZ_SCOPE_CONTEXT: No project is open in the connected ZZTakeoff tab. Open the linked project there, then fetch again.');
 }
 if (projectId !== ${JSON.stringify(projectId)}) throw new Error('ZZ_SCOPE_PROJECT: The connected ZZTakeoff tab is on project ' + projectId + ', but the saved link is for project ' + ${JSON.stringify(projectId)} + '. Select the matching ZZTakeoff tab or update the saved link.');
 const records = []; let skip = 0;

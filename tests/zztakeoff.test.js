@@ -29,7 +29,7 @@ test('ZZTakeoff OAuth is session bound and fetch only invokes the fixed read scr
       assert.match(request.params.arguments.code,/projectId !== "source"/);assert.doesNotMatch(request.params.arguments.code,/\.update\(/);
       if(hold){arrived?.();await new Promise(resolve=>{release=resolve;});}
       const payload=new Script(request.params.arguments.code).runInNewContext({
-        getContext:()=>({projectId:'source'}),
+        Projects:{getCurrent:()=>({_id:'source'})},
         Takeoffs:{list:()=>({records:[{_id:'one',properties:{name:{value:'Slab'},area:{formatted:'160 SF'}}}],pagination:{more:false}})}
       },{timeout:1000});
       called=true;result={content:[{type:'text',text:JSON.stringify(payload)}]};
