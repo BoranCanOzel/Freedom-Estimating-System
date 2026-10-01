@@ -30,7 +30,7 @@ test('ZZTakeoff OAuth is session bound and fetch only invokes the fixed read scr
       if(hold){arrived?.();await new Promise(resolve=>{release=resolve;});}
       const payload=new Script('(function () {\n'+request.params.arguments.code+'\n})()').runInNewContext({
         Projects:{getCurrent:()=>({_id:'source'})},
-        Takeoffs:{list:()=>({records:[{_id:'one',properties:{name:{value:'Slab'},area:{formatted:'160 SF'}}}],pagination:{more:false}})}
+        Takeoffs:{list:()=>({records:[{_id:'one',properties:{name:{value:'Slab'},length:{result:5},'measurement 1':{key:'area',result:160,formatted:'160',units:'SF'}}}],pagination:{more:false}})}
       },{timeout:1000});
       called=true;result={isError:false,content:[{type:'text',text:'Script completed successfully.\nResult: '+payload+'\nElapsed: 12ms'}]};
     }

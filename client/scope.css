@@ -24,8 +24,17 @@
 .scope-status{display:inline-block;padding:4px 7px;background:var(--calc);border-radius:3px;font-size:11px;white-space:nowrap}
 .scope-table .scope-actions,.scope-table .scope-actions-heading{text-align:right;white-space:nowrap}
 .scope-actions .btn + .btn{margin-left:5px}
-.scope-actions [aria-pressed=true]{border-color:var(--amber)!important;color:var(--amber)!important;box-shadow:inset 0 0 0 1px var(--amber)}
-.scope-table tr[data-status=excluded] .scope-status,.scope-table tr[data-status=duplicate] .scope-status{color:var(--amber)}
-.scope-table tr[data-status=ignored] td:first-child{color:var(--muted)}
+#scopeCard{--scope-red:#b42332;--scope-purple:#7542b5;--scope-gray:#59616c}
+body.dark:not(.medieval) #scopeCard{--scope-red:#f08089;--scope-purple:#bc9bea;--scope-gray:#b0b7c1}
+#scopeCard [data-scope-action=excluded],#scopeCard tr[data-status=excluded]{--scope-color:var(--scope-red)}
+#scopeCard [data-scope-action=duplicate],#scopeCard tr[data-status=duplicate]{--scope-color:var(--scope-purple)}
+#scopeCard [data-scope-action=ignored],#scopeCard tr[data-status=ignored]{--scope-color:var(--scope-gray)}
+#scopeCard .scope-actions .btn{color:var(--scope-color)!important;border-color:var(--scope-color)!important;background:transparent!important;text-shadow:none;box-shadow:none}
+#scopeCard .scope-actions .btn:hover{background:color-mix(in srgb,var(--scope-color) 15%,var(--card))!important}
+#scopeCard .scope-actions .btn[aria-pressed=true]{background:var(--scope-color)!important;color:#fff!important}
+body.dark:not(.medieval) #scopeCard .scope-actions .btn[aria-pressed=true]{color:#161c21!important}
+#scopeCard .scope-table tr:is([data-status=excluded],[data-status=ignored],[data-status=duplicate]) td{background:color-mix(in srgb,var(--scope-color) 15%,var(--card))!important}
+#scopeCard .scope-table tr:is([data-status=excluded],[data-status=ignored],[data-status=duplicate]):hover td{background:color-mix(in srgb,var(--scope-color) 22%,var(--card))!important}
+#scopeCard .scope-table tr:is([data-status=excluded],[data-status=ignored],[data-status=duplicate]) .scope-status{color:var(--scope-color);background:transparent;font-weight:600}
 @media(max-width:650px){.scope-content{padding:16px}.scope-source label{min-width:100%}#scope-count{margin-left:0}}
 @media print{.scope-source,.scope-tools,.scope-actions,.scope-actions-heading,#scope-message{display:none!important}}

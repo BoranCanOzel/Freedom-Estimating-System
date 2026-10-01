@@ -70,10 +70,17 @@ export function zzScope(records,projectId){
     if(record.kind==='folder'||record.type==='folder')continue;
     if(typeof record._id!=='string')throw fail('ZZTakeoff returned an item without a source ID. No scope was changed.');
     const properties=record.properties||{}, measurements=[];
-    for(const [key,value] of Object.entries(properties)){
-      if(!measurementKey.test(key))continue;
+    // ZZ's serialized measurement slots contain the evaluated drawing totals.
+    // Ordinary properties such as length may be assembly dimensions, not takeoff quantities.
+    const slots=['measurement 1','measurement 2','measurement 3'].filter(key=>properties[key]!=null);
+    const entries=slots.length?slots.map(key=>[key,properties[key]]):Object.entries(properties).filter(([key])=>measurementKey.test(key));
+    for(const [key,value] of entries){
       const result=property(value);
-      if(result!=null&&typeof result!=='object')measurements.push(`${value?.label||key}: ${result}`);
+      if(result==null||typeof result==='object'||String(result).trim()==='')continue;
+      const label=slots.length?(value.label||value.key||key):(value?.label||key);
+      const units=typeof value?.units==='string'?value.units.trim():'';
+      const numeric=typeof result==='number'||/^[+-]?[\d,.]+$/.test(String(result).trim());
+      measurements.push(`${label}: ${result}${units&&numeric?' '+units:''}`);
     }
     const parents=[],seen=new Set([record._id]);let parent=record.parentId;
     while(parent&&!seen.has(parent)){

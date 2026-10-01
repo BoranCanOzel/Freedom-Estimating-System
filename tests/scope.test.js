@@ -119,3 +119,19 @@ test('scope extracts its encoded payload from prose without losing names or quan
   assert.throws(()=>scopePayload({isError:true,content:[{type:'text',text:output}]},'source'));
   assert.throws(()=>scopePayload({content:[{type:'text',text:output}]},'another-project'));
 });
+
+test('scope imports ZZ measurement slots and units instead of assembly dimensions',()=>{
+  const records=[
+    {_id:'ramp',properties:{name:{value:'Construct Ramp'},length:{result:5},'measurement 1':{key:'area',result:160,formatted:'160.00',units:'SF'},'measurement 2':{key:'volume',result:3,formatted:'3 CY',units:'CY'}}},
+    {_id:'linear',properties:{'measurement 1':{key:'length',result:80,units:'LF'}}},
+    {_id:'count',properties:{'measurement 1':{key:'count',result:0,formatted:'0',units:'EA'}}},
+    {_id:'empty',properties:{length:{result:10},'measurement 1':{key:'area'}}},
+    {_id:'item',properties:{qty:{result:4,formatted:'4',units:'EA'}}}
+  ];
+  const items=zzScope(records,'source').items;
+  assert.equal(items[0].measurements,'area: 160.00 SF\nvolume: 3 CY');
+  assert.equal(items[1].measurements,'length: 80 LF');
+  assert.equal(items[2].measurements,'count: 0 EA');
+  assert.equal(items[3].measurements,'');
+  assert.equal(items[4].measurements,'qty: 4 EA');
+});
