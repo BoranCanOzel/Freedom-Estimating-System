@@ -87,9 +87,9 @@ export function zzScope(records,projectId){
 
 export function scopeScript(projectId){
   // Fixed read-only script. The link cannot inject script or select another user's tab.
-  // ZZTakeoff scripts are synchronous; only UI components use await. An IIFE
-  // returns the payload as the script's completion value without a top-level return.
-  return `(function () {
+  // ZZTakeoff wraps code in a function; explicitly return the payload to its runner.
+  // Its commands are synchronous from the script's perspective.
+  return `return (function () {
 // getContext() contains drawing state only. Projects.getCurrent() identifies the open project.
 const project = Projects.getCurrent();
 const projectId = project && project._id;
@@ -108,6 +108,22 @@ for (let page = 0; page < 100; page++) {
 }
 throw new Error('This project exceeds the 10,000-item fetch limit. No partial scope was imported.');
 })()`;
+}
+
+// The MCP tool returns executeScript's {success, result, logs, ...} envelope.
+// Also accept direct payloads used by MCP clients that unwrap structured results.
+export function scopePayload(response,projectId){
+  const candidates=[response?.structuredContent];
+  for(const block of response?.content||[])if(block.type==='text'){
+    try{candidates.push(JSON.parse(block.text));}catch{/* Non-JSON status text is not scope data. */}
+  }
+  for(const candidate of candidates){
+    if(!candidate||typeof candidate!=='object')continue;
+    if(candidate.success===false)throw fail(zzScopeError(candidate.error)||'ZZTakeoff could not complete the scope script. No saved items were changed.');
+    const data=candidate.success===true?candidate.result:candidate;
+    if(data?.projectId===projectId&&Array.isArray(data.records)&&data.records.length<=10000)return data;
+  }
+  throw fail('ZZTakeoff returned an unsupported scope response. No saved items were changed.');
 }
 
 export function scriptTool(tools){
@@ -227,9 +243,7 @@ export function mountZZTakeoff({app,db,session,fetchImpl=fetch}){
     if(!runner)throw fail('ZZTakeoff is connected, but its available tools need an integration update before scope can be fetched. Your saved scope is unchanged.',409);
     const result=await call('tools/call',{name:runner.name,arguments:{[runner.field]:scopeScript(projectId)}});
     if(result.isError)throw fail(zzScopeError((result.content||[]).filter(block=>block.type==='text').map(block=>block.text).join('\n'))||'ZZTakeoff could not read the linked project. Open it in your connected ZZTakeoff tab and allow read access, then try again.');
-    let data=result.structuredContent;
-    if(!data?.records)for(const content of result.content||[])if(content.type==='text'){try{const parsed=JSON.parse(content.text);if(parsed.records){data=parsed;break;}}catch{}}
-    if(data?.projectId!==projectId||!Array.isArray(data.records)||data.records.length>10000)throw fail('ZZTakeoff returned an unsupported scope response. No saved items were changed.');
+    const data=scopePayload(result,projectId);
     return zzScope(data.records,projectId);
   }
   app.post('/api/zztakeoff/scope',authenticated,wrap(async(req,res)=>res.json(await fetchScope(req.zzUser.token,String(req.body?.link||'')))));

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Script } from 'node:vm';
 import { mergeScope } from '../shared/scope.js';
-import { zzProject, zzScope, scriptTool, scopeScript, zzTransportError, zzScopeError } from '../server-zztakeoff.js';
+import { zzProject, zzScope, scriptTool, scopeScript, zzTransportError, zzScopeError, scopePayload } from '../server-zztakeoff.js';
 
 test('scope refresh preserves decisions by source ID and retains missing items for review',()=>{
   const old={source:'project',items:[{id:'a',name:'Old name',status:'excluded'},{id:'b',name:'Removed',status:'duplicate'}]};
@@ -34,7 +34,7 @@ test('ZZTakeoff errors distinguish browser waits, DNS, TLS and interrupted conne
 });
 
 test('generated scope code executes as a synchronous script, checks the project and fetches every page',()=>{
-  const script=new Script(scopeScript('source'));
+  const script=new Script('(function () {\n'+scopeScript('source')+'\n})()');
   const calls=[];
   const context={Projects:{getCurrent:()=>({_id:'source'})},Takeoffs:{list(query,options){
     calls.push(options.skip);
@@ -50,7 +50,7 @@ test('generated scope code executes as a synchronous script, checks the project 
 });
 
 test('scope reads the current project separately from drawing context and refuses an unopened project',()=>{
-  const script=new Script(scopeScript('source'));
+  const script=new Script('(function () {\n'+scopeScript('source')+'\n})()');
   const drawingContext={activeTool:null,page:{_id:'page'},cursor:null,zoom:1,selectedTakeoff:null,selectedDrawObjects:[]};
   const result=script.runInNewContext({
     getContext:()=>assert.fail('Drawing context cannot identify the project'),
@@ -65,4 +65,20 @@ test('scope reads the current project separately from drawing context and refuse
     });
   }
   assert.equal(zzScopeError('private upstream log'),'');
+});
+
+test('scope accepts ZZTakeoff execution envelopes and rejects failed or mismatched results',()=>{
+  const payload={projectId:'source',records:[]};
+  for(const value of [payload,{success:true,result:payload,logs:[],elapsed:10}]){
+    for(const response of [{structuredContent:value},{content:[{type:'text',text:JSON.stringify(value)}]}]){
+      assert.deepEqual(scopePayload(response,'source'),payload);
+    }
+  }
+  for(const value of [{success:true,logs:[]},{success:true,result:{projectId:'wrong',records:[]}},{projectId:'source',records:{}},{projectId:'source',records:Array(10001).fill({})}]){
+    assert.throws(()=>scopePayload({structuredContent:value},'source'),/unsupported scope response/);
+  }
+  assert.throws(()=>scopePayload({content:[{type:'text',text:JSON.stringify({success:false,error:'ZZ_SCOPE_PROJECT: Wrong project.',result:payload})}]},'source'),/Wrong project/);
+  assert.throws(()=>scopePayload({structuredContent:{success:false,error:'private upstream data'}},'source'),error=>{
+    assert.doesNotMatch(error.message,/private upstream data/);return true;
+  });
 });

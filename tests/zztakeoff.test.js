@@ -28,11 +28,11 @@ test('ZZTakeoff OAuth is session bound and fetch only invokes the fixed read scr
       assert.equal(request.method,'tools/call');assert.equal(request.params.name,'run_script');
       assert.match(request.params.arguments.code,/projectId !== "source"/);assert.doesNotMatch(request.params.arguments.code,/\.update\(/);
       if(hold){arrived?.();await new Promise(resolve=>{release=resolve;});}
-      const payload=new Script(request.params.arguments.code).runInNewContext({
+      const payload=new Script('(function () {\n'+request.params.arguments.code+'\n})()').runInNewContext({
         Projects:{getCurrent:()=>({_id:'source'})},
         Takeoffs:{list:()=>({records:[{_id:'one',properties:{name:{value:'Slab'},area:{formatted:'160 SF'}}}],pagination:{more:false}})}
       },{timeout:1000});
-      called=true;result={content:[{type:'text',text:JSON.stringify(payload)}]};
+      called=true;result={content:[{type:'text',text:JSON.stringify({success:true,result:payload,logs:[],elapsed:12})}]};
     }
     if(stream){
       const data=': ping\r\n\r\ndata: '+JSON.stringify({jsonrpc:'2.0',id:request.id,result})+'\r\n\r\n';
