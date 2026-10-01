@@ -102,7 +102,11 @@ for (let page = 0; page < 100; page++) {
   const result = Takeoffs.list({}, {limit:100, skip});
   if (!Array.isArray(result.records)) throw new Error('ZZTakeoff returned an unsupported takeoff list.');
   records.push(...result.records);
-  if (!result.pagination || !result.pagination.more) return {projectId, records};
+  if (!result.pagination || !result.pagination.more) {
+    // MCP may render a script result inside prose instead of a JSON envelope.
+    // URI encoding keeps quotes, newlines and marker-like item names unambiguous.
+    return 'FREEDOM_SCOPE_V1:' + encodeURIComponent(JSON.stringify({projectId, records})) + ':END_FREEDOM_SCOPE_V1';
+  }
   if (!(result.pagination.skip > skip)) throw new Error('ZZTakeoff pagination did not advance.');
   skip = result.pagination.skip;
 }
@@ -122,7 +126,17 @@ export function scopePayload(response,projectId){
       const fenced=text.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
       if(fenced)text=fenced[1];
       try{pending.push({value:JSON.parse(text),path:path+'.json',depth:depth+1});}
-      catch{shapes.push(path+':text');}
+      catch{
+        const frames=[...text.matchAll(/FREEDOM_SCOPE_V1:([\s\S]*?):END_FREEDOM_SCOPE_V1/g)];
+        if(frames.length){
+          for(const frame of frames){
+            try{payloads.push(JSON.parse(decodeURIComponent(frame[1])));}
+            catch{throw fail('ZZTakeoff returned an unreadable scope payload. No saved items were changed.');}
+          }
+        }else if(text.includes('FREEDOM_SCOPE_V1:')){
+          throw fail('ZZTakeoff cut off the scope payload before it was complete. No saved items were changed.');
+        }else shapes.push(path+':text (no scope payload marker)');
+      }
       continue;
     }
     if(!value||typeof value!=='object'||Array.isArray(value)){shapes.push(path+':'+type(value));continue;}
@@ -142,9 +156,9 @@ export function scopePayload(response,projectId){
     }
   }
   // Validate after examining envelopes so a failed result cannot be accepted via another block.
-  if(payloads.length&&payloads.every(data=>data.projectId===projectId&&Array.isArray(data.records)&&data.records.length<=10000))return payloads[0];
+  if(payloads.length&&payloads.every(data=>data?.projectId===projectId&&Array.isArray(data.records)&&data.records.length<=10000))return payloads[0];
   const diagnostic=shapes.join('; ').slice(0,1800);
-  throw fail('ZZTakeoff returned an unsupported scope response. No saved items were changed. Response format (reader v2): '+diagnostic);
+  throw fail('ZZTakeoff returned an unsupported scope response. No saved items were changed. Response format (reader v3): '+diagnostic);
 }
 
 export function scriptTool(tools){

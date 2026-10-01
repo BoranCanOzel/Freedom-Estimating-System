@@ -41,7 +41,7 @@ test('generated scope code executes as a synchronous script, checks the project 
     return {records:[{_id:options.skip?'second':'first'}],pagination:{more:options.skip===0,skip:100,limit:100}};
   }}};
   const result=script.runInNewContext(context,{timeout:1000});
-  assert.deepEqual(JSON.parse(JSON.stringify(result)),{projectId:'source',records:[{_id:'first'},{_id:'second'}]});
+  assert.deepEqual(scopePayload({content:[{type:'text',text:result}]},'source'),{projectId:'source',records:[{_id:'first'},{_id:'second'}]});
   assert.deepEqual(calls,[0,100]);
   assert.equal(result.then,undefined);
   assert.throws(()=>script.runInNewContext({...context,Projects:{getCurrent:()=>({_id:'wrong'})}}),/connected ZZTakeoff tab is on project wrong, but the saved link is for project source/);
@@ -57,7 +57,7 @@ test('scope reads the current project separately from drawing context and refuse
     Projects:{getCurrent:()=>({_id:'source',properties:{name:{value:'Concrete'}}})},
     Takeoffs:{list:()=>({records:[],pagination:{more:false}})}
   });
-  assert.equal(result.projectId,'source');
+  assert.equal(scopePayload({content:[{type:'text',text:result}]},'source').projectId,'source');
   for(const value of [null,{},drawingContext]){
     assert.throws(()=>script.runInNewContext({Projects:{getCurrent:()=>value},Takeoffs:{list:()=>assert.fail('Must not read unverified project')}}),error=>{
       assert.match(error.message,/ZZ_SCOPE_CONTEXT/);
@@ -100,7 +100,22 @@ test('scope unwraps nested and JSON-encoded MCP results without importing logs o
     {structuredContent:{result:{projectId:'wrong',records:[]}}}
   ])assert.throws(()=>scopePayload(response,'source'));
   assert.throws(()=>scopePayload({structuredContent:{secret:'private value',result:null},content:[{type:'text',text:'private token'}]},'source'),error=>{
-    assert.match(error.message,/reader v2.*result:null/);
+    assert.match(error.message,/reader v3.*result:null/);
     assert.doesNotMatch(error.message,/private|secret/);return true;
   });
+});
+
+test('scope extracts its encoded payload from prose without losing names or quantities',()=>{
+  const records=[{_id:'a',properties:{name:{value:'Slab "A"\nCaf\u00e9 / 50% :END_FREEDOM_SCOPE_V1'},area:{formatted:'160 SF'}}}];
+  const script=new Script('(function () {\n'+scopeScript('source')+'\n})()');
+  const output=script.runInNewContext({Projects:{getCurrent:()=>({_id:'source'})},Takeoffs:{list:()=>({records,pagination:{more:false}})}});
+  const expected={projectId:'source',records};
+  for(const text of [output,'Script completed.\nResult: '+output+'\nElapsed: 12ms','Result:\n```\n'+output+'\n```',JSON.stringify({success:true,result:output})]){
+    assert.deepEqual(scopePayload({isError:false,content:[{type:'text',text}]},'source'),expected);
+  }
+  for(const text of [output.slice(0,-10),'FREEDOM_SCOPE_V1:%ZZ:END_FREEDOM_SCOPE_V1',JSON.stringify({success:false,result:output})]){
+    assert.throws(()=>scopePayload({content:[{type:'text',text}]},'source'));
+  }
+  assert.throws(()=>scopePayload({isError:true,content:[{type:'text',text:output}]},'source'));
+  assert.throws(()=>scopePayload({content:[{type:'text',text:output}]},'another-project'));
 });
