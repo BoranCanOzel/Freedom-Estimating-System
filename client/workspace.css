@@ -34,10 +34,6 @@ body.server-mode .workspace-menu-content select{background:var(--paper);color:va
 .workspace-themes{display:flex;gap:4px;padding:4px 8px}
 body.server-mode #server-bar .workspace-menu-content .workspace-themes button{text-align:center;font-size:11px;padding:7px 4px;border:1px solid var(--rule)}
 body.server-mode #server-bar .workspace-menu-content .workspace-themes button[aria-pressed=true]{background:var(--calc);border-color:var(--amber);color:var(--ink)}
-body.server-mode #workspace-pictures .pic-pair{display:flex;gap:4px;padding:6px 10px;width:100%;font-size:12px;background:transparent;border:0}
-body.server-mode #workspace-pictures .pic-lab{margin-right:auto;color:var(--ink);font:500 12px var(--f-sans)}
-body.server-mode #workspace-pictures button{width:auto;min-width:50px;text-align:center;border:1px solid var(--rule);padding:5px 8px}
-body.server-mode #workspace-pictures button.on{border-color:var(--amber);background:var(--calc)}
 body.server-mode #workspace-option-actions button{color:#c65a4f}
 body.server-mode #workspace-option-actions button.danger{background:#a2372d;color:white}
 #workspace-page-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}

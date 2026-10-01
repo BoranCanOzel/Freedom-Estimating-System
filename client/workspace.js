@@ -51,7 +51,7 @@ export function setupWorkspace() {
         </div><p class="workspace-preference-hint">Your shared cursor and online color. Saved to your account.</p>
         <button id="workspace-tank-solo" type="button">Tank game: single player</button>
         <div data-for-view="sheet" class="menu-context"><div class="menu-divider"></div>
-          <p class="menu-label">Sheet display</p><div id="workspace-pictures"></div><div id="workspace-detail"></div>
+          <p class="menu-label">Sheet display</p><div id="workspace-detail"></div>
         </div>
         <div data-for-view="summary" class="menu-context"><div class="menu-divider"></div>
           <p class="menu-label">Summary display</p><div id="workspace-summary"></div>
@@ -100,8 +100,6 @@ export function setupWorkspace() {
   move('zoomPick', 'workspace-zoom', true);
   $('zoomPick').previousElementSibling.textContent = 'Zoom';
   move('roundTotal', 'workspace-rounding', true);
-  $('workspace-pictures').append($('showPics').closest('.pic-pair'));
-  $('workspace-pictures').querySelector('.pic-lab').textContent = 'Pictures';
   move('toggleNotes', 'workspace-detail');
   const detailCopy = document.createElement('button');
   detailCopy.id = 'workspace-toggle-notes'; detailCopy.type = 'button';

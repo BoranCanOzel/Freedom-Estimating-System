@@ -1082,49 +1082,13 @@ test('library Duplicate creates independent copies in the same folder and saves 
   expect(saved.map(t => t.name)).toEqual(['Saw','Saw (copy 2)']);
 });
 
-test('new pictured items follow Hide and Show without forcing existing rows open', async ({page}) => {
-  const data = workbook();
-  data.templates = {items:[{id:'pictured',name:'Pictured item',kind:'labor',cost:25,
-    img:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'}],sections:[],scopes:[]};
-  await openWorkbook(page, data);
+test('sheet lines no longer expose picture controls', async ({page}) => {
+  await openWorkbook(page);
+  await expect(page.locator('#body .pic-btn-row, #body .pic-strip')).toHaveCount(0);
   await page.locator('#workspace-view > summary').click();
-  await page.locator('#hidePics').click();
+  await expect(page.locator('#showPics, #hidePics')).toHaveCount(0);
   await page.locator('#workspace-view > summary').press('Escape');
-  await page.locator('#libToggle').click();
-  const template = page.locator('#libAll .tpl').filter({hasText:'Pictured item'});
-  await template.locator('.tpl-name').click();
-  await expect(page.locator('#editor')).not.toBeVisible();
-  await expect(template.getByTitle('Add to the end of this option')).toHaveCount(0);
-  await template.getByRole('button', {name:'Edit', exact:true}).click();
-  await expect(page.locator('#editor')).toBeVisible();
-  await page.locator('#edSave').click();
-  const add = async () => {
-    await template.locator('.tpl-name').click();
-    const source = await template.locator('.tpl-name').boundingBox();
-    const targetRow = page.locator('#body tr[data-type="item"]').first();
-    const target = await targetRow.boundingBox();
-    await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(target.x + 80, target.y + target.height * 0.8, {steps:15});
-    const displayedTarget = await targetRow.boundingBox();
-    await page.mouse.move(displayedTarget.x + 80, displayedTarget.y + displayedTarget.height * 0.8);
-    await page.mouse.up();
-  };
-  await add();
-  const rows = page.locator('#body tr[data-type="item"]').filter({has:page.locator('.pic-strip img')});
-  await expect(rows).toHaveCount(1);
-  await expect(rows.first().locator('.pic-strip')).not.toHaveClass(/open/);
-  await page.locator('#libToggle').click();
-  await rows.first().locator('.card-btn').click();
-  await page.locator('#edSave').click();
-  await expect(rows.first().locator('.pic-strip')).not.toHaveClass(/open/);
-  await page.locator('#workspace-view > summary').click();
-  await page.locator('#showPics').click();
-  await page.locator('#workspace-view > summary').press('Escape');
-  await page.locator('#libToggle').click();
-  await add();
-  await expect(rows).toHaveCount(2);
-  await expect(rows.last().locator('.pic-strip')).toHaveClass(/open/);
+  await expect(page.locator('#body .card-btn').first()).toBeVisible();
 });
 
 test('custom dropdowns support company, project and takeoff values and survive reloads', async ({page}) => {
@@ -1523,8 +1487,6 @@ test('menus preserve rounding, display, downloads, printing and keyboard access'
   await page.locator('#zoomPick').selectOption('1.15');
   await expect(page.locator('body')).toHaveCSS('zoom','1.15');
   await expect.poll(async()=>page.evaluate(()=>Math.abs(document.getElementById('tGrandLip').getBoundingClientRect().top - document.getElementById('tdGrandTotal').getBoundingClientRect().bottom))).toBeLessThan(5);
-  await page.locator('#showPics').click(); await expect(page.locator('#showPics')).toHaveClass(/on/);
-  await page.locator('#hidePics').click(); await expect(page.locator('#hidePics')).toHaveClass(/on/);
   await page.locator('#toggleNotes').click();
   await page.locator('#zoomPick').selectOption('1');
   await page.screenshot({path:'test-results/workspace-view-menu.png',fullPage:true});
@@ -2065,4 +2027,43 @@ test('joining a collaborator on another estimate preserves their rows even with 
   await alice.reload();await expect(alice.locator('#title')).toHaveValue('Friend current scope');
   expect((await alice.evaluate(()=>window.estimator.getShared())).lists[0].companies[0].projects[1]).toEqual(before.lists[0].companies[0].projects[1]);
  }finally{await a.close();await b.close();}
+});
+
+test('AI Information remains escapable during a stalled load and ignores a late response',async({page})=>{
+  await openWorkbook(page);
+  let release,requested=false,first=true;
+  const held=new Promise(resolve=>{release=resolve;});
+  await page.route('**/api/ai-information',async route=>{
+    if(first){first=false;requested=true;await held;await route.fulfill({json:{items:[{id:'stale',parent:'',kind:'entry',title:'Stale response',text:''}],revision:'old'}}).catch(()=>{});}
+    else await route.fulfill({json:{items:[],revision:'current'}});
+  });
+  await page.locator('#ai-information-open').click();
+  await expect.poll(()=>requested).toBe(true);
+  await expect(page.locator('#ai-information-page')).toHaveAttribute('aria-busy','true');
+  await page.getByRole('button',{name:'Back to estimating',exact:true}).click();
+  await expect(page.locator('#ai-information-page')).toBeHidden();
+  expect(await page.locator('#sheetCard').evaluate(el=>!!el.closest('[inert]'))).toBe(false);
+  await page.locator('#ai-information-open').click();
+  await expect(page.locator('#ai-info-status')).toHaveText('Library loaded.');
+  release();
+  await expect(page.locator('#ai-info-tree')).toContainText('No folders yet');
+  await page.getByRole('button',{name:'+ Text entry',exact:true}).click();
+  await expect(page.locator('#ai-info-title')).toBeEnabled();
+  page.once('dialog',dialog=>dialog.accept());
+  await page.getByRole('button',{name:'Back to estimating',exact:true}).click();
+});
+
+test('AI Information times out stalled requests and enables retry without a new tab',async({page})=>{
+  await openWorkbook(page);
+  await page.clock.install();
+  let requested=false;
+  await page.route('**/api/ai-information',()=>{requested=true;});
+  await page.locator('#ai-information-open').click();
+  await expect.poll(()=>requested).toBe(true);
+  await page.clock.fastForward(21000);
+  await expect(page.locator('#ai-info-status')).toContainText('request timed out');
+  await expect(page.getByRole('button',{name:'Reload library',exact:true})).toBeEnabled();
+  await page.unroute('**/api/ai-information');
+  await page.getByRole('button',{name:'Reload library',exact:true}).click();
+  await expect(page.locator('#ai-info-status')).toHaveText('Library loaded.');
 });

@@ -32,12 +32,12 @@ export function setupAiInformation(api,openEstimate) {
       context.textContent=`${item.companyName} · ${item.workbookName} / ${item.listName} · ${item.pages} page${item.pages===1?'':'s'}`;
       info.append(title,name,context);
       const open=document.createElement('button');open.type='button';open.textContent='Open estimate';open.setAttribute('aria-label','Open estimate: '+item.takeoffName);
-      open.onclick=()=>run(async()=>{if(!discard())return;await openEstimate(item);closePage();});
+      open.onclick=()=>run(async()=>{if(!discard())return;const signal=operation?.signal;await openEstimate(item);signal?.throwIfAborted();closePage();});
       row.append(info,open);$('data-results').append(row);
     }
     if(!matches.length)$('data-results').textContent=estimates.length?'No matching jobs or estimates.':'No estimates are marked AI Data yet. Enable the AI Data checkbox on an estimate to include it here.';
   }
-  async function loadEstimates(){message('Loading AI Data estimates...');const data=await api('/ai-information/estimates');estimates=data.estimates;renderEstimates();message('');}
+  async function loadEstimates(){message('Loading AI Data estimates...');const data=await request('/ai-information/estimates');estimates=data.estimates;renderEstimates();message('');}
   function setTab(tab){
     activeTab=tab;libraryPanel.hidden=tab!=='library';dataPanel.hidden=tab!=='data';
     for(const name of ['library','data']){$(name+'-tab').setAttribute('aria-selected',String(tab===name));$(name+'-tab').tabIndex=tab===name?0:-1;}
@@ -56,7 +56,7 @@ export function setupAiInformation(api,openEstimate) {
   const item=()=>library.items.find(i=>i.id===selected);
   const message=text=>$('status').textContent=text;
   const discard=()=>{if(!dirty)return true;if(!confirm('Discard your unsaved AI Information changes?'))return false;library=structuredClone(savedLibrary);dirty=false;return true;};
-  const path=value=>{const names=[];let current=value;while(current){const found=library.items.find(i=>i.id===current);if(!found)break;names.unshift(found.title);current=found.parent;}return names.join(' / ');};
+  const path=value=>{const names=[],seen=new Set();let current=value;while(current&&!seen.has(current)){seen.add(current);const found=library.items.find(i=>i.id===current);if(!found)break;names.unshift(found.title);current=found.parent;}return names.join(' / ');};
   const descendants=id=>{const result=new Set([id]);let changed=true;while(changed){changed=false;for(const i of library.items)if(result.has(i.parent)&&!result.has(i.id)){result.add(i.id);changed=true;}}return result;};
   const rootDrop=document.createElement('div');rootDrop.id='ai-info-root-drop';rootDrop.textContent='Library (top level)';
   const dragHint=document.createElement('p');dragHint.className='ai-info-drag-hint';dragHint.textContent='Drag into a folder or between entries to organize. Moves save immediately. Save text edits before dragging.';
@@ -95,7 +95,9 @@ export function setupAiInformation(api,openEstimate) {
   dropTarget(rootDrop,null);
   function tree(){
     $('tree').replaceChildren();const query=$('search').value.toLowerCase().trim();
+    const visited=new Set();
     const add=(parent,depth)=>{for(const i of library.items.filter(i=>i.parent===parent)){
+      if(visited.has(i.id))continue;visited.add(i.id);
       if(!query||(i.title+' '+i.text+' '+path(i.parent)).toLowerCase().includes(query)){
         const row=document.createElement('button');row.type='button';row.className='ai-info-tree-item';row.style.paddingLeft=(12+depth*18)+'px';row.textContent=(i.kind==='folder'?'▸  ':'—  ')+i.title;row.title=path(i.id);row.setAttribute('aria-pressed',String(i.id===selected));
         row.dataset.id=i.id;row.draggable=true;
@@ -119,15 +121,35 @@ export function setupAiInformation(api,openEstimate) {
     for(const folder of library.items.filter(i=>i.kind==='folder'&&!excluded.has(i.id)))$('parent').add(new Option(path(folder.id),folder.id));
     $('parent').value=current.parent;
   }
-  async function run(fn){if(busy)return;busy=true;page.setAttribute('aria-busy','true');page.querySelectorAll('button,input,select,textarea').forEach(e=>e.disabled=true);try{await fn();}catch(error){message(error.message);}finally{busy=false;page.removeAttribute('aria-busy');page.querySelectorAll('button,input,select,textarea').forEach(e=>e.disabled=false);}}
-  async function reload(){library=await api('/ai-information');savedLibrary=structuredClone(library);dirty=false;if(!item())selected='';render();message('Library loaded.');}
-  async function persist(items){library=await api('/ai-information',{method:'PUT',body:JSON.stringify({revision:library.revision,items})});savedLibrary=structuredClone(library);dirty=false;render();message('Saved. AI access now includes the latest information.');}
+  let operation=null;
+  function setBusy(value){
+    busy=value;
+    if(value)page.setAttribute('aria-busy','true');else page.removeAttribute('aria-busy');
+    page.querySelectorAll('button,input,select,textarea').forEach(e=>e.disabled=value&&e.dataset.action!=='close');
+  }
+  async function request(path,options={}){
+    const signal=operation?.signal;
+    const result=await api(path,{...options,signal});
+    signal?.throwIfAborted();
+    return result;
+  }
+  async function run(fn){
+    if(busy)return;
+    const controller=new AbortController();operation=controller;setBusy(true);
+    const timer=setTimeout(()=>controller.abort(new Error('The request timed out. Your unsaved edits are still here. If you were saving, reload the library to check whether the save completed before retrying.')),20000);
+    const aborted=new Promise((_,reject)=>controller.signal.addEventListener('abort',()=>reject(controller.signal.reason),{once:true}));
+    try{await Promise.race([fn(),aborted]);}
+    catch(error){if(operation===controller&&!page.hidden)message(error.message);}
+    finally{clearTimeout(timer);if(operation===controller){operation=null;setBusy(false);}}
+  }
+  async function reload(){library=await request('/ai-information');savedLibrary=structuredClone(library);dirty=false;if(!item())selected='';render();message('Library loaded.');}
+  async function persist(items){library=await request('/ai-information',{method:'PUT',body:JSON.stringify({revision:library.revision,items})});savedLibrary=structuredClone(library);dirty=false;render();message('Saved. AI access now includes the latest information.');}
   button.onclick=()=>run(async()=>{if(!page.hidden)return;page.hidden=false;background(true);button.setAttribute('aria-pressed','true');document.body.classList.add('ai-information-open');message('Loading library...');await reload();if(activeTab==='data')await loadEstimates();setTimeout(()=>page.querySelector('[data-action="close"]').focus(),0);});
-  function closePage(){if(!discard())return;page.hidden=true;dirty=false;background(false);document.body.classList.remove('ai-information-open');button.setAttribute('aria-pressed','false');button.focus();}
+  function closePage(){if(!discard())return;operation?.abort();operation=null;setBusy(false);endDrag();page.hidden=true;dirty=false;background(false);document.body.classList.remove('ai-information-open');button.setAttribute('aria-pressed','false');button.focus();}
   page.querySelector('[data-action="close"]').onclick=closePage;
   document.getElementById('server-bar').addEventListener('click',event=>{
     if(page.hidden||button.contains(event.target))return;
-    if(busy||!discard()){event.preventDefault();event.stopImmediatePropagation();return;}
+    if(!discard()){event.preventDefault();event.stopImmediatePropagation();return;}
     page.querySelector('[data-action="close"]').click();
   },true);
   for(const kind of ['folder','entry'])page.querySelector(`[data-action="${kind}"]`).onclick=()=>run(async()=>{

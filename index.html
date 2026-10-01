@@ -2879,11 +2879,7 @@
       <button class="btn ghost js-print">Print</button>
       <button class="btn ghost" id="saveFile">Save file</button>
       <button class="btn ghost" id="loadFile">Load file</button>
-      <span class="pic-pair" role="group" aria-label="Pictures on every line">
-        <span class="pic-lab">Pics</span>
-        <button type="button" id="showPics" title="Open every picture strip">Show</button>
-        <button type="button" id="hidePics" title="Close every picture strip">Hide</button>
-      </span>
+
       <button class="btn ghost" id="toggleNotes">Collapse all detail</button>
       <button class="btn ghost" id="duplicateSheet" type="button">Duplicate page</button>
       <button class="btn ghost" id="reset">Reset sheet</button>
@@ -3328,53 +3324,6 @@
     grow(document.getElementById('title'));
   }
 
-  function picStrip(row, stackCell){
-    const strip = document.createElement('div');
-    strip.className = 'pic-strip';
-    const paint = () => {
-      strip.innerHTML = '';
-      (row.pics || []).forEach((pic, i) => {
-        const fig = document.createElement('span');
-        fig.className = 'pic';
-        const im = document.createElement('img');
-        im.src = pic.url;
-        im.alt = '';
-        im.addEventListener('click', () => openLightbox(pic.url));
-        const dl = document.createElement('a');
-        dl.className = 'pic-btn';
-        dl.href = pic.url;
-        dl.download = (pic.name || 'picture') + '.jpg';
-        dl.title = 'Download';
-        dl.innerHTML = '&#8595;';
-        const rm = document.createElement('button');
-        rm.type = 'button';
-        rm.className = 'pic-btn rm';
-        rm.innerHTML = '&times;';
-        rm.title = 'Remove';
-        rm.addEventListener('click', () => { row.pics.splice(i, 1); paint(); save(); });
-        fig.append(im, dl, rm);
-        strip.appendChild(fig);
-      });
-      const add = document.createElement('button');
-      add.type = 'button';
-      add.className = 'pic-add';
-      add.textContent = '+ Picture';
-      add.addEventListener('click', () => {
-        pickPicture(url => {
-          row.pics = row.pics || [];
-          row.pics.push({id:id(), name:'picture ' + (row.pics.length + 1), url});
-          paint();
-          save();
-        }, 1000, 0.8);
-      });
-      strip.appendChild(add);
-    };
-    paint();
-    stackCell.appendChild(strip);
-    strip.refresh = paint;
-    return strip;
-  }
-
   function openLightbox(url){
     document.querySelectorAll('.lightbox').forEach(el => el.remove());
     const box = document.createElement('div');
@@ -3558,13 +3507,6 @@
     stackCell.appendChild(wrap);
     tdItem.appendChild(stackCell);
     const syncNote = attachNote(row, stackCell, noteBtn, 'Section detail — one per line');
-    const secStrip = picStrip(row, stackCell);
-    const syncPics = () => {
-      secStrip.classList.toggle('open',
-        row.picsOpen === true || (!!book.picsOn && row.picsOpen !== false));
-    };
-    syncPics();
-
     // the header carries the section totals too, for when it collapses to one line
     const tdMk = moneyCell('mk');
     const tdSub = moneyCell('sub');
@@ -3618,7 +3560,7 @@
     const tdRoundH = moneyCell('round');
     tr.append(tdItem, tdMk, tdSub, ...feeTds, tdGrand, ...upTds, tdRoundH, tdDel);
     refs.set(row.id, {
-      tr, name, row, syncNote, syncPics,
+      tr, name, row, syncNote,
       mk:    tdMk.querySelector('.money'),
       sub:   tdSub.querySelector('.money'),
       fees:  feeTds.map(td => td.querySelector('.money')),
@@ -3754,21 +3696,6 @@
     kindPick.append(kindBtn, kindTip, kindMenu);
     const noteBtn = noteButton();
 
-    const picBtn = document.createElement('button');
-    picBtn.type = 'button';
-    picBtn.className = 'note-btn pic-btn-row';
-    picBtn.title = 'Pictures for this line';
-    picBtn.innerHTML = '<svg viewBox="0 0 14 11" width="12" height="10" fill="none" stroke="currentColor" ' +
-      'stroke-width="1.3" stroke-linejoin="round"><rect x="0.7" y="0.7" width="12.6" height="9.6" rx="1.4"/>' +
-      '<path d="M0.7 8 4.6 4.6l3.2 2.6L10 5.6l3.3 2.4"/><circle cx="4.5" cy="3.4" r="1"/></svg>';
-    picBtn.addEventListener('click', () => {
-      const showing = row.picsOpen === true || (book.picsOn && row.picsOpen !== false);
-      const next = !showing;       // this line only; the sheet-wide buttons are separate
-      if (next === !!book.picsOn) delete row.picsOpen; else row.picsOpen = next;
-      syncPics();
-      save();
-    });
-
     const cardBtn = document.createElement('button');
     cardBtn.type = 'button';
     cardBtn.className = 'note-btn card-btn';
@@ -3788,21 +3715,12 @@
       '<path d="M3.8 10.4h6.6a0.8 0.8 0 0 0 0.8-0.8V3.4"/></svg>';
     dupBtn.addEventListener('click', () => duplicateRow(row));
 
-    wrap.append(dupBtn, grip, rownum, name, picBtn, cardBtn, noteBtn, kindPick);
+    wrap.append(dupBtn, grip, rownum, name, cardBtn, noteBtn, kindPick);
     const stackCell = document.createElement('div');
     stackCell.className = 'item-wrap';
     stackCell.appendChild(wrap);
     tdItem.appendChild(stackCell);
     const syncNote = attachNote(row, stackCell, noteBtn, 'Detail — one per line');
-    const strip = picStrip(row, stackCell);
-    function syncPics(){
-      const on = row.picsOpen === true || (book.picsOn && row.picsOpen !== false);
-      strip.classList.toggle('open', !!on);
-      picBtn.classList.toggle('has-note', !!(row.pics && row.pics.length));
-      picBtn.classList.toggle('note-hidden', !on && !!(row.pics && row.pics.length));
-    }
-    syncPics();
-
     const tdDel = document.createElement('td');
     tdDel.className = 'c-del';
     const del = document.createElement('button');
@@ -3884,7 +3802,7 @@
     );
 
     refs.set(row.id, {
-      tr, syncNote, syncPics, costOut, roundOut, paintKind,
+      tr, syncNote, costOut, roundOut, paintKind,
       sub:   tdSub.querySelector('.money'),
       subTip, mkTip, mkCash, mkPct,
       fees:  feeTds.map(td => td.querySelector('.money')),
@@ -6262,7 +6180,6 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     document.getElementById('roundTotal').value = String(num(state.roundTotal) || 0);
     document.getElementById('roundStep').value = String(num(state.roundStep) || 1);
     mountTitleNote();
-    applyPicsMode();
     renderSheetLoad();
     recalc();
     syncNotesButton();
@@ -7135,26 +7052,6 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       showView(); save();
     }, 'Reset');
   });
-
-  function applyPicsMode(){
-    const on = !!book.picsOn;
-    body.classList.toggle('pics-on', on);
-    document.getElementById('showPics').classList.toggle('on', on);
-    document.getElementById('hidePics').classList.toggle('on', !on);
-    refs.forEach(ref => { if (ref.syncPics) ref.syncPics(); });
-  }
-
-  // both buttons are absolute: they clear every per-line override across the whole
-  // takeoff, so a line can never come back open on its own after one is pressed
-  function setAllPics(on){
-    book.picsOn = on;
-    book.sheets.forEach(sh => (sh.rows || []).forEach(r => { delete r.picsOpen; }));
-    applyPicsMode();
-    save();
-  }
-
-  document.getElementById('showPics').addEventListener('click', () => setAllPics(true));
-  document.getElementById('hidePics').addEventListener('click', () => setAllPics(false));
 
   document.getElementById('scAdd').addEventListener('click', () => {
     const sh = seed(nextNum());
