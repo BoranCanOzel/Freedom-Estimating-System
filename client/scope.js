@@ -13,6 +13,8 @@ export function setupScope(api, context, bridge) {
   function render() {
     if(bridge.getLocation().view!=='scope')return;
     if(identity!==key()){identity=key();$('search').value='';$('filter').value='all';$('message').textContent='';}
+    const focused=document.activeElement?.matches('.scope-item-note')?document.activeElement:null;
+    const editing=focused?{id:focused.closest('[data-scope-item]').dataset.scopeItem,start:focused.selectionStart,end:focused.selectionEnd,scroll:focused.scrollTop}:null;
     const scope=bridge.getScope();
     $('ai-access').checked=scope.aiAccess===true;
     $('title').textContent=context().name;
@@ -24,7 +26,7 @@ export function setupScope(api, context, bridge) {
     const items=scope.data?.items || [], included=items.filter(item=>!item.missing&&item.status==='included').length;
     $('count').textContent=`${included} included / ${items.filter(item=>!item.missing).length} source items`;
     const query=$('search').value.trim().toLowerCase(), filter=$('filter').value;
-    const visible=items.filter(item=>(!query||`${item.name} ${item.group} ${item.measurements} ${(item.pages||[]).map(p=>p.name).join(" ")}`.toLowerCase().includes(query))&&(filter==='all'||(filter==='missing'?item.missing:!item.missing&&item.status===filter)));
+    const visible=items.filter(item=>(!query||`${item.name} ${item.group} ${item.measurements} ${item.note||""} ${(item.pages||[]).map(p=>p.name).join(" ")}`.toLowerCase().includes(query))&&(filter==='all'||(filter==='missing'?item.missing:!item.missing&&item.status===filter)));
     const results=$('results');results.replaceChildren();
     if(!items.length){
       const empty=el('div','','scope-empty');empty.append(el('h3','Bring your measured scope into this takeoff'),el('p','Connect ZZTakeoff, add the project link, then fetch its items. Each line can be excluded, ignored, or marked as a duplicate.'));results.append(empty);return;
@@ -32,10 +34,22 @@ export function setupScope(api, context, bridge) {
     const stamp=el('p','','scope-stamp');
     stamp.textContent=scope.data.fetchedAt?'Last fetched '+new Date(scope.data.fetchedAt).toLocaleString():'';results.append(stamp);
     if(!visible.length){results.append(el('p','No items match this view.','scope-empty'));return;}
-    const table=el('table','','sum-table scope-table');table.innerHTML='<thead><tr><th scope="col">Scope item</th><th scope="col">Measurements</th><th scope="col">Status</th><th scope="col" class="scope-actions-heading">Review</th></tr></thead>';
+    const groupKey=item=>JSON.stringify((item.pages||[]).map(p=>p.id).sort());
+    function showAiCheckbox(members,label){
+      const wrap=el('label','','scope-show-ai'),input=el('input');input.type='checkbox';input.setAttribute('aria-label',label);
+      const checked=members.filter(item=>item.showAi!==false).length;
+      input.checked=members.length>0&&checked===members.length;input.indeterminate=checked>0&&checked<members.length;
+      input.onchange=()=>{
+        bridge.setScopeItemsAiVisibility(members.map(item=>item.id),input.checked);render();
+        [...results.querySelectorAll('input[type=checkbox]')].find(el=>el.getAttribute('aria-label')===label)?.focus({preventScroll:true});
+      };
+      wrap.append(input,document.createTextNode('Show AI'));return wrap;
+    }
+    const table=el('table','','sum-table scope-table');table.innerHTML='<thead><tr><th scope="col">Scope item</th><th scope="col">Measurements</th><th scope="col">Status</th><th scope="col" class="scope-actions-heading">Review</th><th scope="col" class="scope-ai-heading"></th></tr></thead>';
+    table.querySelector('.scope-ai-heading').append(showAiCheckbox(items,'Show all Scope items to AI'));
     const groups=new Map();
     for(const item of visible){
-      const pages=item.pages||[],key=JSON.stringify(pages.map(p=>p.id).sort());
+      const pages=item.pages||[],key=groupKey(item);
       if(!groups.has(key))groups.set(key,{pages,items:[]});
       groups.get(key).items.push(item);
     }
@@ -43,13 +57,18 @@ export function setupScope(api, context, bridge) {
       const body=el('tbody');table.append(body);
       const header=el('tr','','scope-page-heading'),cell=el('th');cell.colSpan=4;cell.scope='rowgroup';
       cell.textContent=pages.length?(pages.length>1?'Shared across pages: ':'')+pages.map(p=>p.name).join(' / '):'No page assigned';
-      header.append(cell);body.append(header);
+      const aiCell=el('th');aiCell.append(showAiCheckbox(items.filter(item=>groupKey(item)===groupKey(pageItems[0])),'Show page group '+cell.textContent+' to AI'));
+      header.append(cell,aiCell);body.append(header);
       for(const item of pageItems){
       const row=el('tr');row.dataset.scopeItem=item.id;row.dataset.status=item.status;
       const name=el('td');name.append(el('strong',item.name));if(item.group)name.append(el('small',item.group));
+      const note=el('textarea','','scope-item-note');note.rows=2;note.maxLength=10000;note.placeholder='Add a note...';note.value=item.note||'';
+      note.setAttribute('aria-label','Notes for '+item.name);
+      note.oninput=()=>bridge.setScopeItemNote(item.id,note.value);
+      name.append(note);
       const status=el('td');status.append(el('span',item.missing?'No longer in source':statusLabels[item.status]||'Included','scope-status'));
       const actions=el('td','','scope-actions');
-      for(const [value,label] of [['excluded','Exclude'],['ignored','Ignore'],['duplicate','Mark duplicate']]){
+      for(const [value,label] of [['excluded','Exclude'],['ignored','Ignore'],['duplicate','Duplicate']]){
         const button=el('button',label,'btn alt tiny');button.type='button';button.dataset.scopeAction=value;
         button.setAttribute('aria-pressed',String(item.status===value));button.setAttribute('aria-label',label+' '+item.name);
         button.title=item.status===value?'Click again to include this item':label;
@@ -60,10 +79,15 @@ export function setupScope(api, context, bridge) {
         };
         actions.append(button);
       }
-      row.append(name,el('td',item.measurements||'Not supplied','scope-measurements'),status,actions);body.append(row);
+      const aiCell=el('td');aiCell.append(showAiCheckbox([item],'Show '+item.name+' to AI'));
+      row.append(name,el('td',item.measurements||'Not supplied','scope-measurements'),status,actions,aiCell);body.append(row);
     }
     }
     const scroll=el('div','','scope-table-scroll');scroll.append(table);results.append(scroll);
+    if(editing){
+      const restored=[...results.querySelectorAll('[data-scope-item]')].find(row=>row.dataset.scopeItem===editing.id)?.querySelector('.scope-item-note');
+      if(restored){restored.focus({preventScroll:true});restored.setSelectionRange(editing.start,editing.end);restored.scrollTop=editing.scroll;}
+    }
   }
   $('ai-access').onchange=()=>{bridge.setScopeAiAccess($('ai-access').checked);render();};
   $('search').oninput=render;$('filter').onchange=render;
@@ -102,7 +126,7 @@ export function setupScope(api, context, bridge) {
       if(target!==key())return;
       const merged=mergeScope(bridge.getScope().data,response);
       bridge.setScopeData(merged);
-      $('message').textContent=`Fetched ${response.items.length} items. Your review marks have been kept.`;
+      $('message').textContent=`Fetched ${response.items.length} items. Your review marks and notes have been kept.`;
     }catch(error){if(target===key())$('message').textContent=error.message;}
     finally{busy=false;render();}
   };

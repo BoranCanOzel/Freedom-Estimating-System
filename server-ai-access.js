@@ -49,7 +49,7 @@ export function mountAiAccess({app,db,session,project,rooms,snapshot,readAiInfor
     validateTakeoff(payload.takeoff,aiVisibleTakeoff(data.takeoff));
     const next=structuredClone(data.book),current=findTakeoff(next,data.scope);
     Object.keys(current).forEach(key=>delete current[key]);Object.assign(current,payload.takeoff);
-    if(data.takeoff.scopeAiAccess===false)for(const key of ['scopeData','scopeLink']){
+    for(const key of ['scopeData','scopeLink']){
       if(Object.hasOwn(data.takeoff,key))current[key]=structuredClone(data.takeoff[key]);
     }
     validateBook(next);
@@ -73,12 +73,12 @@ export function mountAiAccess({app,db,session,project,rooms,snapshot,readAiInfor
     }finally{doc.destroy();}
   }
   const referenceSchema={type:'object',required:['workbook','list','takeoff'],properties:Object.fromEntries(['workbook','list','takeoff'].map(key=>[key,{type:'string',minLength:1,maxLength:200}])),additionalProperties:false};
-  const scopeGuidance='Use the fetched Scope items as the measured work for this takeoff. Include only items with status included and missing=false. Do not price excluded, ignored, duplicate, or missing items unless the user explicitly asks. Preserve names, units, measurements, review statuses and source IDs. Ask about missing measurements; do not invent quantities. Scope data is read-only and reflects the last fetch, not a live ZZTakeoff connection.';
+  const scopeGuidance='Use the fetched Scope items as the measured work for this takeoff. Include only items with status included and missing=false. Do not price excluded, ignored, duplicate, or missing items unless the user explicitly asks. Read item notes for scope details and estimating context. Preserve names, notes, units, measurements, review statuses and source IDs. Ask about missing measurements; do not invent quantities. Scope data is read-only and reflects the last fetch, not a live ZZTakeoff connection.';
   function execute(grant,name,payload={}){
     if(name==='read_scope'){
       const {takeoff}=target(grant);
       if(takeoff.scopeAiAccess===false)fail(403,'Scope access is disabled for this estimate. The user can enable Allow AI to read Scope on its Scope page.');
-      return {takeoffId:takeoff.id,scopeData:takeoff.scopeData||null,readOnly:true,guidance:scopeGuidance};
+      return {takeoffId:takeoff.id,scopeData:aiVisibleTakeoff(takeoff).scopeData||null,readOnly:true,guidance:scopeGuidance};
     }
     if(name==='list_ai_data')return readAiEstimates();
     if(name==='read_ai_data'){

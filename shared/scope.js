@@ -10,6 +10,8 @@ export function mergeScope(previous, incoming) {
     seen.add(item.id);
     return {id:item.id, name:item.name, measurements:String(item.measurements || ''), group:String(item.group || ''),
       ...(Array.isArray(item.pages)?{pages:item.pages.map(page=>({id:String(page.id),name:String(page.name)}))}:{}),
+      ...(typeof old.get(item.id)?.note==='string'?{note:old.get(item.id).note}:{}),
+      ...(old.get(item.id)?.showAi===false?{showAi:false}:{}),
       status:scopeStatuses.includes(old.get(item.id)?.status) ? old.get(item.id).status : 'included', missing:false};
   });
   for (const [id, item] of old) if (!seen.has(id)) items.push({...item, missing:true});

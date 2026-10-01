@@ -119,18 +119,30 @@ test('AI Data marks only the selected estimate and persists when toggled',async(
   await expect(checkbox).not.toBeChecked();
   await checkbox.click();
   const confirmation=page.getByRole('alertdialog',{name:'Confirm action'});
-  await expect(confirmation).toContainText('Use this estimate as AI reference data?');
+  await expect(confirmation).toContainText('Allow active AI access keys to read this estimate as reference data?');
   await expect(checkbox).not.toBeChecked();
   await confirmation.getByRole('button',{name:'Cancel',exact:true}).click();
   await expect(confirmation).toHaveCount(0);
   await expect(checkbox).toBeFocused();
   await checkbox.click();
+  await confirmation.getByRole('combobox',{name:'Pricing method'}).selectOption('unit-price');
+  await confirmation.getByRole('checkbox',{name:'Concrete pour',exact:true}).check();
+  await confirmation.getByRole('checkbox',{name:'Demo',exact:true}).check();
   await confirmation.getByRole('button',{name:'Enable AI Data',exact:true}).click();
   await expect(page.locator('#server-status')).toHaveText('All changes saved');
   await page.reload();
   await expect(checkbox).toBeChecked();
   const data=await page.evaluate(()=>window.estimator.getShared());
   expect(data.lists[0].companies[0].projects[0].takeoffs[0].aiData).toBe(true);
+  expect(data.lists[0].companies[0].projects[0].takeoffs[0].aiDataMethod).toBe('unit-price');
+  expect(data.lists[0].companies[0].projects[0].takeoffs[0].aiDataWorkTypes).toEqual(['concrete-pour','demo']);
+  await page.getByRole('checkbox',{name:'Demo',exact:true}).uncheck();
+  await page.locator('#takeoff-ai-data-method').selectOption('hourly');
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();
+  await expect(page.locator('#takeoff-ai-data-method')).toHaveValue('hourly');
+  await expect(page.getByRole('checkbox',{name:'Demo',exact:true})).not.toBeChecked();
+  await expect(page.getByRole('checkbox',{name:'Concrete pour',exact:true})).toBeChecked();
   await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'ts',sheet:'ss',view:'sheet'}));
   await expect(checkbox).not.toBeChecked();
   await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'tn',sheet:'sn',view:'summary'}));
@@ -151,7 +163,7 @@ test('AI Information lists checked estimates across workbooks and opens their ex
   await openWorkbook(page);
   const suffix=Date.now().toString(),job='AI reference job '+suffix,estimate='AI reference estimate '+suffix;
   const data=workbook();
-  const target=data.lists[0].companies[0].projects[1];target.name=job;target.takeoffs[0].name=estimate;target.takeoffs[0].aiData=true;
+  const target=data.lists[0].companies[0].projects[1];target.name=job;target.takeoffs[0].name=estimate;target.takeoffs[0].aiData=true;target.takeoffs[0].aiDataMethod='mixed';target.takeoffs[0].aiDataWorkTypes=['concrete-pour','demo'];
   target.takeoffs[0].sheets.push(sheet('extra','Extra page'));
   const created=await (await page.request.post('/api/projects',{data:{name:'AI references '+suffix,book:data}})).json();
   await page.locator('#ai-information-open').click();
@@ -162,6 +174,16 @@ test('AI Information lists checked estimates across workbooks and opens their ex
   const record=page.locator('.ai-info-estimate');
   await expect(record).toHaveCount(1);await expect(record).toContainText(job);await expect(record).toContainText('2 pages');
   await expect(record).not.toContainText('North takeoff');
+  await expect(record).toContainText('Pricing method: Mixed');
+  await expect(record).toContainText('Work type: Concrete pour + Demo');
+  await page.locator('#ai-info-data-work-type').selectOption('');
+  await expect(record).toHaveCount(0);
+  await page.locator('#ai-info-data-work-type').selectOption('both');
+  await expect(record).toHaveCount(1);
+  await page.locator('#ai-info-data-method').selectOption('hourly');
+  await expect(record).toHaveCount(0);
+  await page.locator('#ai-info-data-method').selectOption('mixed');
+  await expect(record).toHaveCount(1);
   await page.getByRole('tab',{name:'Text library',exact:true}).click();
   await expect(page.locator('#ai-info-title')).toHaveValue('Keep this unsaved draft');
   await page.getByRole('tab',{name:'AI Data',exact:true}).click();
@@ -773,14 +795,13 @@ test('Ctrl+Z and Ctrl+Y undo workbook edits, additions, deletions and editor dra
   await expect(page.locator('#title')).toHaveValue('Changed scope (copy)');
   await page.keyboard.press('Control+y');
   await expect(page.locator('#rail [data-sheet]')).toHaveCount(1);
-  await page.locator('#body .card-btn').first().click();
-  const draftName=page.locator('#editor .ed-name, #editor .gc-name').first();
+  const draftName=page.locator('#body input[aria-label="Item name"]').first();
   await draftName.fill('Draft change');
   await page.keyboard.press('Control+z');
   await expect(draftName).toHaveValue('Concrete cutting');
   await page.keyboard.press('Control+y');
   await expect(draftName).toHaveValue('Draft change');
-  await page.locator('#edSave').click();
+  await draftName.blur();
   await expect(page.locator('#body input[aria-label="Item name"]').first()).toHaveValue('Draft change');
   await page.locator('#workspace-undo').click();
   await expect(page.locator('#body input[aria-label="Item name"]').first()).toHaveValue('Concrete cutting');
@@ -824,8 +845,7 @@ test('undo only affects my edits and redo syncs to other estimators', async ({pa
     await peer.keyboard.press('Control+z');
     await expect(page.locator('#body input[aria-label="cost"]').first()).toHaveValue('125.00');
     await expect(page.locator('#title')).toHaveValue('My scope');
-    await page.locator('#body .card-btn').first().click();
-    const draft=page.locator('#editor .ed-name, #editor .gc-name').first();
+    const draft=page.locator('#body input[aria-label="Item name"]').first();
     await draft.fill('My draft');
     await peer.locator('#body input[aria-label="cost"]').first().focus();
     await peer.locator('#body input[aria-label="cost"]').first().fill('99');
@@ -834,7 +854,7 @@ test('undo only affects my edits and redo syncs to other estimators', async ({pa
     await expect(draft).toHaveValue('Concrete cutting');
     await page.keyboard.press('Control+y');
     await expect(draft).toHaveValue('My draft');
-    await page.locator('#edSave').click();
+    await draft.blur();
     await expect(peer.locator('#body input[aria-label="Item name"]').first()).toHaveValue('My draft');
     await expect(peer.locator('#body input[aria-label="cost"]').first()).toHaveValue(/^99(?:\.00)?$/);
     await page.context().setOffline(true);
@@ -968,6 +988,7 @@ test('compact library creation menu opens each editor and supports keyboard dism
   await create.locator('summary').press('Escape');
   await expect(page.locator('#libNew')).not.toBeVisible();
   await page.locator('.lib-save-existing > summary').click();
+  await page.locator('#libCaptureType').selectOption('page');
   await expect(page.locator('#libCapScope')).toBeVisible();
 });
 
@@ -1088,7 +1109,7 @@ test('sheet lines no longer expose picture controls', async ({page}) => {
   await page.locator('#workspace-view > summary').click();
   await expect(page.locator('#showPics, #hidePics')).toHaveCount(0);
   await page.locator('#workspace-view > summary').press('Escape');
-  await expect(page.locator('#body .card-btn').first()).toBeVisible();
+  await expect(page.locator('#body .card-btn')).toHaveCount(0);
 });
 
 test('custom dropdowns support company, project and takeoff values and survive reloads', async ({page}) => {
@@ -1309,13 +1330,25 @@ test('Scope fetch keeps per-takeoff review marks and never replaces estimate pag
   await expect(page.locator('#scope-message')).toContainText('reading scope items');
   await expect(page.locator('#scope-fetch')).toBeDisabled();
   await expect(page.locator('[data-scope-item]')).toHaveCount(4);
-  await expect(page.locator('.scope-page-heading')).toHaveText(['A1 - Floor plan','A2 - Details','No page assigned']);
+  await expect(page.locator('.scope-page-heading th:first-child')).toHaveText(['A1 - Floor plan','A2 - Details','No page assigned']);
   await page.locator('#scope-search').fill('A2 - Details');
   await expect(page.locator('[data-scope-item]')).toHaveCount(1);
   await page.locator('#scope-search').fill('');
+  await page.getByRole('textbox',{name:'Notes for Concrete slab',exact:true}).fill('Night shift only');
+  const allAi=page.getByRole('checkbox',{name:'Show all Scope items to AI',exact:true});
+  await expect(allAi).toBeChecked();
+  await page.getByRole('checkbox',{name:'Show Concrete slab to AI',exact:true}).uncheck();
+  expect(await allAi.evaluate(el=>el.indeterminate)).toBe(true);
+  await page.locator('#scope-search').fill('Concrete slab');
+  await page.getByRole('checkbox',{name:'Show page group A1 - Floor plan to AI',exact:true}).check();
+  await page.getByRole('checkbox',{name:'Show page group A1 - Floor plan to AI',exact:true}).uncheck();
+  await page.locator('#scope-search').fill('');
+  await expect(page.getByRole('checkbox',{name:'Show Sawcut perimeter to AI',exact:true})).not.toBeChecked();
+  await allAi.check();
+  await page.getByRole('checkbox',{name:'Show Concrete slab to AI',exact:true}).uncheck();
   await page.getByRole('button',{name:'Exclude Concrete slab',exact:true}).click();
   await page.getByRole('button',{name:'Ignore Reference note',exact:true}).click();
-  await page.getByRole('button',{name:'Mark duplicate Extra slab',exact:true}).click();
+  await page.getByRole('button',{name:'Duplicate Extra slab',exact:true}).click();
   await expect(page.locator('#scope-count')).toHaveText('1 included / 4 source items');
   await page.locator('#scope-filter').selectOption('excluded');
   await expect(page.locator('[data-scope-item]')).toHaveCount(1);
@@ -1324,6 +1357,8 @@ test('Scope fetch keeps per-takeoff review marks and never replaces estimate pag
   revision++;
   await page.locator('#scope-fetch').click();
   await expect(page.locator('[data-scope-item="a"]')).toContainText('180 SF');
+  await expect(page.getByRole('textbox',{name:'Notes for Concrete slab revised',exact:true})).toHaveValue('Night shift only');
+  await expect(page.getByRole('checkbox',{name:'Show Concrete slab revised to AI',exact:true})).not.toBeChecked();
   await expect(page.locator('[data-scope-item="a"]')).toHaveAttribute('data-status','excluded');
   await expect(page.locator('[data-scope-item="c"]')).toHaveAttribute('data-status','duplicate');
   await expect(page.locator('[data-scope-item="d"]')).toContainText('No longer in source');
@@ -1334,6 +1369,7 @@ test('Scope fetch keeps per-takeoff review marks and never replaces estimate pag
   await expect(page.locator('[data-scope-item]')).toHaveCount(4);
   await expect(page.locator('#server-status')).toHaveText('All changes saved');
   await page.reload();
+  await expect(page.getByRole('textbox',{name:'Notes for Concrete slab revised',exact:true})).toHaveValue('Night shift only');
   await expect(page.locator('#scopeCard')).toBeVisible();
   await expect(page.locator('[data-scope-item="c"]')).toHaveAttribute('data-status','duplicate');
   await expect(page.locator('#scope-ai-access')).not.toBeChecked();
@@ -1573,6 +1609,7 @@ test('nested sections retain totals, collapse state, duplication and library dro
   expect(stack).toEqual([]);
   await page.locator('#libToggle').click();
   await page.locator('.lib-save-existing > summary').click();
+  await page.locator('#libCaptureType').selectOption('section');
   await page.locator('#libCapture .tpl').filter({hasText:'Parent'}).first().locator('button').click();
   const template=page.locator('#libAll .tpl').filter({hasText:'Parent'}).first();
   await expect(template).toBeVisible();
@@ -1681,9 +1718,7 @@ test('editing names and prices after moving a nested section preserves its saved
   await row('work').getByRole('textbox',{name:'Item name',exact:true}).fill('Updated nested item');
   await row('work').getByRole('textbox',{name:'cost',exact:true}).focus();
   await row('work').getByRole('textbox',{name:'cost',exact:true}).fill('95');
-  await row('work').locator('.card-btn').click();
-  await page.locator('#editor .ed-name, #editor .gc-name').first().fill('Saved nested item');
-  await page.locator('#edSave').click();
+  await row('work').getByRole('textbox',{name:'Item name',exact:true}).fill('Saved nested item');
   expect(await order()).toEqual(expected);
   await expect(page.locator('#server-status')).toHaveText('All changes saved');
   await page.reload();
@@ -1757,6 +1792,7 @@ test('section drop ghost matches committed rows after subtotals and cancels with
   await openWorkbook(page,data);
   await page.locator('#libToggle').click();
   await page.locator('.lib-save-existing > summary').click();
+  await page.locator('#libCaptureType').selectOption('section');
   await page.locator('#libCapture .tpl').filter({hasText:'Inner'}).locator('button').click();
   const template=page.locator('#libAll .tpl').filter({hasText:'Inner'}).first();
   const original=await page.evaluate(()=>JSON.stringify(window.estimator.exportBook().sheets));
@@ -2096,4 +2132,34 @@ test('main library icon folders accept dragged items and allow moving them back 
   await page.reload();await page.locator('#libToggle').click();
   await expect(page.locator('#libMainFolders button')).toHaveCount(4);
   await expect.poll(folder).toBe('');
+});
+
+test('save from this page searches items and subsections and saves into the selected folder',async({page})=>{
+  const data=workbook();data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0].rows=[
+    {id:'outer',type:'section',name:'Concrete'},
+    {id:'inner',type:'section',name:'Ramp'},
+    {id:'crew',kind:'labor',name:'Ramp crew',note:'Night work',cost:25,count:2,time:3,days:1,flatAdd:40},
+    {id:'end-inner',type:'sectionEnd',sid:'inner'},
+    {id:'end-outer',type:'sectionEnd',sid:'outer'}
+  ];
+  await openWorkbook(page,data);await page.locator('#libToggle').click();
+  await page.getByRole('button',{name:'Labor folder',exact:true}).click();
+  await page.getByText('Save from this page',{exact:true}).click();
+  await expect(page.locator('#libCapture')).toBeEmpty();
+  await page.locator('#libCaptureType').selectOption('section');
+  await page.locator('#libCaptureSearch').fill('Ramp');
+  await expect(page.locator('#libCapture .tpl')).toHaveCount(1);
+  await expect(page.locator('#libCapture')).toContainText('Subsection - Concrete');
+  await page.getByRole('button',{name:'Save Ramp to library',exact:true}).click();
+  const section=await page.evaluate(()=>window.estimator.exportBook().templates.sections.find(t=>t.name==='Ramp'));
+  expect(section.folder).toBe('Labor');expect(section.items[0].name).toBe('Ramp crew');
+  await page.locator('#libCaptureType').selectOption('item');
+  await page.locator('#libCaptureSearch').fill('Night work');
+  await page.getByRole('button',{name:'Save Ramp crew to library',exact:true}).click();
+  const item=await page.evaluate(()=>window.estimator.exportBook().templates.items.find(t=>t.name==='Ramp crew'));
+  expect(item.folder).toBe('Labor');expect(item.flatAdd).toBe(40);expect(item.count).toBe(2);
+  await page.locator('#libCaptureSearch').fill('no such item');await expect(page.locator('#libCapture')).toHaveText('No matches on this page.');
+  await page.locator('#libCaptureType').selectOption('page');await page.getByRole('button',{name:'Save entire page',exact:true}).click();
+  expect(await page.evaluate(()=>window.estimator.exportBook().templates.scopes.at(-1).folder)).toBe('Labor');
+  await expect(page.locator('#body .card-btn')).toHaveCount(0);
 });

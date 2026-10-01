@@ -21,7 +21,9 @@ test('AI grants enforce scope, repeated saves, revisions, validation, live broad
     const login=await fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'AI tester',password:'1313'})});
     const cookie=login.headers.get('set-cookie').split(';')[0];
     const call=(path,method='GET',body,key)=>fetch(base+path,{method,headers:{'Content-Type':'application/json',...(key?{Authorization:'Bearer '+key}:{cookie})},body:body===undefined?undefined:JSON.stringify(body)});
-    const scopeData={source:'zz-project',fetchedAt:'2026-10-01T10:00:00Z',items:['included','excluded','ignored','duplicate'].map((status,i)=>({id:'scope-'+i,name:'Measured '+status,group:'Concrete',measurements:'160 SF',status,missing:i===3}))};
+    const scopeData={source:'zz-project',fetchedAt:'2026-10-01T10:00:00Z',items:['included','excluded','ignored','duplicate'].map((status,i)=>({id:'scope-'+i,name:'Measured '+status,note:'Use night shift crew',group:'Concrete',measurements:'160 SF',status,missing:i===3}))};
+    scopeData.items.push({id:'hidden-scope',name:'Hidden scope secret',note:'Hidden scope note',showAi:false,status:'included',measurements:'900 SF'});
+    const shownScope={...scopeData,items:scopeData.items.filter(item=>item.showAi!==false)};
     const scoped={...takeoff('one'),scopeLink:'https://www.zztakeoff.com/app/takeoff?projectId=zz-project',scopeData};
     const book={lists:[{id:'list',companies:[{id:'co',name:'Private customer',projects:[{id:'pr',name:'Job',takeoffs:[scoped,takeoff('two')]}]}]}],libs:[]};
     const created=await (await call('/api/projects','POST',{name:'AI workbook',book})).json();
@@ -49,7 +51,7 @@ test('AI grants enforce scope, repeated saves, revisions, validation, live broad
     const spec=await (await call(api+'/openapi.json')).json();assert.ok(spec.paths['/save'].post.requestBody);
     const original=await (await call(api+'/takeoff','GET',undefined,key)).json();assert.equal(original.takeoff.id,'one');assert.ok(!JSON.stringify(original).includes('Private customer'));
     const scopeRead=await (await call(api+'/scope','GET',undefined,key)).json();
-    assert.deepEqual(scopeRead.scopeData,scopeData);assert.equal(scopeRead.readOnly,true);assert.deepEqual(original.takeoff.scopeData,scopeData);
+    assert.deepEqual(scopeRead.scopeData,shownScope);assert.equal(scopeRead.readOnly,true);assert.deepEqual(original.takeoff.scopeData,shownScope);
     assert.equal(instructions.scopeAvailable,true);assert.equal(instructions.schema.properties.scopeData.readOnly,true);
     assert.equal((await fetch(base+api+'/scope')).status,401);
     for(const field of ['scopeData','scopeLink']){
@@ -72,7 +74,7 @@ test('AI grants enforce scope, repeated saves, revisions, validation, live broad
     assert.equal((await call(api+'/save','POST',{...change,requestId:'again'},key)).status,409);
     const collision=structuredClone(change);collision.takeoff.name='Different payload';
     assert.equal((await call(api+'/save','POST',collision,key)).status,409);
-    const exported=await (await call('/api/projects/'+created.id+'/export')).json();assert.deepEqual(exported.lists[0].companies[0].projects[0].takeoffs[1],book.lists[0].companies[0].projects[0].takeoffs[1]);
+    const exported=await (await call('/api/projects/'+created.id+'/export')).json();assert.deepEqual(exported.lists[0].companies[0].projects[0].takeoffs[0].scopeData,scopeData);assert.deepEqual(exported.lists[0].companies[0].projects[0].takeoffs[1],book.lists[0].companies[0].projects[0].takeoffs[1]);
     const history=await (await call(admin+'?list=list&takeoff=one')).json();assert.equal(history.changes[0].id,receipt.changeId);assert.equal(history.changes[0].canUndo,true);assert.ok(!JSON.stringify(history).includes(key));
     const later=access,read=await (await call(api+'/takeoff','GET',undefined,later.key)).json();read.takeoff.name='Edited again';
     const laterReceipt=await (await call(api+'/save','POST',{revision:read.revision,takeoff:read.takeoff,requestId:'later'},later.key)).json();
@@ -94,7 +96,7 @@ test('AI grants enforce scope, repeated saves, revisions, validation, live broad
     assert.equal((await rpc('initialize',{protocolVersion:'2025-11-25'})).result.protocolVersion,'2025-11-25');
     assert.equal((await rpc('tools/list')).result.tools.length,8);
     assert.equal(JSON.parse((await rpc('tools/call',{name:'read_takeoff',arguments:{}})).result.content[0].text).takeoff.id,'one');
-    assert.deepEqual(JSON.parse((await rpc('tools/call',{name:'read_scope',arguments:{}})).result.content[0].text).scopeData,scopeData);
+    assert.deepEqual(JSON.parse((await rpc('tools/call',{name:'read_scope',arguments:{}})).result.content[0].text).scopeData,shownScope);
     await call(admin+'/'+fresh.id,'DELETE');assert.equal((await call(api+'/scope','GET',undefined,fresh.key)).status,403);assert.equal((await call(api+'/takeoff','GET',undefined,fresh.key)).status,403);
     const permanent=await grant();inspect=new DatabaseSync(join(dataDir,'projects.sqlite'));
     assert.equal(inspect.prepare('SELECT count(*) AS count FROM ai_grants WHERE key_hash=?').get(permanent.key).count,0);
@@ -171,18 +173,22 @@ test('AI keys read only enabled reference JSONs across workbooks and lose access
     const admin='/api/projects/'+target+'/ai-access';
     const grant=await (await call(admin,'POST',{list:'list',takeoff:'target'})).json();
     // A key created before the reference exists can discover it without regeneration.
-    const reference={...takeoff('reference'),aiData:true,note:'Reference scope'};
+    const reference={...takeoff('reference'),aiData:true,aiDataMethod:'unit-price',aiDataWorkTypes:['concrete-pour','demo'],note:'Reference scope',scopeData:{source:'zz',items:[{id:'visible',name:'Visible scope'},{id:'hidden',name:'Secret scope',showAi:false}]}};
+    const visibleReference={...reference,scopeData:{...reference.scopeData,items:[reference.scopeData.items[0]]}};
     const workbook=await create([reference,takeoff('private')]);
     const api='/api/ai/v1',args={workbook,list:'list',takeoff:'reference'},path=api+'/ai-data/takeoff?'+new URLSearchParams(args);
     assert.equal((await fetch(base+api+'/ai-data')).status,401);
     const index=await (await call(api+'/ai-data','GET',undefined,grant.key)).json();
     assert.deepEqual(index.estimates.map(e=>e.takeoff),['reference']);
+    assert.equal(index.estimates[0].aiDataMethod,'unit-price');
+    assert.deepEqual(index.estimates[0].aiDataWorkTypes,['concrete-pour','demo']);
+    assert.equal(index.estimates[0].aiDataMethodLabel,'Unit price (SF / LF / EA)');
     assert.deepEqual((await (await call(api+'/instructions','GET',undefined,grant.key)).json()).aiData,index);
-    const read=await (await call(path,'GET',undefined,grant.key)).json();assert.deepEqual(read.takeoff,reference);assert.equal(read.readOnly,true);
+    const read=await (await call(path,'GET',undefined,grant.key)).json();assert.deepEqual(read.takeoff,visibleReference);assert.equal(read.readOnly,true);
     assert.equal((await call(path.replace('takeoff=reference','takeoff=private'),'GET',undefined,grant.key)).status,404);
     assert.equal((await call(api+'/ai-data/takeoff','GET',undefined,grant.key)).status,422);
     const rpc=async(name,arguments_={})=>(await (await call(api+'/mcp','POST',{jsonrpc:'2.0',id:1,method:'tools/call',params:{name,arguments:arguments_}},grant.key)).json()).result;
-    assert.deepEqual(JSON.parse((await rpc('read_ai_data',args)).content[0].text).takeoff,reference);
+    assert.deepEqual(JSON.parse((await rpc('read_ai_data',args)).content[0].text).takeoff,visibleReference);
     assert.deepEqual(JSON.parse((await rpc('list_ai_data')).content[0].text),index);
     const original=await (await call(api+'/takeoff','GET',undefined,grant.key)).json();
     assert.equal((await call(api+'/save','POST',{revision:original.revision,takeoff:reference,requestId:'cannot-edit-reference'},grant.key)).status,422);

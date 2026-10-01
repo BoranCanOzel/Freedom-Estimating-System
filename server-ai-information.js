@@ -1,3 +1,4 @@
+import { aiDataMethods, aiDataMethodLabel, normalizeAiDataWorkTypes } from './shared/ai-data.js';
 import { aiVisibleTakeoff } from './shared/ai-takeoff.js';
 import { createHash } from 'node:crypto';
 import * as Y from 'yjs';
@@ -23,7 +24,8 @@ export function mountAiInformation({app,db,session,rooms}) {
         for(const list of book.lists||[])for(const company of list.companies||[])for(const project of company.projects||[])for(const takeoff of project.takeoffs||[]){
           if(takeoff.aiData!==true)continue;
           if(selector&&(selector.list!==list.id||selector.takeoff!==takeoff.id))continue;
-          const metadata={workbook:workbook.id,workbookName:workbook.name,list:list.id,listName:list.name||'Projects',
+          const method=aiDataMethods.some(([id])=>id===takeoff.aiDataMethod)?takeoff.aiDataMethod:'';
+          const metadata={aiDataWorkTypes:normalizeAiDataWorkTypes(takeoff.aiDataWorkTypes),aiDataMethod:method,aiDataMethodLabel:aiDataMethodLabel(method),workbook:workbook.id,workbookName:workbook.name,list:list.id,listName:list.name||'Projects',
             companyName:company.name||'Untitled customer',projectName:project.name||'Untitled project',
             takeoff:takeoff.id,takeoffName:takeoff.name||'Untitled estimate',sheet:takeoff.sheets?.[0]?.id||'',pages:takeoff.sheets?.length||0};
           if(selector)return {reference:metadata,takeoff:aiVisibleTakeoff(takeoff),readOnly:true};

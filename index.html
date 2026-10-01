@@ -3058,9 +3058,13 @@
         </div>
       </details>
       <details class="lib-save-existing">
-        <summary>Save from this option</summary>
-        <button type="button" class="btn alt tiny" id="libCapScope">Save entire option</button>
-        <div class="lib-hint">Or choose a section:</div>
+        <summary>Save from this page</summary>
+        <label class="lib-capture-field">What do you want to save?
+          <select id="libCaptureType"><option value="">Choose what to save</option><option value="item">Item</option><option value="section">Section or subsection</option><option value="page">Entire page</option></select>
+        </label>
+        <label class="lib-capture-field" id="libCaptureSearchLabel" hidden>Find on this page<input id="libCaptureSearch" type="search" placeholder="Search name, section, or detail"></label>
+        <p id="libCaptureDestination" class="lib-hint"></p>
+        <button type="button" class="btn alt tiny" id="libCapScope" hidden>Save entire page</button>
         <div class="lib-list" id="libCapture"></div>
       </details>
     </div>
@@ -3697,15 +3701,6 @@
     kindPick.append(kindBtn, kindTip, kindMenu);
     const noteBtn = noteButton();
 
-    const cardBtn = document.createElement('button');
-    cardBtn.type = 'button';
-    cardBtn.className = 'note-btn card-btn';
-    cardBtn.title = 'Open this line as a card';
-    cardBtn.innerHTML = '<svg viewBox="0 0 12 12" width="11" height="11" fill="none" stroke="currentColor" ' +
-      'stroke-width="1.4" stroke-linejoin="round"><rect x="0.8" y="1.6" width="10.4" height="8.8" rx="1.4"/>' +
-      '<path d="M3 4.6h6M3 7h4"/></svg>';
-    cardBtn.addEventListener('click', () => openRowCard(row));
-
     const dupBtn = document.createElement('button');
     dupBtn.type = 'button';
     dupBtn.className = 'note-btn dup-btn';
@@ -3716,7 +3711,7 @@
       '<path d="M3.8 10.4h6.6a0.8 0.8 0 0 0 0.8-0.8V3.4"/></svg>';
     dupBtn.addEventListener('click', () => duplicateRow(row));
 
-    wrap.append(dupBtn, grip, rownum, name, cardBtn, noteBtn, kindPick);
+    wrap.append(dupBtn, grip, rownum, name, noteBtn, kindPick);
     const stackCell = document.createElement('div');
     stackCell.className = 'item-wrap';
     stackCell.appendChild(wrap);
@@ -3922,7 +3917,7 @@
   }
 
   // Native modal behavior provides focus trapping and Escape-to-cancel.
-  function confirmPop(anchor, text, onYes, actionLabel = 'Remove'){
+  function confirmPop(anchor, text, onYes, actionLabel = 'Remove', content = null){
     document.querySelectorAll('.confirm-pop').forEach(el => el.remove());
     const pop = document.createElement('dialog');
     pop.className = 'confirm-pop';
@@ -3945,7 +3940,9 @@
     no.addEventListener('click', e => { e.stopPropagation(); pop.close(); });
     pop.addEventListener('close', () => { pop.remove(); if (anchor?.isConnected) anchor.focus({preventScroll:true}); });
     row.append(no, yes);
-    pop.append(heading, msg, row);
+    pop.append(heading, msg);
+    if(content)pop.append(content);
+    pop.append(row);
     document.body.appendChild(pop);
     pop.showModal();
     no.focus();
@@ -6620,35 +6617,6 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     return tab && book.sheets.find(sh => sh.id === tab.dataset.sheet && sh.id !== (drag?.sourceId || state.id));
   }
 
-  // edit a live sheet line in the same card the library uses
-  function openRowCard(row){
-    const seed2 = Object.assign({}, row, {id:null});
-    if (!seed2.img && row.pics && row.pics.length) seed2.img = row.pics[0].url;
-    if (row.kind === 'service'){
-      openEditor('service', seed2);
-      svcDraft.__rowId = row.id;
-      document.getElementById('edTitle').textContent = 'Service';
-      addEdGrab();
-    applyEdWidth();
-    document.getElementById('edHint').textContent = 'Edits this line';
-      renderEditor();
-      return;
-    }
-    if (row.kind === 'construct'){
-      openEditor('construct', seed2);
-      conDraft.__rowId = row.id;
-      document.getElementById('edTitle').textContent = 'Construct';
-      document.getElementById('edHint').textContent = 'Edits this line';
-      renderEditor();
-      return;
-    }
-    openEditor('item', seed2);
-    itemDraft.__rowId = row.id;
-    document.getElementById('edTitle').textContent = 'Line card';
-    document.getElementById('edHint').textContent = 'Edits this line';
-    renderEditor();
-  }
-
   function saveRowAsTemplate(row, folder){
     const tpl = templates();
     if (row.type === 'section'){
@@ -6657,9 +6625,10 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       tpl.sections.push({...section, id:id(), folder});
       flash('section saved to library');
     } else {
-      tpl.items.push({id:id(), kind:row.kind || 'labor', name:row.name, note:row.note, folder:folder,
-                      img:(row.pics && row.pics[0] ? row.pics[0].url : undefined),
-                      count:row.count, time:row.time, days:row.days, cost:row.cost, markup:row.markup});
+      const copy=freshIds(row);copy.id=id();copy.folder=folder;delete copy.picsOpen;
+      if(!copy.img&&row.pics?.[0])copy.img=row.pics[0].url;
+      const key=row.kind==='construct'?'constructs':row.kind==='service'?'services':row.kind==='part'?'parts':'items';
+      tpl[key].push(copy);
       flash('item saved to library');
     }
     renderLibrary();
@@ -7619,30 +7588,40 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     renderTree(document.getElementById('libAll'), allTemplates());
     renderMainLibraryFolders(allTemplates());
 
-    const cap = document.getElementById('libCapture');
-    cap.innerHTML = '';
-    const found = sheetSections(state);
-    if (!found.length){
-      cap.innerHTML = '<div class="lib-hint">This option has no sections.</div>';
-    } else {
-      found.forEach(sec => {
-        const el = document.createElement('div');
-        el.className = 'tpl';
-        el.style.cursor = 'default';
-        el.innerHTML = '<span class="tpl-main"><span class="tpl-name">' +
-          esc(sec.name || 'Unnamed section') + '</span></span>';
-        const b = document.createElement('button');
-        b.type = 'button'; b.className = 'tpl-btn'; b.innerHTML = '+';
-        b.title = 'Save this section as a template';
-        b.addEventListener('click', () => {
-          saveRowAsTemplate(sec.row, '');
-          flash('section saved');
-        });
-        el.appendChild(b);
-        cap.appendChild(el);
-      });
-    }
+    renderPageCapture();
   }
+
+  function renderPageCapture(){
+    const cap=document.getElementById('libCapture'),type=document.getElementById('libCaptureType').value;
+    const query=document.getElementById('libCaptureSearch').value.trim().toLowerCase();
+    cap.replaceChildren();
+    document.getElementById('libCaptureSearchLabel').hidden=!type||type==='page';
+    document.getElementById('libCapScope').hidden=type!=='page';
+    document.getElementById('libCaptureDestination').textContent=type?'Save to: Library'+(libPath?' / '+libPath:''):'';
+    if(!type)return;
+    if(type==='page'){
+      cap.textContent=state.title||'Untitled page';return;
+    }
+    const stack=[];let count=0;
+    for(const row of state.rows){
+      if(row.type==='sectionEnd'){stack.pop();continue;}
+      const section=row.type==='section',parent=stack.join(' / ');
+      if((type==='section')===section&&(!query||[row.name,row.note,parent].join(' ').toLowerCase().includes(query))){
+        const entry=document.createElement('div');entry.className='tpl lib-capture-result';
+        const info=document.createElement('span');info.className='tpl-main';
+        const name=document.createElement('span');name.className='tpl-name';name.textContent=row.name||(section?'Unnamed section':'Unnamed item');
+        const context=document.createElement('span');context.className='tpl-meta';context.textContent=(section?(stack.length?'Subsection':'Section'):'Item')+(parent?' - '+parent:'');
+        info.append(name,context);
+        const saveButton=document.createElement('button');saveButton.type='button';saveButton.className='tpl-btn';saveButton.textContent='Save';saveButton.setAttribute('aria-label','Save '+name.textContent+' to library');
+        saveButton.onclick=()=>saveRowAsTemplate(row,libPath);
+        entry.append(info,saveButton);cap.append(entry);count++;
+      }
+      if(section)stack.push(row.name||'Unnamed section');
+    }
+    if(!count)cap.textContent=query?'No matches on this page.':type==='section'?'This page has no sections or subsections.':'This page has no items.';
+  }
+  document.getElementById('libCaptureType').addEventListener('change',()=>{document.getElementById('libCaptureSearch').value='';renderPageCapture();});
+  document.getElementById('libCaptureSearch').addEventListener('input',renderPageCapture);
 
   document.getElementById('libToggle').addEventListener('click', () => {
     const open = document.body.classList.contains('lib-open');
@@ -8068,14 +8047,14 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       id:id(),
       name: state.title || '',
       note: state.note || '',
-      folder: '',
+      folder: libPath,
       parts: partsFromRows(state.rows),
       fees: state.fees.map(f => ({label:f.label, pct:f.pct})),
       units: state.units.map(u => ({label:u.label, qty:u.qty}))
     });
     renderLibrary();
     save();
-    flash('option saved as scope');
+    flash('page saved as scope');
   });
 
   /* ---------- template editor panel ---------- */
@@ -12008,14 +11987,31 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     getShared(){ projectTree(); templates(); return separate(book); },
     getLocation(){ return {list:book.activeList,view:book.view, sheet:book.active, takeoff:book.activeTakeoff}; },
     aiDataEnabled(){ return findTakeoff(book.activeTakeoff)?.tk.aiData === true; },
-    confirmAiDataEnabled(enabled, anchor){
+    aiDataMethod(){ return findTakeoff(book.activeTakeoff)?.tk.aiDataMethod || ''; },
+    setAiDataMethod(method){
+      const hit=findTakeoff(book.activeTakeoff);
+      if(!hit||!['','unit-price','hourly','mixed'].includes(method))return;
+      hit.tk.aiDataMethod=method;save();
+    },
+    aiDataWorkTypes(){
+      const values=findTakeoff(book.activeTakeoff)?.tk.aiDataWorkTypes;
+      return ['concrete-pour','demo'].filter(value=>Array.isArray(values)&&values.includes(value));
+    },
+    setAiDataWorkTypes(values){
+      const hit=findTakeoff(book.activeTakeoff);if(!hit||!Array.isArray(values))return;
+      hit.tk.aiDataWorkTypes=['concrete-pour','demo'].filter(value=>values.includes(value));save();
+    },
+    confirmAiDataEnabled(enabled, anchor, content = null, getMethod = () => this.aiDataMethod(), getWorkTypes = () => this.aiDataWorkTypes()){  
       const takeoff=book.activeTakeoff,list=book.activeList;
       if(!findTakeoff(takeoff))return;
       confirmPop(anchor,enabled
         ? 'Allow active AI access keys to read this estimate as reference data? This includes the full JSON of all its option pages.'
         : 'Remove this estimate from AI reference data?',()=>{
-          if(book.activeList===list&&book.activeTakeoff===takeoff)this.setAiDataEnabled(enabled);
-        },enabled?'Enable AI Data':'Remove AI Data');
+          if(book.activeList===list&&book.activeTakeoff===takeoff){
+            if(enabled){this.setAiDataMethod(getMethod());this.setAiDataWorkTypes(getWorkTypes());}
+            this.setAiDataEnabled(enabled);
+          }
+        },enabled?'Enable AI Data':'Remove AI Data',content);
     },
     setAiDataEnabled(enabled){
       const hit = findTakeoff(book.activeTakeoff);
@@ -12058,6 +12054,16 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     setScopeAiAccess(enabled){const hit=findTakeoff(book.activeTakeoff);if(hit){hit.tk.scopeAiAccess=enabled===true;save();}},
     setScopeLink(value){const hit=findTakeoff(book.activeTakeoff);if(hit){hit.tk.scopeLink=value;save();}},
     setScopeData(data){const hit=findTakeoff(book.activeTakeoff);if(hit){hit.tk.scopeData=structuredClone(data);save();}},
+    setScopeItemsAiVisibility(ids,enabled){
+      const hit=findTakeoff(book.activeTakeoff);if(!hit?.tk.scopeData)return;
+      const selected=new Set(ids);
+      for(const item of hit.tk.scopeData.items||[])if(selected.has(item.id))item.showAi=enabled===true;
+      save();
+    },
+    setScopeItemNote(itemId,note){
+      const item=findTakeoff(book.activeTakeoff)?.tk.scopeData?.items?.find(item=>item.id===itemId);
+      if(item){item.note=String(note).slice(0,10000);save();}
+    },
     setScopeItemStatus(itemId,status){
       if(!['included','excluded','ignored','duplicate'].includes(status))return;
       const item=findTakeoff(book.activeTakeoff)?.tk.scopeData?.items?.find(item=>item.id===itemId);

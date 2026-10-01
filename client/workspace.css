@@ -277,3 +277,25 @@ body #sheetTable tr.section-head.tree-child .sec-add:hover{color:var(--ink);bord
 #libMainFolders .lib-main-folder:hover,#libMainFolders .lib-main-folder[aria-pressed=true]{background:#f2cb541a;border-color:#f2cb5480}
 #libMainFolders .lib-main-folder.folder-drop{background:#f2cb5433;border-color:#f2cb54;box-shadow:inset 0 0 0 1px #f2cb54}
 #libMainFolders .lib-main-folder:focus-visible{outline:2px solid #f2cb54;outline-offset:1px}
+
+#library .lib-capture-field{display:flex;flex-direction:column;gap:6px;margin:12px 0;font:12px var(--f-sans);color:var(--muted)}
+#library .lib-capture-field[hidden]{display:none}
+#library .lib-capture-field input,#library .lib-capture-field select{width:100%;min-width:0;padding:8px;border:1px solid var(--rule);border-radius:4px;background:var(--card);color:var(--ink);font:12px var(--f-sans)}
+#libCapture{max-height:320px;overflow:auto;font:12px var(--f-sans);color:var(--muted)}
+#libCapture .lib-capture-result{cursor:default;flex-shrink:0}
+#libCapture .tpl-name{white-space:normal;overflow-wrap:anywhere}
+#libCapture .tpl-meta{white-space:normal}
+
+.workspace-ai-method{display:inline-flex;align-items:center;gap:6px;font-size:12px}
+.workspace-ai-method[hidden]{display:none}
+.workspace-ai-method select{width:auto;max-width:230px}
+.ai-data-method-prompt{display:grid;gap:8px;margin:16px 0}
+.ai-data-method-prompt p{font-size:13px;color:var(--muted);margin:0}
+@media print{.workspace-ai-method{display:none!important}}
+
+.ai-data-work-types{display:flex;flex-wrap:wrap;gap:8px 14px;border:1px solid var(--line);border-radius:6px;padding:5px 10px;margin:0;font-size:12px}
+.ai-data-work-types legend{padding:0 4px}
+.ai-data-work-types label{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;cursor:pointer}
+.ai-data-work-types input{width:auto;margin:0;accent-color:var(--teal)}
+.ai-data-work-types[hidden]{display:none}
+@media print{.ai-data-work-types{display:none!important}}

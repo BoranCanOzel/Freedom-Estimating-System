@@ -1,3 +1,4 @@
+import { aiDataMethods, aiDataWorkTypes } from '../shared/ai-data.js';
 import { peerColor } from './project-presence.js';
 import { renderProjectSettings } from './project-settings.js';
 import './workspace.css';
@@ -133,11 +134,44 @@ export function setupWorkspace() {
   const aiData = document.createElement('input');
   aiData.type = 'checkbox'; aiData.id = 'takeoff-ai-data';
   aiDataLabel.append(aiData, document.createTextNode('AI Data'));
-  zzTakeoff.after(aiDataLabel);
+  const methodLabel = document.createElement('label');
+  methodLabel.className = 'workspace-ai-method';
+  methodLabel.append(document.createTextNode('Pricing method '));
+  const method = document.createElement('select');
+  method.id = 'takeoff-ai-data-method';
+  const fillMethods = select => {
+    select.add(new Option('Not specified', ''));
+    for (const [value, label] of aiDataMethods) select.add(new Option(label, value));
+  };
+  fillMethods(method);methodLabel.append(method);
+  method.onchange = () => { bridge.setAiDataMethod(method.value); sync(); };
+  function workTypeChoices(values, onChange) {
+    const group = document.createElement('fieldset');group.className = 'ai-data-work-types';
+    const legend = document.createElement('legend');legend.textContent = 'Work type';group.append(legend);
+    for (const [value, title] of aiDataWorkTypes) {
+      const label = document.createElement('label'), input = document.createElement('input');
+      input.type = 'checkbox';input.value = value;input.checked = values.includes(value);
+      input.onchange = () => onChange?.([...group.querySelectorAll('input:checked')].map(el => el.value));
+      label.append(input, document.createTextNode(title));group.append(label);
+    }
+    return group;
+  }
+  const workTypes = workTypeChoices(bridge.aiDataWorkTypes(), values => { bridge.setAiDataWorkTypes(values);sync(); });
+  zzTakeoff.after(aiDataLabel, methodLabel, workTypes);
   aiData.addEventListener('change', () => {
     const enabled = aiData.checked;
     sync();
-    bridge.confirmAiDataEnabled(enabled, aiData);
+    const label = document.createElement('label');
+    label.className = 'ai-data-method-prompt';label.textContent = 'Pricing method';
+    const select = document.createElement('select');fillMethods(select);
+    select.value = bridge.aiDataMethod();label.append(select);
+    const hint = document.createElement('p');
+    hint.textContent = 'Choose how this estimate was priced. Mixed combines unit prices and hourly breakdowns. Labor, material, and equipment sections can be used with any method.';
+    label.append(hint);
+    const content = document.createElement('div');
+    const choices = workTypeChoices(bridge.aiDataWorkTypes());content.append(label, choices);
+    bridge.confirmAiDataEnabled(enabled, aiData, enabled ? content : null, () => select.value,
+      () => [...choices.querySelectorAll('input:checked')].map(el => el.value));
   });
   move('reset', 'workspace-option-actions');
   const excel = document.querySelector('.js-export');
@@ -209,7 +243,13 @@ export function setupWorkspace() {
     if (mapHost && map.parentElement !== mapHost) mapHost.append(map);
     if (mapHost && zzTakeoff.previousElementSibling !== map) map.after(zzTakeoff);
     if (mapHost && aiDataLabel.parentElement !== mapHost) mapHost.append(aiDataLabel);
+    if (mapHost && methodLabel.previousElementSibling !== aiDataLabel) aiDataLabel.after(methodLabel);
     aiData.checked = ready && bridge.aiDataEnabled();
+    methodLabel.hidden = !aiData.checked;
+    method.value = bridge.aiDataMethod();
+    if (mapHost && workTypes.previousElementSibling !== methodLabel) methodLabel.after(workTypes);
+    workTypes.hidden = !aiData.checked;
+    for (const input of workTypes.querySelectorAll('input')) input.checked = bridge.aiDataWorkTypes().includes(input.value);
     aiData.disabled = !ready || !bridge.getLocation().takeoff;
     const address = ready ? bridge.getMapAddress() : '';
     map.title = address || (ready ? 'Add a job or customer address to open the map.' : 'Open a workbook to view its project map.');

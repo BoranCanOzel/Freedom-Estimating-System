@@ -5,11 +5,11 @@ import { mergeScope } from '../shared/scope.js';
 import { zzProject, zzScope, scriptTool, scopeScript, zzTransportError, zzScopeError, scopePayload } from '../server-zztakeoff.js';
 
 test('scope refresh preserves decisions by source ID and retains missing items for review',()=>{
-  const old={source:'project',items:[{id:'a',name:'Old name',status:'excluded'},{id:'b',name:'Removed',status:'duplicate'}]};
+  const old={source:'project',items:[{id:'a',name:'Old name',status:'excluded',showAi:false,note:'Night shift only'},{id:'b',name:'Removed',status:'duplicate'}]};
   const next=mergeScope(old,{source:'project',items:[{id:'a',name:'New name',measurements:'area: 160 SF'},{id:'c',name:'New'}]});
-  assert.equal(next.items[0].status,'excluded');assert.equal(next.items[0].measurements,'area: 160 SF');
+  assert.equal(next.items[0].note,'Night shift only');assert.equal(next.items[0].showAi,false);assert.equal(next.items[0].status,'excluded');assert.equal(next.items[0].measurements,'area: 160 SF');
   assert.equal(next.items[1].status,'included');assert.equal(next.items[2].missing,true);assert.equal(next.items[2].status,'duplicate');
-  const other=mergeScope(old,{source:'other',items:[{id:'a',name:'Different project'}]});assert.equal(other.items[0].status,'included');assert.equal(other.items.length,1);
+  const other=mergeScope(old,{source:'other',items:[{id:'a',name:'Different project'}]});assert.equal(other.items[0].note,undefined);assert.equal(other.items[0].status,'included');assert.equal(other.items.length,1);
   assert.throws(()=>mergeScope(old,{source:'project',items:[{id:'a',name:'One'},{id:'a',name:'Two'}]}),/unique/);
 });
 
