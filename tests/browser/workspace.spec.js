@@ -510,16 +510,24 @@ test('section deletion offers keeping items or deleting the complete nested sect
   expect(await ids()).toEqual(['before','after']);
 });
 
-test('company names reject duplicates across lists while allowing edits and distinct names', async ({page}) => {
+test('company names suggest existing matches while typing and reject duplicates across lists', async ({page}) => {
   const data=workbook();
-  data.lists.push({id:'archive',name:'Archive',companies:[{id:'archived-company',name:'Other Customer',projects:[]}]});
+  data.lists.push({id:'archive',name:'Archive',companies:[{id:'archived-company',name:'Empire Builders',projects:[]}]});
   await openWorkbook(page,data);await page.locator('#server-projects').click();
   const companies=()=>page.evaluate(()=>window.estimator.getShared().lists.flatMap(list=>list.companies));
   await page.locator('#addCompany').click();
   const name=page.locator('#editor').getByLabel('Company name',{exact:true});
   const error=page.locator('#company-name-error');
+  const matches=page.locator('#company-name-matches');
+  await expect(matches).toBeHidden();
+  await name.fill('  EMP ');
+  await expect(matches).toContainText('Empire Builders');
+  await expect(matches).toContainText('Archive');
+  await expect(name).toBeFocused();
+  await name.fill('builders');await expect(matches).toContainText('Empire Builders');
+  await name.fill('');await expect(matches).toBeHidden();
   await page.locator('#editor').getByLabel('Phone',{exact:true}).fill('555-0123');
-  for(const value of ['Freedom Customer','  freedom   CUSTOMER  ','OTHER customer']){
+  for(const value of ['Freedom Customer','  freedom   CUSTOMER  ','EMPIRE builders']){
     await name.fill(value);await page.locator('#edSave').click();
     await expect(error).toContainText('already exists');
     await expect(name).toHaveAttribute('aria-invalid','true');
@@ -528,11 +536,12 @@ test('company names reject duplicates across lists while allowing edits and dist
     expect((await companies()).length).toBe(2);
   }
   await expect(error).toContainText('Archive');
-  await name.fill('New customer');await expect(error).toBeHidden();
+  await name.fill('New customer');await expect(error).toBeHidden();await expect(matches).toBeHidden();
   await page.locator('#edSave').click();await expect(page.locator('#editor')).toBeHidden();
   const added=(await companies()).find(company=>company.name==='New customer');
   expect(added.phone).toBe('555-0123');
   await page.locator(`[data-company="${added.id}"]`).getByTitle('Edit this company',{exact:true}).click();
+  await expect(matches).toBeHidden();
   await name.fill('freedom customer');await page.locator('#edSave').click();
   await expect(error).toContainText('already exists');
   await name.fill('New customer');await page.locator('#edSave').click();

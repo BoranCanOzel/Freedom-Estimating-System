@@ -123,6 +123,12 @@ body.server-mode .ed.listopts .ed-head,body.server-mode .ed.listopts .ed-foot{ba
 body.server-mode .ed.listopts .ed-body{padding:14px;background:var(--card)}
 #company-name-error{margin:0 0 12px;font:12px/1.5 var(--f-sans);color:var(--ink)}
 #company-name[aria-invalid="true"]{border-color:#c65a4f;outline:1px solid #c65a4f}
+#company-name-matches{margin:0 0 12px;padding:10px 12px;border:1px solid var(--rule);border-radius:8px;background:var(--card);font:12px/1.5 var(--f-sans)}
+#company-name-matches[hidden]{display:none}
+#company-name-matches p{margin:0;color:var(--muted)}
+#company-name-matches ul{list-style:none;margin:6px 0 0;padding:0}
+#company-name-matches li{display:flex;flex-direction:column;padding:5px 0;overflow-wrap:anywhere}
+#company-name-matches li span{color:var(--muted)}
 .project-settings-tabs{display:flex;gap:3px;padding:3px;background:var(--calc);border-radius:5px;margin:0 0 16px}
 body.server-mode .project-settings-tabs button{flex:1;padding:8px 4px;border:0;border-radius:3px;background:transparent;color:var(--muted);font:500 12px var(--f-sans);cursor:pointer;white-space:nowrap}
 body.server-mode .project-settings-tabs button[aria-selected=true]{color:var(--ink);background:var(--card);box-shadow:0 1px 4px #0002}

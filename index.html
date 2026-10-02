@@ -9626,6 +9626,14 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     return b;
   }
 
+  const companyNameKey = name => String(name || '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase();
+  function matchingCompanies(name, excludeId, exact = false){
+    const key = companyNameKey(name);
+    if (!key) return [];
+    return (book.lists || []).flatMap(list => (list.companies || []).map(company => ({company, list})))
+      .filter(({company}) => company.id !== excludeId && (exact ? companyNameKey(company.name) === key : companyNameKey(company.name).includes(key)));
+  }
+
   function renderCoEd(box){
     const d = coDraft;
     box.appendChild(imageBlock(d));
@@ -9634,21 +9642,44 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     card.appendChild(blockHead(d, 'Company', 'coLocked', 'coOpen'));
     if (d.coOpen !== false){
       CO_FIELDS.forEach(([k, lab]) => {
+        let updateMatches = () => {};
         const field = edField(lab, d[k], v => {
           d[k] = v;
           if (k === 'name'){
             document.getElementById('company-name')?.removeAttribute('aria-invalid');
             const error = document.getElementById('company-name-error');
             if (error){ error.hidden = true; error.textContent = ''; }
+            updateMatches();
           }
         });
         card.appendChild(field);
         if (k === 'name'){
           const input = field.querySelector('input');
-          input.id = 'company-name'; input.setAttribute('aria-describedby', 'company-name-error');
+          input.id = 'company-name'; input.autocomplete = 'off';
+          input.setAttribute('aria-describedby', 'company-name-error company-name-matches');
           const error = document.createElement('p');
           error.id = 'company-name-error'; error.setAttribute('role', 'alert'); error.hidden = true;
           card.appendChild(error);
+          const matches = document.createElement('div');matches.id = 'company-name-matches';
+          matches.setAttribute('role', 'status');matches.setAttribute('aria-live', 'polite');
+          card.appendChild(matches);
+          updateMatches = () => {
+            const found = matchingCompanies(d.name, d.id);
+            matches.replaceChildren();matches.hidden = !found.length;
+            if (!found.length) return;
+            const heading = document.createElement('p');heading.textContent = 'Existing companies with matching names';matches.appendChild(heading);
+            const list = document.createElement('ul');
+            for (const {company, list: owner} of found.slice(0, 8)){
+              const row = document.createElement('li'),name = document.createElement('strong'),location = document.createElement('span');
+              name.textContent = company.name;location.textContent = owner.name || 'This workbook';
+              row.append(name, location);list.appendChild(row);
+            }
+            matches.appendChild(list);
+            if (found.length > 8){
+              const more = document.createElement('p');more.textContent = `${found.length - 8} more matches. Keep typing to narrow the list.`;matches.appendChild(more);
+            }
+          };
+          updateMatches();
         }
         if (k === 'address') card.appendChild(mapsBtn(() => d.address));
       });
@@ -9970,11 +10001,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       return;
     }
     if (edMode === 'company'){
-      const nameKey = name => String(name || '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase();
-      const key = nameKey(coDraft.name);
-      const duplicate = key && (book.lists || []).flatMap(list =>
-        (list.companies || []).map(company => ({company, list})))
-        .find(({company}) => company.id !== coDraft.id && nameKey(company.name) === key);
+      const duplicate = matchingCompanies(coDraft.name, coDraft.id, true)[0];
       if (duplicate){
         coDraft.coOpen = true; renderEditor();
         const error = document.getElementById('company-name-error');
