@@ -113,6 +113,86 @@ test('Save as PDF downloads every takeoff option with readable pagination and co
   await expect(page.locator('#takeoff-share + #takeoff-pdf')).toBeVisible();
 });
 
+test.describe('phone layouts',()=>{
+test.use({hasTouch:true});
+test('phone line-item cards keep editing, sections, totals and desktop table behavior',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  const data=workbook(),sh=data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0];
+  sh.rows.unshift({id:'mobile-section',type:'section',name:'Concrete work'});
+  sh.rows.push({id:'mobile-end',type:'sectionEnd',sid:'mobile-section'});
+  await openWorkbook(page,data);
+  const row=page.locator('#body tr[data-id="row-sn"]');
+  await expect(page.locator('body')).toHaveClass(/mobile-sheet/);
+  await expect(page.locator('#sheetTable thead')).toBeHidden();
+  await expect(row.locator('[aria-label="cost"]')).toBeVisible();
+  await expect(row.locator('td[data-mobile-label="Cost"]')).toBeVisible();
+  await expect(row.locator('td[data-mobile-label="Fee"]')).toBeVisible();
+  await row.locator('[aria-label="cost"]').tap();await expect(row.locator('[aria-label="cost"]')).toBeFocused();
+  await row.locator('[aria-label="cost"]').fill('200');await row.locator('[aria-label="cost"]').blur();
+  await expect(page.locator('#tGrand .v')).toHaveText('206.00');
+  await page.screenshot({path:'test-results/mobile-line-item-cards.png',fullPage:true});
+  const width=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,view:innerWidth}));
+  expect(width.scroll).toBeLessThanOrEqual(width.view+1);
+  const bounds=await row.boundingBox();expect(bounds.x).toBeGreaterThanOrEqual(0);expect(bounds.x+bounds.width).toBeLessThanOrEqual(391);
+  await page.locator('#body tr[data-id="mobile-section"] .caret').click();await expect(row).toBeHidden();
+  await page.locator('#body tr[data-id="mobile-section"] .caret').click();await expect(row).toBeVisible();
+  await row.getByRole('button',{name:'Duplicate this line',exact:true}).click();
+  await expect(page.locator('#tGrand .v')).toHaveText('412.00');
+  await page.locator('.mobile-sheet-tools').getByRole('button',{name:'Table view',exact:true}).click();
+  await expect(page.locator('#sheetTable thead')).toBeVisible();
+  await page.locator('#sheetTable thead .col-fee .h-lab-in').fill('Permit');
+  await page.locator('.mobile-sheet-tools').getByRole('button',{name:'Card view',exact:true}).click();
+  await expect(row.locator('td[data-mobile-label="Permit"]')).toBeVisible();
+  await page.setViewportSize({width:1440,height:1000});
+  await expect(page.locator('#sheetTable thead')).toBeVisible();
+  await expect(page.locator('.mobile-sheet-tools')).toBeHidden();
+  expect(await row.evaluate(el=>getComputedStyle(el).display)).toBe('table-row');
+  await expect(page.locator('#tGrand .v')).toHaveText('412.00');
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();await expect(page.locator('#tGrand .v')).toHaveText('412.00');
+});
+
+test('narrow phone cards label hidden columns, fees, units, services and rounded totals correctly',async({page})=>{
+  await page.setViewportSize({width:320,height:740});
+  const data=workbook(),sh=data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0];
+  sh.hiddenCols=['time','days'];sh.flatAddEnabled=true;sh.roundColumnVisible=true;sh.roundTotal=10;
+  sh.units=[{id:'sf',label:'SF',qty:10}];sh.fees=[{id:'permit',label:'Permit',pct:5},{id:'tax',label:'Tax',pct:2}];
+  sh.rows=[{id:'sec',type:'section',name:'Site work'},
+    {id:'service',kind:'service',name:'Delivery and fuel',count:1,time:1,days:1,cost:100,markup:10,flatAdd:5,parts:[{id:'fuel',name:'Fuel',kind:'part',cost:20,count:1}]},
+    {id:'construct',kind:'construct',name:'Assembly',count:1,time:1,days:1,markup:0,parts:[{id:'part',name:'Concrete',kind:'material',cost:50,count:2}]},
+    {id:'end',type:'sectionEnd',sid:'sec'}];
+  await openWorkbook(page,data);
+  const row=page.locator('#body tr[data-id="service"]');
+  await page.locator('.mobile-sheet-tools').getByRole('button',{name:'Table view',exact:true}).click();
+  await page.locator('#sheetTable [data-hide="time"]').click();
+  await page.locator('#sheetTable [data-hide="days"]').click();
+  await page.locator('#workspace-estimate > summary').click();
+  await page.locator('#hiddenCols').getByRole('button',{name:'+ Round',exact:true}).click();
+  await page.locator('#workspace-estimate > summary').press('Escape');
+  await page.locator('.mobile-sheet-tools').getByRole('button',{name:'Card view',exact:true}).click();
+  await expect(row.locator('[aria-label="time"]')).toHaveCount(0);
+  await expect(row.locator('[aria-label="flatAdd"]')).toBeVisible();
+  await expect(row.locator('td[data-mobile-label="Flat add $"]')).toBeVisible();
+  await expect(row.locator('td[data-mobile-label="Markup"] input')).toHaveAttribute('aria-label','Markup percent');
+  for(const label of ['Grand','Permit','Tax','Unit price / SF','Round'])await expect(row.locator('td[data-mobile-label="'+label+'"]')).toBeVisible();
+  await expect(page.locator('#body tr[data-id="sec"] td[data-mobile-label="Grand"] .v')).toHaveText('253.59');
+  await row.locator('[aria-label="cost"]').fill('150');await row.locator('[aria-label="cost"]').blur();
+  await expect(page.locator('#tGrand .v')).toHaveText('288.90');
+  await expect(page.locator('#tGrandLipMoney .v')).toHaveText('290.00');
+  await page.locator('.mobile-sheet-tools').getByRole('button',{name:'+ Item',exact:true}).click();
+  await expect(page.locator('#body tr[data-type="item"]')).toHaveCount(3);
+  await expect(page.locator('#tGrand .v')).toHaveText('288.90');
+  await page.screenshot({path:'test-results/mobile-narrow-cards.png',fullPage:true});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(321);
+  await page.emulateMedia({media:'print'});
+  expect(await row.evaluate(el=>getComputedStyle(el).display)).toBe('table-row');
+  await page.emulateMedia({media:'screen'});
+  await page.setViewportSize({width:760,height:900});await expect(page.locator('#sheetTable thead')).toBeHidden();
+  await page.setViewportSize({width:1024,height:900});await expect(page.locator('#sheetTable thead')).toBeVisible();
+});
+
+});
+
 test('takeoff header edits the owning job status across pages and sibling takeoffs',async({page})=>{
   const data=workbook();data.statuses=['Open','Reviewing','Completed','Closed'];
   data.lists[0].companies[0].projects[0].takeoffs.push({id:'sibling',name:'Alternate takeoff',sheets:[sheet('sibling-sheet','Alternate scope')]});

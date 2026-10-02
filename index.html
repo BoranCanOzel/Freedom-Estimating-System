@@ -6558,12 +6558,14 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   function edgeScroll(){
     if (!drag) return;
     if (drag.toOption){ requestAnimationFrame(edgeScroll); return; }
-    const box = scroller.getBoundingClientRect();
+    const phone = document.body.classList.contains('mobile-sheet');
+    const scrollHost = phone ? document.scrollingElement : scroller;
+    const box = phone ? {top:0,bottom:window.innerHeight} : scroller.getBoundingClientRect();
     const zone = 56;
     let dy = 0;
     if (drag.y < box.top + zone)         dy = -Math.min(15, (box.top + zone - drag.y) / 3);
     else if (drag.y > box.bottom - zone) dy =  Math.min(15, (drag.y - (box.bottom - zone)) / 3);
-    if (dy){ scroller.scrollTop += dy; placeRow(drag.y); }
+    if (dy){ scrollHost.scrollTop += dy; placeRow(drag.y); }
     requestAnimationFrame(edgeScroll);
   }
 
@@ -7427,12 +7429,14 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   function templateEdgeScroll(){
     if (!tplDrag) return;
     if (tplDrag.mode === 'rows' && tplDrag.valid){
-      const box = scroller.getBoundingClientRect();
+      const phone = document.body.classList.contains('mobile-sheet');
+      const scrollHost = phone ? document.scrollingElement : scroller;
+      const box = phone ? {top:0,bottom:window.innerHeight} : scroller.getBoundingClientRect();
       const dy = tplDrag.y < box.top + 45 ? -8 : tplDrag.y > box.bottom - 45 ? 8 : 0;
       if (dy){
-        const previous = scroller.scrollTop;
-        scroller.scrollTop += dy;
-        if (scroller.scrollTop !== previous) markDrop(tplDrag.x, tplDrag.y);
+        const previous = scrollHost.scrollTop;
+        scrollHost.scrollTop += dy;
+        if (scrollHost.scrollTop !== previous) markDrop(tplDrag.x, tplDrag.y);
       }
     }
     requestAnimationFrame(templateEdgeScroll);

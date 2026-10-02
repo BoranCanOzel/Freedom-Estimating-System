@@ -3,6 +3,7 @@ import { peerColor } from './project-presence.js';
 import { renderProjectSettings } from './project-settings.js';
 import './workspace.css';
 import './textures.css';
+import { setupMobileSheet } from './mobile-sheet.js';
 import { normalizeCursor, cursorColors, normalizeCursorColor } from '../shared/cursors.js';
 
 const $ = id => document.getElementById(id);
@@ -313,6 +314,7 @@ export function setupWorkspace() {
   }
   document.addEventListener('estimator:view', sync);
   document.addEventListener('estimator:projects', sync);
+  setupMobileSheet();
   sync();
   function setCursor(style) {
     style = normalizeCursor(style);
