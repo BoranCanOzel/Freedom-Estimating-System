@@ -128,6 +128,7 @@ test('AI Data marks only the selected estimate and persists when toggled',async(
   await confirmation.getByRole('combobox',{name:'Pricing method'}).selectOption('unit-price');
   await confirmation.getByRole('checkbox',{name:'Concrete pour',exact:true}).check();
   await confirmation.getByRole('checkbox',{name:'Demo',exact:true}).check();
+  await confirmation.getByRole('checkbox',{name:'Saw cutting',exact:true}).check();
   await confirmation.getByRole('button',{name:'Enable AI Data',exact:true}).click();
   await expect(page.locator('#server-status')).toHaveText('All changes saved');
   await page.reload();
@@ -135,7 +136,9 @@ test('AI Data marks only the selected estimate and persists when toggled',async(
   const data=await page.evaluate(()=>window.estimator.getShared());
   expect(data.lists[0].companies[0].projects[0].takeoffs[0].aiData).toBe(true);
   expect(data.lists[0].companies[0].projects[0].takeoffs[0].aiDataMethod).toBe('unit-price');
-  expect(data.lists[0].companies[0].projects[0].takeoffs[0].aiDataWorkTypes).toEqual(['concrete-pour','demo']);
+  expect(data.lists[0].companies[0].projects[0].takeoffs[0].aiDataWorkTypes).toEqual(['concrete-pour','demo','saw-cutting']);
+  await expect(page.getByRole('checkbox',{name:'Saw cutting',exact:true})).toBeChecked();
+  await page.getByRole('checkbox',{name:'Saw cutting',exact:true}).uncheck();
   await page.getByRole('checkbox',{name:'Demo',exact:true}).uncheck();
   await page.locator('#takeoff-ai-data-method').selectOption('hourly');
   await expect(page.locator('#server-status')).toHaveText('All changes saved');
@@ -143,6 +146,7 @@ test('AI Data marks only the selected estimate and persists when toggled',async(
   await expect(page.locator('#takeoff-ai-data-method')).toHaveValue('hourly');
   await page.screenshot({path:'test-results/ai-controls-layout.png',fullPage:true});
   await expect(page.getByRole('checkbox',{name:'Demo',exact:true})).not.toBeChecked();
+  await expect(page.getByRole('checkbox',{name:'Saw cutting',exact:true})).not.toBeChecked();
   await expect(page.getByRole('checkbox',{name:'Concrete pour',exact:true})).toBeChecked();
   await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'ts',sheet:'ss',view:'sheet'}));
   await expect(checkbox).not.toBeChecked();
@@ -164,7 +168,7 @@ test('AI Information lists checked estimates across workbooks and opens their ex
   await openWorkbook(page);
   const suffix=Date.now().toString(),job='AI reference job '+suffix,estimate='AI reference estimate '+suffix;
   const data=workbook();
-  const target=data.lists[0].companies[0].projects[1];target.name=job;target.takeoffs[0].name=estimate;target.takeoffs[0].aiData=true;target.takeoffs[0].aiDataMethod='mixed';target.takeoffs[0].aiDataWorkTypes=['concrete-pour','demo'];
+  const target=data.lists[0].companies[0].projects[1];target.name=job;target.takeoffs[0].name=estimate;target.takeoffs[0].aiData=true;target.takeoffs[0].aiDataMethod='mixed';target.takeoffs[0].aiDataWorkTypes=['concrete-pour','demo','saw-cutting'];
   target.takeoffs[0].sheets.push(sheet('extra','Extra page'));
   const created=await (await page.request.post('/api/projects',{data:{name:'AI references '+suffix,book:data}})).json();
   await page.locator('#ai-information-open').click();
@@ -179,6 +183,9 @@ test('AI Information lists checked estimates across workbooks and opens their ex
   await page.screenshot({path:'test-results/ai-data-layout.png',fullPage:true});
   await expect(record.locator('[data-work-type=concrete-pour]')).toHaveText('Concrete pour');
   await expect(record.locator('[data-work-type=demo]')).toHaveText('Demo');
+  await expect(record.locator('[data-work-type=saw-cutting]')).toHaveText('Saw cutting');
+  await page.locator('#ai-info-data-work-type').selectOption('saw-cutting');
+  await expect(record).toHaveCount(1);
   await page.locator('#ai-info-data-work-type').selectOption('');
   await expect(record).toHaveCount(0);
   await page.locator('#ai-info-data-work-type').selectOption('both');

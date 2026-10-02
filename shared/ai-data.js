@@ -5,5 +5,5 @@ export const aiDataMethods = [
 ];
 export const aiDataMethodLabel = value => aiDataMethods.find(([id]) => id === value)?.[1] || 'Not specified';
 
-export const aiDataWorkTypes = [['concrete-pour', 'Concrete pour'], ['demo', 'Demo']];
+export const aiDataWorkTypes = [['concrete-pour', 'Concrete pour'], ['demo', 'Demo'], ['saw-cutting', 'Saw cutting']];
 export const normalizeAiDataWorkTypes = value => aiDataWorkTypes.map(([id]) => id).filter(id => Array.isArray(value) && value.includes(id));

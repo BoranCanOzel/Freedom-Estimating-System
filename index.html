@@ -11995,11 +11995,11 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     },
     aiDataWorkTypes(){
       const values=findTakeoff(book.activeTakeoff)?.tk.aiDataWorkTypes;
-      return ['concrete-pour','demo'].filter(value=>Array.isArray(values)&&values.includes(value));
+      return ['concrete-pour','demo','saw-cutting'].filter(value=>Array.isArray(values)&&values.includes(value));
     },
     setAiDataWorkTypes(values){
       const hit=findTakeoff(book.activeTakeoff);if(!hit||!Array.isArray(values))return;
-      hit.tk.aiDataWorkTypes=['concrete-pour','demo'].filter(value=>values.includes(value));save();
+      hit.tk.aiDataWorkTypes=['concrete-pour','demo','saw-cutting'].filter(value=>values.includes(value));save();
     },
     confirmAiDataEnabled(enabled, anchor, content = null, getMethod = () => this.aiDataMethod(), getWorkTypes = () => this.aiDataWorkTypes()){  
       const takeoff=book.activeTakeoff,list=book.activeList;

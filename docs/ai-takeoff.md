@@ -10,7 +10,7 @@ The instructions and AI Information responses include an `aiData.estimates` inde
 
 Each reference index entry includes `aiDataMethod` and `aiDataMethodLabel`: `unit-price` (SF/LF/EA pricing), `hourly` (hourly / crew breakdown), or `mixed` (both). Empty or absent means not specified; do not infer a method from labor/material/equipment section names. Prefer examples matching the intended pricing method, and inspect their quantities, units, conditions, and rates before using them. This classification is user-controlled and read-only to AI.
 
-References also include `aiDataWorkTypes`, an array of `concrete-pour` and/or `demo`. These independent, user-selected labels can both apply. Missing or empty means not specified. Use them to find relevant examples alongside pricing method; never assume an unlabeled estimate excludes these activities.
+References also include `aiDataWorkTypes`, an array containing any combination of `concrete-pour`, `demo`, and `saw-cutting`. These independent, user-selected labels can all apply. Missing or empty means not specified. Use them to find relevant examples alongside pricing method; never assume an unlabeled estimate excludes these activities.
 
 Reference access is read-only and checked on every request. Unchecking AI Data removes that reference from AI access immediately. Existing non-revoked keys include this access. Only the takeoff originally authorized by the key can be edited.
 

@@ -26,7 +26,7 @@ const idSchema={type:'string',minLength:1,maxLength:160};
 const numeric={anyOf:[{type:'number'},{type:'string',pattern:'^$|^-?[0-9]+(\\.[0-9]+)?$'}]};
 export const takeoffSchema={type:'object',required:['id','name','sheets'],properties:{
   id:idSchema,name:{type:'string'},note:{type:'string'},custom:{type:'object'},
-  aiDataWorkTypes:{type:'array',items:{type:'string',enum:['concrete-pour','demo']},uniqueItems:true,readOnly:true,description:'User-selected work labels. May include concrete-pour, demo, or both. Missing or empty means not specified, not that neither activity is present.'},
+  aiDataWorkTypes:{type:'array',items:{type:'string',enum:['concrete-pour','demo','saw-cutting']},uniqueItems:true,readOnly:true,description:'User-selected work labels. May include any combination of concrete-pour, demo, and saw-cutting. Missing or empty means not specified, not that these activities are absent.'},
   aiDataMethod:{type:'string',enum:['','unit-price','hourly','mixed'],readOnly:true,description:'Reference pricing method: unit-price = SF/LF/EA pricing; hourly = hourly or crew breakdown; mixed = both. Missing or empty means not specified. Section organization does not determine this method.'},
   aiData:{type:'boolean',readOnly:true,description:'Whether this estimate is selected as reference data for AI models. Missing means false.'},
   scopeAiAccess:{type:'boolean',readOnly:true,description:'User-controlled Scope sharing. Missing means true; AI cannot change it.'},

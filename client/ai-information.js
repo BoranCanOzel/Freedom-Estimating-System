@@ -19,7 +19,7 @@ export function setupAiInformation(api,openEstimate) {
   libraryPanel.before(tabs);
   const dataPanel=document.createElement('section');dataPanel.id='ai-info-data-panel';dataPanel.hidden=true;dataPanel.setAttribute('role','tabpanel');dataPanel.setAttribute('aria-labelledby','ai-info-data-tab');
   dataPanel.innerHTML=`<div class="ai-data-heading"><div><p class="ai-info-eyebrow">ESTIMATE REFERENCES</p><h2>AI Data estimates</h2><p>Find past estimates by pricing method and work type. Open an estimate to review its pages or update its labels.</p></div><span class="ai-data-sharing">Shared with AI</span></div>
-    <div class="ai-data-filters"><label class="ai-data-search">Find an estimate<input id="ai-info-data-search" type="search" placeholder="Search estimates, jobs, customers..."></label><label>Pricing method<select id="ai-info-data-method"><option value="all">All methods</option><option value="">Not specified</option></select></label><label>Work type<select id="ai-info-data-work-type"><option value="all">All work types</option><option value="concrete-pour">Concrete pour</option><option value="demo">Demo</option><option value="both">Concrete pour + Demo</option><option value="">Not specified</option></select></label></div>
+    <div class="ai-data-filters"><label class="ai-data-search">Find an estimate<input id="ai-info-data-search" type="search" placeholder="Search estimates, jobs, customers..."></label><label>Pricing method<select id="ai-info-data-method"><option value="all">All methods</option><option value="">Not specified</option></select></label><label>Work type<select id="ai-info-data-work-type"><option value="all">All work types</option><option value="concrete-pour">Concrete pour</option><option value="demo">Demo</option><option value="saw-cutting">Saw cutting</option><option value="both">Concrete pour + Demo</option><option value="">Not specified</option></select></label></div>
     <div class="ai-data-results-bar"><p id="ai-info-data-count" role="status"></p><button type="button" id="ai-info-data-reset">Clear filters</button></div><div id="ai-info-data-results"></div>`;
   libraryPanel.after(dataPanel);
   for(const [value,label] of aiDataMethods)$('data-method').add(new Option(label,value));
@@ -29,7 +29,7 @@ export function setupAiInformation(api,openEstimate) {
     const workType=$('data-work-type').value;
     const matchesWorkType=item=>{
       const types=normalizeAiDataWorkTypes(item.aiDataWorkTypes);
-      return workType==='all'||(workType==='both'?types.length===2:workType?types.includes(workType):!types.length);
+      return workType==='all'||(workType==='both'?types.includes('concrete-pour')&&types.includes('demo'):workType?types.includes(workType):!types.length);
     };
     const matches=estimates.filter(item=>matchesWorkType(item)&&($('data-method').value==='all'||(item.aiDataMethod||'')===$('data-method').value)&&[item.workbookName,item.listName,item.companyName,item.projectName,item.takeoffName].some(value=>value.toLowerCase().includes(query)));
     $('data-count').textContent=`${matches.length} of ${estimates.length} estimates across all workbooks`;
