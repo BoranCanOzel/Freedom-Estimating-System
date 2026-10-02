@@ -6,7 +6,7 @@ const statusLabels={included:'Included',excluded:'Excluded',ignored:'Ignored',du
 
 export function setupScope(api, context, bridge) {
   const card=document.getElementById('scopeCard');
-  card.innerHTML='<div class="head"><div class="eyebrow-row"><span class="eyebrow">Scope</span></div><div class="sum-title" id="scope-title"></div><p class="scope-description">Measured work from ZZTakeoff. Review each line before using it in your estimate.</p></div><div class="scroll scope-content"><div class="scope-source"><label>ZZTakeoff project link<input id="scope-source" type="url" placeholder="Paste the ZZTakeoff project link"></label><button type="button" class="btn" id="scope-fetch">Fetch from ZZTakeoff</button><button type="button" class="btn alt" id="scope-connect">Connect ZZTakeoff</button></div><label class="scope-ai-access"><input type="checkbox" id="scope-ai-access"> Allow AI to read Scope</label><p id="scope-message" role="status"></p><div class="scope-tools"><label>Find an item<input id="scope-search" type="search" placeholder="Search scope items"></label><label>Show<select id="scope-filter" aria-label="Scope status"><option value="all">All items</option><option value="included">Included</option><option value="excluded">Excluded</option><option value="ignored">Ignored</option><option value="duplicate">Duplicates</option><option value="missing">No longer in source</option></select></label><span id="scope-count"></span></div><div id="scope-results"></div></div>';
+  card.innerHTML='<div class="head"><div class="eyebrow-row"><span class="eyebrow">Scope</span></div><div class="sum-title" id="scope-title"></div><p class="scope-description">Measured work from ZZTakeoff. Review each line before using it in your estimate.</p></div><div class="scroll scope-content"><div class="scope-source"><label>ZZTakeoff project link<input id="scope-source" type="url" placeholder="Paste the ZZTakeoff project link"></label><button type="button" class="btn" id="scope-fetch">Fetch from ZZTakeoff</button><button type="button" class="btn alt" id="scope-connect">Connect ZZTakeoff</button></div><label class="scope-ai-access"><input type="checkbox" id="scope-ai-access"> Allow AI to read Scope</label><p id="scope-message" role="status"></p><div class="scope-tools"><label>Find an item<input id="scope-search" type="search" placeholder="Search scope items"></label><label>Show<select id="scope-filter" aria-label="Scope status"><option value="all">All items</option><option value="included">Included</option><option value="excluded">Excluded</option><option value="ignored">Ignored</option><option value="duplicate">Duplicates</option></select></label><span id="scope-count"></span></div><div id="scope-results"></div></div>';
   const $=id=>document.getElementById('scope-'+id);
   let identity='',busy=false,connection=null;
   const key=()=>{const c=context();return `${c.workbook}/${c.list}/${c.takeoff}`;};
@@ -23,10 +23,11 @@ export function setupScope(api, context, bridge) {
     $('source').disabled=busy;
     $('fetch').textContent=busy?'Fetching...':'Fetch from ZZTakeoff';
     $('connect').textContent=connection?.connected?'Reconnect ZZTakeoff':'Connect ZZTakeoff';
-    const items=scope.data?.items || [], included=items.filter(item=>!item.missing&&item.status==='included').length;
-    $('count').textContent=`${included} included / ${items.filter(item=>!item.missing).length} source items`;
+    // Older saved snapshots can still contain retained, removed source rows.
+    const items=(scope.data?.items || []).filter(item=>!item.missing), included=items.filter(item=>item.status==='included').length;
+    $('count').textContent=`${included} included / ${items.length} source items`;
     const query=$('search').value.trim().toLowerCase(), filter=$('filter').value;
-    const visible=items.filter(item=>(!query||`${item.name} ${item.group} ${item.measurements} ${item.note||""} ${(item.pages||[]).map(p=>p.name).join(" ")}`.toLowerCase().includes(query))&&(filter==='all'||(filter==='missing'?item.missing:!item.missing&&item.status===filter)));
+    const visible=items.filter(item=>(!query||`${item.name} ${item.group} ${item.measurements} ${item.note||""} ${(item.pages||[]).map(p=>p.name).join(" ")}`.toLowerCase().includes(query))&&(filter==='all'||item.status===filter));
     const results=$('results');results.replaceChildren();
     if(!items.length){
       const empty=el('div','','scope-empty');empty.append(el('h3','Bring your measured scope into this takeoff'),el('p','Connect ZZTakeoff, add the project link, then fetch its items. Each line can be excluded, ignored, or marked as a duplicate.'));results.append(empty);return;

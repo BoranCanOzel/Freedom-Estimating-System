@@ -19,7 +19,7 @@ export function locateTakeoff(book, listId, takeoffId) {
 export function aiVisibleTakeoff(takeoff){
   const visible=structuredClone(takeoff);
   if(takeoff.scopeAiAccess===false){delete visible.scopeData;delete visible.scopeLink;}
-  else if(Array.isArray(visible.scopeData?.items))visible.scopeData.items=visible.scopeData.items.filter(item=>item.showAi!==false);
+  else if(Array.isArray(visible.scopeData?.items))visible.scopeData.items=visible.scopeData.items.filter(item=>!item.missing&&item.showAi!==false);
   return visible;
 }
 const idSchema={type:'string',minLength:1,maxLength:160};

@@ -14,6 +14,6 @@ export function mergeScope(previous, incoming) {
       ...(old.get(item.id)?.showAi===false?{showAi:false}:{}),
       status:scopeStatuses.includes(old.get(item.id)?.status) ? old.get(item.id).status : 'included', missing:false};
   });
-  for (const [id, item] of old) if (!seen.has(id)) items.push({...item, missing:true});
+  // A successful fetch is the current source snapshot; do not resurrect removed IDs.
   return {source:incoming.source, fetchedAt:incoming.fetchedAt, items};
 }

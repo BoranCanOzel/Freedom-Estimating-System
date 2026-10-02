@@ -23,7 +23,7 @@ test('AI grants enforce scope, repeated saves, revisions, validation, live broad
     const call=(path,method='GET',body,key)=>fetch(base+path,{method,headers:{'Content-Type':'application/json',...(key?{Authorization:'Bearer '+key}:{cookie})},body:body===undefined?undefined:JSON.stringify(body)});
     const scopeData={source:'zz-project',fetchedAt:'2026-10-01T10:00:00Z',items:['included','excluded','ignored','duplicate'].map((status,i)=>({id:'scope-'+i,name:'Measured '+status,note:'Use night shift crew',group:'Concrete',measurements:'160 SF',status,missing:i===3}))};
     scopeData.items.push({id:'hidden-scope',name:'Hidden scope secret',note:'Hidden scope note',showAi:false,status:'included',measurements:'900 SF'});
-    const shownScope={...scopeData,items:scopeData.items.filter(item=>item.showAi!==false)};
+    const shownScope={...scopeData,items:scopeData.items.filter(item=>!item.missing&&item.showAi!==false)};
     const scoped={...takeoff('one'),scopeLink:'https://www.zztakeoff.com/app/takeoff?projectId=zz-project',scopeData};
     const book={lists:[{id:'list',companies:[{id:'co',name:'Private customer',projects:[{id:'pr',name:'Job',takeoffs:[scoped,takeoff('two')]}]}]}],libs:[]};
     const created=await (await call('/api/projects','POST',{name:'AI workbook',book})).json();
