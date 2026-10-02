@@ -129,6 +129,17 @@ body.server-mode .ed.listopts .ed-body{padding:14px;background:var(--card)}
 #company-name-matches ul{list-style:none;margin:6px 0 0;padding:0}
 #company-name-matches li{display:flex;flex-direction:column;padding:5px 0;overflow-wrap:anywhere}
 #company-name-matches li span{color:var(--muted)}
+.s-section-tree{position:relative}
+.s-section-heading{display:flex;align-items:center;gap:5px;min-height:20px}
+.s-section-heading .caret,.s-section-heading .caret-gap{flex:0 0 17px}
+.s-section-heading .s-secname{padding-left:0}
+.sum-section-caret{color:var(--slate)}
+.sum-section-caret.shut svg{transform:rotate(-90deg)}
+.sum-section-caret:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.s-tree-guide{position:absolute;top:-9px;bottom:-9px;width:1px;background:var(--rule);pointer-events:none}
+.sum-table tr.s-root-section td{border-top:1px solid var(--rule)}
+.sum-table tr.s-nested .s-secname{font-weight:500;letter-spacing:.025em;text-transform:none}
+.sum-table tr.s-sec .s-section-tree .s-detail{margin-left:22px;padding-left:0}
 .project-settings-tabs{display:flex;gap:3px;padding:3px;background:var(--calc);border-radius:5px;margin:0 0 16px}
 body.server-mode .project-settings-tabs button{flex:1;padding:8px 4px;border:0;border-radius:3px;background:transparent;color:var(--muted);font:500 12px var(--f-sans);cursor:pointer;white-space:nowrap}
 body.server-mode .project-settings-tabs button[aria-selected=true]{color:var(--ink);background:var(--card);box-shadow:0 1px 4px #0002}

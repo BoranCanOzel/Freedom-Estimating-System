@@ -6035,6 +6035,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     document.getElementById('sumNotes').value = book.summaryNotes || '';
     const detail = !!book.sumDetail;
     book.sumOpen = book.sumOpen || {};
+    book.sumSectionClosed = book.sumSectionClosed || {};
     let tot = {sub:0, fee:0, grand:0, rounded:0};
     const hasRounding = book.sheets.some(sh => num(sh.roundTotal));
 
@@ -6051,7 +6052,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       let block = '<tr class="s-row" data-sheet="' + sh.id + '">' +
         '<td class="s-num"><div class="num-wrap">' +
           (secs.length ? '<button type="button" class="caret sum-caret' + (isOpen ? '' : ' shut') +
-                         '" data-open="' + sh.id + '" title="' +
+                         '" data-open="' + sh.id + '" aria-expanded="' + isOpen + '" title="' +
                          (isOpen ? 'Hide sections' : 'Show ' + secs.length + ' sections') + '">' +
                          caretSvg() + '</button>' : '<span class="caret-gap"></span>') +
           (tabColor(sh.color) ? '<span class="s-dot" style="background:' + tabColor(sh.color).dot + '"></span>' : '') +
@@ -6069,21 +6070,34 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       '</tr>';
 
       if (isOpen){
+        const numbering = [];
+        let closedDepth = null;
         block += secs.map((sec, si) => {
+          numbering.length = sec.depth + 1;
+          numbering[sec.depth] = (numbering[sec.depth] || 0) + 1;
+          if (closedDepth !== null && sec.depth > closedDepth) return '';
+          closedDepth = null;
+          const sectionKey = JSON.stringify([sh.id, sec.row.id]);
+          const hasChildren = secs[si + 1]?.depth > sec.depth;
+          const expanded = !book.sumSectionClosed[sectionKey];
+          if (hasChildren && !expanded) closedDepth = sec.depth;
           const ups = sh.units.map(col => {
             const u = secUnit(sec.row, col);
             const q = num(u.qty);
             return {label:u.label, qty:q, price: q ? sec.grand / q : 0};
           });
           const feeSum = sec.fees.reduce((a,b) => a + b, 0);
-          return '<tr class="s-sec">' +
+          return '<tr class="s-sec' + (sec.depth ? ' s-nested' : ' s-root-section') + '" data-section="' + esc(sec.row.id) + '" data-depth="' + sec.depth + '">' +
             '<td class="s-num"><div class="num-wrap"><span class="s-subn">' +
-              sh.num + '.' + (si + 1) + '</span></div></td>' +
-            '<td class="s-scope"><span class="s-secname" style="padding-left:' + (22 + sec.depth * 18) + 'px">' +
-              (sec.name ? esc(sec.name) : '<span class="s-none">unnamed section</span>') + '</span>' +
+              sh.num + '.' + numbering.join('.') + '</span></div></td>' +
+            '<td class="s-scope"><div class="s-section-tree" style="padding-left:' + (8 + sec.depth * 20) + 'px">' +
+              Array.from({length:sec.depth}, (_, level) => '<span class="s-tree-guide" aria-hidden="true" style="left:' + (18 + level * 20) + 'px"></span>').join('') +
+              '<div class="s-section-heading">' +
+              (hasChildren ? '<button type="button" class="caret sum-section-caret' + (expanded ? '' : ' shut') + '" data-section-key="' + esc(sectionKey) + '" aria-expanded="' + expanded + '" aria-label="' + esc((expanded ? 'Hide subsections of ' : 'Show subsections of ') + (sec.name || 'unnamed section')) + '">' + caretSvg() + '</button>' : '<span class="caret-gap"></span>') +
+              '<span class="s-secname">' + (sec.name ? esc(sec.name) : '<span class="s-none">unnamed section</span>') + '</span></div>' +
               (detail && sec.note && sec.note.trim()
                 ? '<span class="s-detail">' + esc(sec.note.trim()) + '</span>' : '') +
-            '</td>' +
+            '</div></td>' +
             '<td>' + moneyHTML(sec.sub) + '</td>' +
             '<td>' + moneyHTML(feeSum) + '</td>' +
             '<td class="s-grand">' + moneyHTML(sec.grand) + '</td>' +
@@ -6134,6 +6148,16 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         book.sumOpen[key] = !book.sumOpen[key];
         renderSummary();
         save();
+      });
+    });
+
+    t.querySelectorAll('.sum-section-caret').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const key = btn.dataset.sectionKey;
+        book.sumSectionClosed[key] = !book.sumSectionClosed[key];
+        renderSummary();save();
+        [...t.querySelectorAll('.sum-section-caret')].find(button => button.dataset.sectionKey === key)?.focus({preventScroll:true});
       });
     });
 
@@ -7062,6 +7086,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     book.sumOpen = book.sumOpen || {};
     const anyOpen = book.sheets.some(sh => book.sumOpen[sh.id]);
     book.sheets.forEach(sh => { book.sumOpen[sh.id] = !anyOpen; });
+    if (!anyOpen) book.sumSectionClosed = {};
     renderSummary();
     save();
   });
@@ -11872,7 +11897,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
   // The server adapter keeps navigation local and shares canonical data only.
   const personalRoot = new Set(['view','active','activeTakeoff','activeList','activeLib',
-    'theme','dark','zoom','libW','projW','edW','sumWidths','sumOpen','sumDetail',
+    'theme','dark','zoom','libW','projW','edW','sumWidths','sumOpen','sumSectionClosed','sumDetail',
     'statusHidden','fieldPicks','picsOn','gameCard','stOpen']);
   const personalNested = new Set(['active','collapsed','shut','noteOpen','widths','hiddenCols','roundColumnVisible','loadShut']);
   const aliases = new Set(['sheets','companies','templates','folders','_app','_v']);

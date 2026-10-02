@@ -1920,6 +1920,53 @@ test('optional flat add applies once after markup and persists with its toggle',
   await toggle(true);await expect(page.locator('#body [aria-label="flatAdd"]')).toHaveValue('400.00');
 });
 
+test('summary sections collapse descendants independently and preserve totals and nesting', async ({page}) => {
+  const data=workbook(),sh=data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0];
+  const section=(id,name)=>({id,type:'section',name,note:name+' notes'});
+  const end=id=>({id:id+'-end',type:'sectionEnd',sid:id});
+  sh.rows=[section('parent','Site work'),section('child','Concrete'),section('grandchild','Sidewalk'),...sh.rows,end('grandchild'),end('child'),section('sibling','Demolition'),end('sibling'),end('parent'),section('other','Other work'),end('other')];
+  await openWorkbook(page,data);
+  const originalRows=await page.evaluate(()=>window.estimator.getShared().lists[0].companies[0].projects[0].takeoffs[0].sheets[0].rows);
+  await page.locator('#rail .tab-summary').click();
+  const row=id=>page.locator('#sumTable [data-section="'+id+'"]');
+  const toggle=id=>row(id).locator('.sum-section-caret');
+  const pageToggle=page.locator('#sumTable .sum-caret');
+  await pageToggle.click();
+  await expect(page.locator('#sumTable .s-subn')).toHaveText(['1.1','1.1.1','1.1.1.1','1.1.2','1.2']);
+  await expect(row('grandchild').locator('.s-tree-guide')).toHaveCount(2);
+  await expect(row('other').locator('.sum-section-caret')).toHaveCount(0);
+  const totals=await page.locator('#sumTable tfoot').innerText();
+  const parentTotal=await row('parent').locator('.s-grand').innerText();
+  await page.screenshot({path:'test-results/summary-section-tree.png',fullPage:true});
+  await toggle('child').focus();await page.keyboard.press('Enter');
+  await expect(toggle('child')).toHaveAttribute('aria-expanded','false');
+  await expect(toggle('child')).toBeFocused();
+  await expect(row('grandchild')).toHaveCount(0);await expect(row('sibling')).toBeVisible();
+  await toggle('parent').click();
+  await expect(row('child')).toHaveCount(0);await expect(row('sibling')).toHaveCount(0);await expect(row('other')).toBeVisible();
+  expect(await row('parent').locator('.s-grand').innerText()).toBe(parentTotal);
+  expect(await page.locator('#sumTable tfoot').innerText()).toBe(totals);
+  await pageToggle.click();await pageToggle.click();
+  await expect(toggle('parent')).toHaveAttribute('aria-expanded','false');
+  await toggle('parent').click();
+  await expect(toggle('child')).toHaveAttribute('aria-expanded','false');await expect(row('grandchild')).toHaveCount(0);
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.locator('#rail .tab[data-sheet]').first().click();
+  await page.locator('#rail .tab-summary').click();
+  await expect(toggle('child')).toHaveAttribute('aria-expanded','false');
+  await expect(row('sibling').locator('.s-subn')).toHaveText('1.1.2');
+  await page.evaluate(()=>{window.print=()=>{window.printCapture=document.getElementById('printAll').innerHTML;};window.estimator.print(false);});
+  const printed=await page.evaluate(()=>window.printCapture);
+  expect(printed).toContain('Concrete');expect(printed).not.toContain('Sidewalk');
+  await toggle('child').click();await expect(row('grandchild')).toBeVisible();
+  await toggle('parent').click();
+  await page.locator('#workspace-view > summary').click();await page.locator('#sumSections').click();
+  await page.locator('#sumSections').click();await page.locator('#workspace-view > summary').press('Escape');
+  await expect(row('grandchild')).toBeVisible();
+  const saved=await page.evaluate(()=>window.estimator.getShared());
+  expect(saved.lists[0].companies[0].projects[0].takeoffs[0].sheets[0].rows).toEqual(originalRows);
+});
+
 test('summary and printing include rounding and summary details', async ({page}) => {
   const data=workbook(), tk=data.lists[0].companies[0].projects[0].takeoffs[0];
   data.summaryNotes='Summary note';
