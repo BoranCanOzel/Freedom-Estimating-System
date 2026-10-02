@@ -286,16 +286,23 @@ body #sheetTable tr.section-head.tree-child .sec-add:hover{color:var(--ink);bord
 #libCapture .tpl-name{white-space:normal;overflow-wrap:anywhere}
 #libCapture .tpl-meta{white-space:normal}
 
-.workspace-ai-method{display:inline-flex;align-items:center;gap:6px;font-size:12px}
-.workspace-ai-method[hidden]{display:none}
-.workspace-ai-method select{width:auto;max-width:230px}
-.ai-data-method-prompt{display:grid;gap:8px;margin:16px 0}
-.ai-data-method-prompt p{font-size:13px;color:var(--muted);margin:0}
-@media print{.workspace-ai-method{display:none!important}}
 
-.ai-data-work-types{display:flex;flex-wrap:wrap;gap:8px 14px;border:1px solid var(--line);border-radius:6px;padding:5px 10px;margin:0;font-size:12px}
-.ai-data-work-types legend{padding:0 4px}
-.ai-data-work-types label{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;cursor:pointer}
-.ai-data-work-types input{width:auto;margin:0;accent-color:var(--teal)}
-.ai-data-work-types[hidden]{display:none}
-@media print{.ai-data-work-types{display:none!important}}
+.workspace-ai-settings{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:7px 10px;border:1px solid var(--rule);border-radius:8px;background:var(--calc);font:12px var(--f-sans);text-transform:none;letter-spacing:normal}
+.workspace-ai-settings.is-enabled{border-color:color-mix(in srgb,var(--teal) 35%,var(--rule))}
+.workspace-ai-settings .workspace-ai-data{font-weight:600;margin:0}
+.workspace-ai-method{display:flex;flex-direction:column;align-items:flex-start;gap:4px;font-size:10px;color:var(--muted);border-left:1px solid var(--rule);padding-left:12px}
+.workspace-ai-method select,.ai-data-method-prompt select{font:12px var(--f-sans);color:var(--ink);background:var(--card);border:1px solid var(--rule);border-radius:5px;padding:7px 9px;width:auto;max-width:240px;min-height:32px}
+.ai-data-method-prompt{display:grid;gap:8px;margin:18px 0;font:12px var(--f-sans);color:var(--ink)}
+.ai-data-method-prompt select{width:100%;max-width:none}
+.ai-data-method-prompt p{font-size:12px;line-height:1.6;color:var(--muted);margin:0}
+.ai-data-work-types{display:flex;flex-wrap:wrap;gap:6px;border:0;padding:0;margin:0;min-width:0;font:12px var(--f-sans)}
+.ai-data-work-types legend{font-size:10px;color:var(--muted);padding:0;margin-bottom:4px}
+.ai-data-work-types label{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;cursor:pointer;padding:7px 9px;border:1px solid var(--rule);border-radius:5px;background:var(--card);color:var(--muted);transition:background .15s,border-color .15s}
+.ai-data-work-types label:has(input:checked){border-color:color-mix(in srgb,var(--teal) 55%,var(--rule));background:color-mix(in srgb,var(--teal) 10%,var(--card));color:var(--ink)}
+.ai-data-work-types label:focus-within{outline:2px solid var(--teal);outline-offset:2px}
+.ai-data-work-types input{width:13px;height:13px;margin:0;accent-color:var(--teal)}
+.workspace-ai-method[hidden],.ai-data-work-types[hidden]{display:none}
+.confirm-pop:has(.ai-data-method-prompt){width:min(480px,calc(100vw - 32px))}
+.confirm-pop .ai-data-work-types{margin-bottom:20px}
+@media(max-width:600px){.workspace-ai-settings{width:100%;gap:10px}.workspace-ai-method{flex:1}.workspace-ai-method select{max-width:100%;width:100%}}
+@media print{.workspace-ai-settings,.workspace-ai-method,.ai-data-work-types{display:none!important}}

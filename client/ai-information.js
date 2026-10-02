@@ -18,7 +18,9 @@ export function setupAiInformation(api,openEstimate) {
   tabs.innerHTML='<button type="button" role="tab" id="ai-info-library-tab" aria-controls="ai-info-library-panel" aria-selected="true">Text library</button><button type="button" role="tab" id="ai-info-data-tab" aria-controls="ai-info-data-panel" aria-selected="false" tabindex="-1">AI Data</button>';
   libraryPanel.before(tabs);
   const dataPanel=document.createElement('section');dataPanel.id='ai-info-data-panel';dataPanel.hidden=true;dataPanel.setAttribute('role','tabpanel');dataPanel.setAttribute('aria-labelledby','ai-info-data-tab');
-  dataPanel.innerHTML='<h2>AI Data estimates</h2><p>Jobs with estimates marked AI Data, including all their pages. Open an estimate to review it or change its pricing method or AI Data checkbox.</p><label>Find a job or estimate<input id="ai-info-data-search" type="search" placeholder="Search jobs, customers, estimates, or workbooks"></label><label>Pricing method<select id="ai-info-data-method"><option value="all">All methods</option><option value="">Not specified</option></select></label><label>Work type<select id="ai-info-data-work-type"><option value="all">All work types</option><option value="concrete-pour">Concrete pour</option><option value="demo">Demo</option><option value="both">Concrete pour + Demo</option><option value="">Not specified</option></select></label><p id="ai-info-data-count" role="status"></p><div id="ai-info-data-results"></div>';
+  dataPanel.innerHTML=`<div class="ai-data-heading"><div><p class="ai-info-eyebrow">ESTIMATE REFERENCES</p><h2>AI Data estimates</h2><p>Find past estimates by pricing method and work type. Open an estimate to review its pages or update its labels.</p></div><span class="ai-data-sharing">Shared with AI</span></div>
+    <div class="ai-data-filters"><label class="ai-data-search">Find an estimate<input id="ai-info-data-search" type="search" placeholder="Search estimates, jobs, customers..."></label><label>Pricing method<select id="ai-info-data-method"><option value="all">All methods</option><option value="">Not specified</option></select></label><label>Work type<select id="ai-info-data-work-type"><option value="all">All work types</option><option value="concrete-pour">Concrete pour</option><option value="demo">Demo</option><option value="both">Concrete pour + Demo</option><option value="">Not specified</option></select></label></div>
+    <div class="ai-data-results-bar"><p id="ai-info-data-count" role="status"></p><button type="button" id="ai-info-data-reset">Clear filters</button></div><div id="ai-info-data-results"></div>`;
   libraryPanel.after(dataPanel);
   for(const [value,label] of aiDataMethods)$('data-method').add(new Option(label,value));
   let activeTab='library',estimates=[];
@@ -35,18 +37,30 @@ export function setupAiInformation(api,openEstimate) {
     for(const item of matches){
       const row=document.createElement('article');row.className='ai-info-estimate';
       const info=document.createElement('div'),title=document.createElement('h3'),name=document.createElement('p'),context=document.createElement('p');
-      title.textContent=item.projectName;name.textContent=item.takeoffName;context.className='ai-info-estimate-context';
+      title.textContent=item.takeoffName;name.textContent=item.projectName;name.className='ai-info-estimate-project';context.className='ai-info-estimate-context';
       context.textContent=`${item.companyName} · ${item.workbookName} / ${item.listName} · ${item.pages} page${item.pages===1?'':'s'}`;
-      const method=document.createElement('p');method.className='ai-info-estimate-method';
+      const tags=document.createElement('div');tags.className='ai-data-tags';
+      const method=document.createElement('span');method.className='ai-data-tag';
       method.textContent='Pricing method: '+aiDataMethodLabel(item.aiDataMethod);
-      const work=document.createElement('p');
-      work.textContent='Work type: '+(aiDataWorkTypes.filter(([id])=>normalizeAiDataWorkTypes(item.aiDataWorkTypes).includes(id)).map(([,label])=>label).join(' + ')||'Not specified');
-      info.append(title,name,context,method,work);
+      tags.append(method);
+      const types=normalizeAiDataWorkTypes(item.aiDataWorkTypes);
+      for(const [id,label] of aiDataWorkTypes)if(types.includes(id)){
+        const tag=document.createElement('span');tag.className='ai-data-tag';tag.dataset.workType=id;tag.textContent=label;tags.append(tag);
+      }
+      if(!types.length){const tag=document.createElement('span');tag.className='ai-data-tag';tag.textContent='Work type: Not specified';tags.append(tag);}
+      info.append(title,name,context,tags);
       const open=document.createElement('button');open.type='button';open.textContent='Open estimate';open.setAttribute('aria-label','Open estimate: '+item.takeoffName);
       open.onclick=()=>run(async()=>{if(!discard())return;const signal=operation?.signal;await openEstimate(item);signal?.throwIfAborted();closePage();});
       row.append(info,open);$('data-results').append(row);
     }
-    if(!matches.length)$('data-results').textContent=estimates.length?'No matching jobs or estimates.':'No estimates are marked AI Data yet. Enable the AI Data checkbox on an estimate to include it here.';
+    $('data-reset').hidden=!query&&$('data-method').value==='all'&&workType==='all';
+    if(!matches.length){
+      const empty=document.createElement('div');empty.className='ai-data-empty';
+      const heading=document.createElement('h3'),hint=document.createElement('p');
+      heading.textContent=estimates.length?'No matching estimates':'Build your estimate reference library';
+      hint.textContent=estimates.length?'Try a different search or clear your filters.':'Enable AI Data on a takeoff, then choose its pricing method and work types. Its pages will appear here for AI to reference.';
+      empty.append(heading,hint);$('data-results').append(empty);
+    }
   }
   async function loadEstimates(){message('Loading AI Data estimates...');const data=await request('/ai-information/estimates');estimates=data.estimates;renderEstimates();message('');}
   function setTab(tab){
@@ -56,6 +70,7 @@ export function setupAiInformation(api,openEstimate) {
   }
   for(const tab of ['library','data'])$(tab+'-tab').onclick=()=>run(async()=>{setTab(tab);if(tab==='data')await loadEstimates();else message(dirty?'Unsaved changes.':'');});
   tabs.onkeydown=event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)&&!busy){event.preventDefault();const tab=event.key==='Home'?'library':event.key==='End'?'data':activeTab==='library'?'data':'library';$(tab+'-tab').click();setTimeout(()=>$(tab+'-tab').focus(),0);}};
+  $('data-reset').onclick=()=>{$('data-search').value='';$('data-method').value='all';$('data-work-type').value='all';renderEstimates();};
   $('data-search').oninput=renderEstimates;
   $('data-method').onchange=renderEstimates;
   $('data-work-type').onchange=renderEstimates;

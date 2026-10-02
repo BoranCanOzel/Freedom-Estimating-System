@@ -141,6 +141,7 @@ test('AI Data marks only the selected estimate and persists when toggled',async(
   await expect(page.locator('#server-status')).toHaveText('All changes saved');
   await page.reload();
   await expect(page.locator('#takeoff-ai-data-method')).toHaveValue('hourly');
+  await page.screenshot({path:'test-results/ai-controls-layout.png',fullPage:true});
   await expect(page.getByRole('checkbox',{name:'Demo',exact:true})).not.toBeChecked();
   await expect(page.getByRole('checkbox',{name:'Concrete pour',exact:true})).toBeChecked();
   await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'ts',sheet:'ss',view:'sheet'}));
@@ -175,7 +176,9 @@ test('AI Information lists checked estimates across workbooks and opens their ex
   await expect(record).toHaveCount(1);await expect(record).toContainText(job);await expect(record).toContainText('2 pages');
   await expect(record).not.toContainText('North takeoff');
   await expect(record).toContainText('Pricing method: Mixed');
-  await expect(record).toContainText('Work type: Concrete pour + Demo');
+  await page.screenshot({path:'test-results/ai-data-layout.png',fullPage:true});
+  await expect(record.locator('[data-work-type=concrete-pour]')).toHaveText('Concrete pour');
+  await expect(record.locator('[data-work-type=demo]')).toHaveText('Demo');
   await page.locator('#ai-info-data-work-type').selectOption('');
   await expect(record).toHaveCount(0);
   await page.locator('#ai-info-data-work-type').selectOption('both');

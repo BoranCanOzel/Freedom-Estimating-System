@@ -157,7 +157,8 @@ export function setupWorkspace() {
     return group;
   }
   const workTypes = workTypeChoices(bridge.aiDataWorkTypes(), values => { bridge.setAiDataWorkTypes(values);sync(); });
-  zzTakeoff.after(aiDataLabel, methodLabel, workTypes);
+  const aiSettings=document.createElement('div');aiSettings.className='workspace-ai-settings';
+  aiSettings.append(aiDataLabel,methodLabel,workTypes);zzTakeoff.after(aiSettings);
   aiData.addEventListener('change', () => {
     const enabled = aiData.checked;
     sync();
@@ -242,9 +243,10 @@ export function setupWorkspace() {
     const mapHost = document.querySelector(`#${view}Card .eyebrow-row`);
     if (mapHost && map.parentElement !== mapHost) mapHost.append(map);
     if (mapHost && zzTakeoff.previousElementSibling !== map) map.after(zzTakeoff);
-    if (mapHost && aiDataLabel.parentElement !== mapHost) mapHost.append(aiDataLabel);
+    if (mapHost && aiSettings.parentElement !== mapHost) mapHost.append(aiSettings);
     if (mapHost && methodLabel.previousElementSibling !== aiDataLabel) aiDataLabel.after(methodLabel);
     aiData.checked = ready && bridge.aiDataEnabled();
+    aiSettings.classList.toggle('is-enabled',aiData.checked);
     methodLabel.hidden = !aiData.checked;
     method.value = bridge.aiDataMethod();
     if (mapHost && workTypes.previousElementSibling !== methodLabel) methodLabel.after(workTypes);
