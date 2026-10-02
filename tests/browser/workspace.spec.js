@@ -113,6 +113,36 @@ test('Save as PDF downloads every takeoff option with readable pagination and co
   await expect(page.locator('#takeoff-share + #takeoff-pdf')).toBeVisible();
 });
 
+test('takeoff header edits the owning job status across pages and sibling takeoffs',async({page})=>{
+  const data=workbook();data.statuses=['Open','Reviewing','Completed','Closed'];
+  data.lists[0].companies[0].projects[0].takeoffs.push({id:'sibling',name:'Alternate takeoff',sheets:[sheet('sibling-sheet','Alternate scope')]});
+  await openWorkbook(page,data);
+  const status=page.getByRole('combobox',{name:'Job status',exact:true});
+  await expect(status).toHaveValue('Open');
+  await expect(status.locator('option')).toHaveText(data.statuses);
+  await status.selectOption('Reviewing');
+  await page.locator('#rail .tab-summary').click();
+  await expect(status).toHaveValue('Reviewing');
+  await expect(page.locator('#summaryContext')).toContainText('Reviewing');
+  await page.screenshot({path:'test-results/takeoff-job-status.png',fullPage:true});
+  await status.selectOption('Completed');
+  await expect(page.locator('#summaryContext')).toContainText('Completed');
+  await expect(page.locator('#sumBlocks .summary-project')).toContainText('Completed');
+  await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'sibling',sheet:'sibling-sheet',view:'sheet'}));
+  await expect(status).toHaveValue('Completed');
+  await status.selectOption('Closed');
+  await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'ts',sheet:'ss',view:'sheet'}));
+  await expect(status).toHaveValue('Completed');
+  await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'tn',sheet:'sn',view:'summary'}));
+  await expect(status).toHaveValue('Closed');
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();await expect(status).toHaveValue('Closed');
+  const jobs=await page.evaluate(()=>window.estimator.getShared().lists[0].companies[0].projects);
+  expect(jobs.find(job=>job.id==='north').status).toBe('Closed');
+  expect(jobs.find(job=>job.id==='south').status).toBe('Completed');
+  expect(jobs.find(job=>job.id==='north').takeoffs.every(takeoff=>takeoff.status===undefined)).toBe(true);
+});
+
 test('AI Data marks only the selected estimate and persists when toggled',async({page})=>{
   await openWorkbook(page);
   const checkbox=page.getByRole('checkbox',{name:'AI Data',exact:true});

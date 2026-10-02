@@ -305,6 +305,10 @@ body #sheetTable tr.section-head.tree-child .sec-add:hover{color:var(--ink);bord
 
 
 .workspace-ai-settings{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:7px 10px;border:1px solid var(--rule);border-radius:8px;background:var(--calc);font:12px var(--f-sans);text-transform:none;letter-spacing:normal}
+.workspace-job-status{display:inline-flex;align-items:center;gap:7px;font:12px var(--f-sans);color:var(--muted);text-transform:none;letter-spacing:normal}
+.workspace-job-status select{max-width:190px;padding:5px 8px;border:1px solid var(--rule);border-radius:6px;background:var(--card);color:var(--ink);font:600 12px var(--f-sans)}
+.workspace-job-status[hidden]{display:none}
+@media print{.workspace-job-status{display:none!important}}
 .workspace-ai-settings.is-enabled{border-color:color-mix(in srgb,var(--teal) 35%,var(--rule))}
 .workspace-ai-settings .workspace-ai-data{font-weight:600;margin:0}
 .workspace-ai-method{display:flex;flex-direction:column;align-items:flex-start;gap:4px;font-size:10px;color:var(--muted);border-left:1px solid var(--rule);padding-left:12px}

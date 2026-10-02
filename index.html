@@ -12084,6 +12084,17 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     flatAddEnabled(){ return !!state.flatAddEnabled; },
     setFlatAddEnabled(enabled){ state.flatAddEnabled = !!enabled; renderAll(); save(); },
     getProjectLists(){ return book.lists || []; },
+    getCurrentJobStatus(){
+      const hit=findTakeoff(book.activeTakeoff);
+      return hit ? {name:hit.pr.name || 'Untitled job',status:hit.pr.status || '',options:statuses().slice()} : null;
+    },
+    setCurrentJobStatus(status){
+      const hit=findTakeoff(book.activeTakeoff);
+      if(!hit || !statuses().includes(status))return;
+      hit.pr.status=status;
+      if(book.view==='summary')renderSummary();
+      renderProjects();save();
+    },
     getPdfReport(){
       const hit = findTakeoff(book.activeTakeoff);
       if (!hit) throw new Error('Open a takeoff before saving a PDF.');

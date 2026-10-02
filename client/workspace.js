@@ -122,6 +122,11 @@ export function setupWorkspace() {
   map.target = '_blank'; map.rel = 'noopener noreferrer';
   map.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg><span>Map</span>';
   detailCopy.after(map);
+  const jobStatusLabel=document.createElement('label');jobStatusLabel.className='workspace-job-status';
+  jobStatusLabel.append(document.createTextNode('Job status'));
+  const jobStatus=document.createElement('select');jobStatus.id='workspace-job-status';
+  jobStatusLabel.append(jobStatus);map.before(jobStatusLabel);
+  jobStatus.onchange=()=>{bridge.setCurrentJobStatus(jobStatus.value);sync();};
   const zzTakeoff = document.createElement('a');
   zzTakeoff.id = 'workspace-zztakeoff'; zzTakeoff.className = 'summary-map-link';
   zzTakeoff.target = '_blank'; zzTakeoff.rel = 'noopener noreferrer';
@@ -250,6 +255,18 @@ export function setupWorkspace() {
     const ready = document.body.classList.contains('server-active'), view = bridge.getLocation().view || 'sheet';
     const mapHost = document.querySelector(`#${view}Card .eyebrow-row`);
     if (mapHost && map.parentElement !== mapHost) mapHost.append(map);
+    if (mapHost && jobStatusLabel.nextElementSibling !== map) map.before(jobStatusLabel);
+    const job=ready ? bridge.getCurrentJobStatus() : null;
+    jobStatusLabel.hidden=!job;
+    jobStatus.disabled=!job;
+    if(job){
+      const options=job.options.includes(job.status)?job.options:[job.status,...job.options];
+      if(JSON.stringify([...jobStatus.options].map(option=>option.value))!==JSON.stringify(options)){
+        jobStatus.replaceChildren(...options.map(value=>new Option(value || 'Not specified',value)));
+      }
+      jobStatus.value=job.status;
+      jobStatus.title='Status for '+job.name+' (all takeoffs in this job)';
+    }
     if (mapHost && zzTakeoff.previousElementSibling !== map) map.after(zzTakeoff);
     if (mapHost && aiSettings.parentElement !== mapHost) mapHost.append(aiSettings);
     if (mapHost && methodLabel.previousElementSibling !== aiDataLabel) aiDataLabel.after(methodLabel);
