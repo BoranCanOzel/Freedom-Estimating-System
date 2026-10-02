@@ -175,12 +175,14 @@ test('AI keys read only enabled reference JSONs across workbooks and lose access
     // A key created before the reference exists can discover it without regeneration.
     const reference={...takeoff('reference'),aiData:true,aiDataMethod:'unit-price',aiDataWorkTypes:['concrete-pour','demo','saw-cutting'],note:'Reference scope',scopeData:{source:'zz',items:[{id:'visible',name:'Visible scope'},{id:'hidden',name:'Secret scope',showAi:false}]}};
     const visibleReference={...reference,scopeData:{...reference.scopeData,items:[reference.scopeData.items[0]]}};
+    reference.aiDataPrevailingWage=true;visibleReference.aiDataPrevailingWage=true;
     const workbook=await create([reference,takeoff('private')]);
     const api='/api/ai/v1',args={workbook,list:'list',takeoff:'reference'},path=api+'/ai-data/takeoff?'+new URLSearchParams(args);
     assert.equal((await fetch(base+api+'/ai-data')).status,401);
     const index=await (await call(api+'/ai-data','GET',undefined,grant.key)).json();
     assert.deepEqual(index.estimates.map(e=>e.takeoff),['reference']);
     assert.equal(index.estimates[0].aiDataMethod,'unit-price');
+    assert.equal(index.estimates[0].aiDataPrevailingWage,true);
     assert.deepEqual(index.estimates[0].aiDataWorkTypes,['concrete-pour','demo','saw-cutting']);
     assert.equal(index.estimates[0].aiDataMethodLabel,'Unit price (SF / LF / EA)');
     assert.deepEqual((await (await call(api+'/instructions','GET',undefined,grant.key)).json()).aiData,index);

@@ -301,7 +301,7 @@ body #sheetTable tr.section-head.tree-child .sec-add:hover{color:var(--ink);bord
 .ai-data-work-types label:has(input:checked){border-color:color-mix(in srgb,var(--teal) 55%,var(--rule));background:color-mix(in srgb,var(--teal) 10%,var(--card));color:var(--ink)}
 .ai-data-work-types label:focus-within{outline:2px solid var(--teal);outline-offset:2px}
 .ai-data-work-types input{width:13px;height:13px;margin:0;accent-color:var(--teal)}
-.workspace-ai-method[hidden],.ai-data-work-types[hidden]{display:none}
+.workspace-ai-method[hidden],.ai-data-work-types[hidden],.workspace-ai-data[hidden]{display:none}
 .confirm-pop:has(.ai-data-method-prompt){width:min(480px,calc(100vw - 32px))}
 .confirm-pop .ai-data-work-types{margin-bottom:20px}
 @media(max-width:600px){.workspace-ai-settings{width:100%;gap:10px}.workspace-ai-method{flex:1}.workspace-ai-method select{max-width:100%;width:100%}}

@@ -157,8 +157,15 @@ export function setupWorkspace() {
     return group;
   }
   const workTypes = workTypeChoices(bridge.aiDataWorkTypes(), values => { bridge.setAiDataWorkTypes(values);sync(); });
+  function wageChoice(onChange) {
+    const label=document.createElement('label'),input=document.createElement('input');
+    label.className='workspace-ai-data';input.type='checkbox';input.checked=bridge.aiDataPrevailingWage();
+    input.onchange=()=>onChange?.(input.checked);
+    label.append(input,document.createTextNode('Prevailing wage'));return label;
+  }
+  const wageLabel=wageChoice(value=>{bridge.setAiDataPrevailingWage(value);sync();});
   const aiSettings=document.createElement('div');aiSettings.className='workspace-ai-settings';
-  aiSettings.append(aiDataLabel,methodLabel,workTypes);zzTakeoff.after(aiSettings);
+  aiSettings.append(aiDataLabel,methodLabel,workTypes,wageLabel);zzTakeoff.after(aiSettings);
   aiData.addEventListener('change', () => {
     const enabled = aiData.checked;
     sync();
@@ -170,9 +177,9 @@ export function setupWorkspace() {
     hint.textContent = 'Choose how this estimate was priced. Mixed combines unit prices and hourly breakdowns. Labor, material, and equipment sections can be used with any method.';
     label.append(hint);
     const content = document.createElement('div');
-    const choices = workTypeChoices(bridge.aiDataWorkTypes());content.append(label, choices);
+    const choices = workTypeChoices(bridge.aiDataWorkTypes()),wage=wageChoice();content.append(label, choices, wage);
     bridge.confirmAiDataEnabled(enabled, aiData, enabled ? content : null, () => select.value,
-      () => [...choices.querySelectorAll('input:checked')].map(el => el.value));
+      () => [...choices.querySelectorAll('input:checked')].map(el => el.value),()=>wage.querySelector('input').checked);
   });
   move('reset', 'workspace-option-actions');
   const excel = document.querySelector('.js-export');
@@ -251,6 +258,8 @@ export function setupWorkspace() {
     method.value = bridge.aiDataMethod();
     if (mapHost && workTypes.previousElementSibling !== methodLabel) methodLabel.after(workTypes);
     workTypes.hidden = !aiData.checked;
+    wageLabel.hidden = !aiData.checked;
+    wageLabel.querySelector('input').checked=bridge.aiDataPrevailingWage();
     for (const input of workTypes.querySelectorAll('input')) input.checked = bridge.aiDataWorkTypes().includes(input.value);
     aiData.disabled = !ready || !bridge.getLocation().takeoff;
     const address = ready ? bridge.getMapAddress() : '';

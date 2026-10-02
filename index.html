@@ -12001,14 +12001,19 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       const hit=findTakeoff(book.activeTakeoff);if(!hit||!Array.isArray(values))return;
       hit.tk.aiDataWorkTypes=['concrete-pour','demo','saw-cutting'].filter(value=>values.includes(value));save();
     },
-    confirmAiDataEnabled(enabled, anchor, content = null, getMethod = () => this.aiDataMethod(), getWorkTypes = () => this.aiDataWorkTypes()){  
+    aiDataPrevailingWage(){return findTakeoff(book.activeTakeoff)?.tk.aiDataPrevailingWage===true;},
+    setAiDataPrevailingWage(value){
+      const hit=findTakeoff(book.activeTakeoff);if(!hit)return;
+      hit.tk.aiDataPrevailingWage=value===true;save();
+    },
+    confirmAiDataEnabled(enabled, anchor, content = null, getMethod = () => this.aiDataMethod(), getWorkTypes = () => this.aiDataWorkTypes(), getWage = () => this.aiDataPrevailingWage()){
       const takeoff=book.activeTakeoff,list=book.activeList;
       if(!findTakeoff(takeoff))return;
       confirmPop(anchor,enabled
         ? 'Allow active AI access keys to read this estimate as reference data? This includes the full JSON of all its option pages.'
         : 'Remove this estimate from AI reference data?',()=>{
           if(book.activeList===list&&book.activeTakeoff===takeoff){
-            if(enabled){this.setAiDataMethod(getMethod());this.setAiDataWorkTypes(getWorkTypes());}
+            if(enabled){this.setAiDataMethod(getMethod());this.setAiDataWorkTypes(getWorkTypes());this.setAiDataPrevailingWage(getWage());}
             this.setAiDataEnabled(enabled);
           }
         },enabled?'Enable AI Data':'Remove AI Data',content);

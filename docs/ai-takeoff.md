@@ -14,6 +14,8 @@ References also include `aiDataWorkTypes`, an array containing any combination o
 
 Reference access is read-only and checked on every request. Unchecking AI Data removes that reference from AI access immediately. Existing non-revoked keys include this access. Only the takeoff originally authorized by the key can be edited.
 
+Each example can also be labeled **Prevailing wage** with its own checkbox. The reference index and takeoff JSON expose `aiDataPrevailingWage`; true means labeled, while false or absent means not labeled. This label does not change estimate rates or calculations and is read-only to AI.
+
 ## Fetched Scope items
 
 **Scope sharing is on by default for each estimate.** A missing scopeAiAccess field means enabled. The user can uncheck **Allow AI to read Scope** on that estimate's Scope page to disable it; an explicit false remains disabled. When disabled, scopeData and scopeLink are omitted from all AI takeoff reads, including AI Data references, and read_scope returns 403. The AI cannot change scopeAiAccess. Saving other edits preserves hidden Scope data automatically. A Scope-only 403 does not revoke the takeoff key.
