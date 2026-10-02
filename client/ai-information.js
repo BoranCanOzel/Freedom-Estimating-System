@@ -43,6 +43,9 @@ export function setupAiInformation(api,openEstimate) {
       const method=document.createElement('span');method.className='ai-data-tag';
       method.textContent='Pricing method: '+aiDataMethodLabel(item.aiDataMethod);
       tags.append(method);
+      if(item.aiDataNightWork===true){
+        const night=document.createElement('span');night.className='ai-data-tag';night.textContent='Night time work';tags.append(night);
+      }
       if(item.aiDataPrevailingWage===true){
         const wage=document.createElement('span');wage.className='ai-data-tag';wage.textContent='Prevailing wage';tags.append(wage);
       }

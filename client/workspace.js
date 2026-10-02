@@ -157,15 +157,16 @@ export function setupWorkspace() {
     return group;
   }
   const workTypes = workTypeChoices(bridge.aiDataWorkTypes(), values => { bridge.setAiDataWorkTypes(values);sync(); });
-  function wageChoice(onChange) {
+  function exampleLabel(title,checked,onChange) {
     const label=document.createElement('label'),input=document.createElement('input');
-    label.className='workspace-ai-data';input.type='checkbox';input.checked=bridge.aiDataPrevailingWage();
+    label.className='workspace-ai-data';input.type='checkbox';input.checked=checked;
     input.onchange=()=>onChange?.(input.checked);
-    label.append(input,document.createTextNode('Prevailing wage'));return label;
+    label.append(input,document.createTextNode(title));return label;
   }
-  const wageLabel=wageChoice(value=>{bridge.setAiDataPrevailingWage(value);sync();});
+  const wageLabel=exampleLabel('Prevailing wage',bridge.aiDataPrevailingWage(),value=>{bridge.setAiDataPrevailingWage(value);sync();});
+  const nightLabel=exampleLabel('Night time work',bridge.aiDataNightWork(),value=>{bridge.setAiDataNightWork(value);sync();});
   const aiSettings=document.createElement('div');aiSettings.className='workspace-ai-settings';
-  aiSettings.append(aiDataLabel,methodLabel,workTypes,wageLabel);zzTakeoff.after(aiSettings);
+  aiSettings.append(aiDataLabel,methodLabel,workTypes,wageLabel,nightLabel);zzTakeoff.after(aiSettings);
   aiData.addEventListener('change', () => {
     const enabled = aiData.checked;
     sync();
@@ -177,9 +178,9 @@ export function setupWorkspace() {
     hint.textContent = 'Choose how this estimate was priced. Mixed combines unit prices and hourly breakdowns. Labor, material, and equipment sections can be used with any method.';
     label.append(hint);
     const content = document.createElement('div');
-    const choices = workTypeChoices(bridge.aiDataWorkTypes()),wage=wageChoice();content.append(label, choices, wage);
+    const choices = workTypeChoices(bridge.aiDataWorkTypes()),wage=exampleLabel('Prevailing wage',bridge.aiDataPrevailingWage()),night=exampleLabel('Night time work',bridge.aiDataNightWork());content.append(label, choices, wage, night);
     bridge.confirmAiDataEnabled(enabled, aiData, enabled ? content : null, () => select.value,
-      () => [...choices.querySelectorAll('input:checked')].map(el => el.value),()=>wage.querySelector('input').checked);
+      () => [...choices.querySelectorAll('input:checked')].map(el => el.value),()=>wage.querySelector('input').checked,()=>night.querySelector('input').checked);
   });
   move('reset', 'workspace-option-actions');
   const excel = document.querySelector('.js-export');
@@ -260,6 +261,8 @@ export function setupWorkspace() {
     workTypes.hidden = !aiData.checked;
     wageLabel.hidden = !aiData.checked;
     wageLabel.querySelector('input').checked=bridge.aiDataPrevailingWage();
+    nightLabel.hidden = !aiData.checked;
+    nightLabel.querySelector('input').checked=bridge.aiDataNightWork();
     for (const input of workTypes.querySelectorAll('input')) input.checked = bridge.aiDataWorkTypes().includes(input.value);
     aiData.disabled = !ready || !bridge.getLocation().takeoff;
     const address = ready ? bridge.getMapAddress() : '';

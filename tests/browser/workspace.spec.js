@@ -130,6 +130,7 @@ test('AI Data marks only the selected estimate and persists when toggled',async(
   await confirmation.getByRole('checkbox',{name:'Demo',exact:true}).check();
   await confirmation.getByRole('checkbox',{name:'Saw cutting',exact:true}).check();
   await confirmation.getByRole('checkbox',{name:'Prevailing wage',exact:true}).check();
+  await confirmation.getByRole('checkbox',{name:'Night time work',exact:true}).check();
   await confirmation.getByRole('button',{name:'Enable AI Data',exact:true}).click();
   await expect(page.locator('#server-status')).toHaveText('All changes saved');
   await page.reload();
@@ -137,9 +138,13 @@ test('AI Data marks only the selected estimate and persists when toggled',async(
   const data=await page.evaluate(()=>window.estimator.getShared());
   expect(data.lists[0].companies[0].projects[0].takeoffs[0].aiData).toBe(true);
   expect(data.lists[0].companies[0].projects[0].takeoffs[0].aiDataPrevailingWage).toBe(true);
+  expect(data.lists[0].companies[0].projects[0].takeoffs[0].aiDataNightWork).toBe(true);
   expect(data.lists[0].companies[0].projects[1].takeoffs[0].aiDataPrevailingWage).toBeUndefined();
+  expect(data.lists[0].companies[0].projects[1].takeoffs[0].aiDataNightWork).toBeUndefined();
   await expect(page.getByRole('checkbox',{name:'Prevailing wage',exact:true})).toBeChecked();
+  await expect(page.getByRole('checkbox',{name:'Night time work',exact:true})).toBeChecked();
   await page.getByRole('checkbox',{name:'Prevailing wage',exact:true}).uncheck();
+  await page.getByRole('checkbox',{name:'Night time work',exact:true}).uncheck();
   expect(data.lists[0].companies[0].projects[0].takeoffs[0].aiDataMethod).toBe('unit-price');
   expect(data.lists[0].companies[0].projects[0].takeoffs[0].aiDataWorkTypes).toEqual(['concrete-pour','demo','saw-cutting']);
   await expect(page.getByRole('checkbox',{name:'Saw cutting',exact:true})).toBeChecked();
@@ -150,6 +155,7 @@ test('AI Data marks only the selected estimate and persists when toggled',async(
   await page.reload();
   await expect(page.locator('#takeoff-ai-data-method')).toHaveValue('hourly');
   await expect(page.getByRole('checkbox',{name:'Prevailing wage',exact:true})).not.toBeChecked();
+  await expect(page.getByRole('checkbox',{name:'Night time work',exact:true})).not.toBeChecked();
   await page.screenshot({path:'test-results/ai-controls-layout.png',fullPage:true});
   await expect(page.getByRole('checkbox',{name:'Demo',exact:true})).not.toBeChecked();
   await expect(page.getByRole('checkbox',{name:'Saw cutting',exact:true})).not.toBeChecked();
@@ -177,6 +183,7 @@ test('AI Information lists checked estimates across workbooks and opens their ex
   const target=data.lists[0].companies[0].projects[1];target.name=job;target.takeoffs[0].name=estimate;target.takeoffs[0].aiData=true;target.takeoffs[0].aiDataMethod='mixed';target.takeoffs[0].aiDataWorkTypes=['concrete-pour','demo','saw-cutting'];
   target.takeoffs[0].sheets.push(sheet('extra','Extra page'));
   target.takeoffs[0].aiDataPrevailingWage=true;
+  target.takeoffs[0].aiDataNightWork=true;
   const created=await (await page.request.post('/api/projects',{data:{name:'AI references '+suffix,book:data}})).json();
   await page.locator('#ai-information-open').click();
   await page.getByRole('button',{name:'+ Text entry',exact:true}).click();
@@ -188,6 +195,7 @@ test('AI Information lists checked estimates across workbooks and opens their ex
   await expect(record).not.toContainText('North takeoff');
   await expect(record).toContainText('Pricing method: Mixed');
   await expect(record).toContainText('Prevailing wage');
+  await expect(record).toContainText('Night time work');
   await page.screenshot({path:'test-results/ai-data-layout.png',fullPage:true});
   await expect(record.locator('[data-work-type=concrete-pour]')).toHaveText('Concrete pour');
   await expect(record.locator('[data-work-type=demo]')).toHaveText('Demo');
