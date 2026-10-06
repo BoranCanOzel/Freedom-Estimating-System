@@ -2776,3 +2776,23 @@ test('Summary colors are editable and stay shared with Scope, tabs and AI saves'
   await expect(page.locator('#sumTable .summary-coloured')).toHaveCount(0);
   await expect(page.locator('#summaryCard')).toBeVisible();
 });
+
+
+test('Summary column headings stick flush to the scroll area without a gap',async({page})=>{
+  const data=workbook();
+  data.lists[0].companies[0].projects[0].takeoffs[0].sheets=Array.from({length:35},(_,i)=>sheet('page-'+i,'Scope '+i));
+  await openWorkbook(page,data);
+  await page.locator('#rail .tab-summary').click();
+  for(const theme of ['light','dark','medieval']){
+    await page.evaluate(theme=>window.estimator.setTheme(theme),theme);
+    const scroll=page.locator('#summaryCard>.scroll');
+    await scroll.evaluate(el=>{el.scrollTop=500;});
+    await expect.poll(()=>page.locator('#sumTable thead th').first().evaluate(th=>{
+      const scroll=document.querySelector('#summaryCard>.scroll');
+      const bounds=scroll.getBoundingClientRect(),scale=bounds.width/scroll.offsetWidth;
+      return Math.abs(th.getBoundingClientRect().top-(bounds.top+scroll.clientTop*scale));
+    })).toBeLessThanOrEqual(2);
+    await expect(page.locator('#sumTable thead th').first()).toBeInViewport();
+  }
+  await page.screenshot({path:'.tools/summary-sticky-header.png'});
+});
