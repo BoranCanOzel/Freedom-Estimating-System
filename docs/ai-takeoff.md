@@ -103,3 +103,11 @@ The validation response includes a bounded diff preview. The save is applied
 atomically, recorded with the user who granted access, and broadcast to connected
 estimators. Only a signed-in user can undo it, and undo refuses to overwrite later
 changes to the same takeoff. Undo does not revoke the AI key.
+
+### Scope assignments and page colors
+
+You may color-code estimating pages and assign imported Scope items to them. Set `sheets[].color` to `slate`, `teal`, `moss`, `amber`, `rust`, `plum`, `red`, or `gray`; omit it or use `""` to clear the color. Choose consistent colors for related work.
+
+Set `takeoff.scopeAssignments` to an object mapping visible imported Scope item IDs to estimating sheet IDs, for example `{"zz-item-42":"sheet-demo"}`. Each item can be assigned to one existing page and inherits its color. Omit an entry to unassign it. When removing a page, remove or reassign its entries. These assignments organize measured work; they do not create priced rows or alter quantities. The user can change assignments and colors on the Scope page.
+
+Use the usual revision-checked validate/save endpoints or MCP tools. `read_scope` also returns current assignments and estimating pages with colors. Only visible Scope item IDs are assignable; hidden items' assignments are preserved by the server. `scopeData`, measurements, notes, review statuses, source IDs, and visibility controls remain read-only.

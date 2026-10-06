@@ -24,7 +24,7 @@ test('AI grants enforce scope, repeated saves, revisions, validation, live broad
     const scopeData={source:'zz-project',fetchedAt:'2026-10-01T10:00:00Z',items:['included','excluded','ignored','duplicate'].map((status,i)=>({id:'scope-'+i,name:'Measured '+status,note:'Use night shift crew',group:'Concrete',measurements:'160 SF',status,missing:i===3}))};
     scopeData.items.push({id:'hidden-scope',name:'Hidden scope secret',note:'Hidden scope note',showAi:false,status:'included',measurements:'900 SF'});
     const shownScope={...scopeData,items:scopeData.items.filter(item=>!item.missing&&item.showAi!==false)};
-    const scoped={...takeoff('one'),scopeLink:'https://www.zztakeoff.com/app/takeoff?projectId=zz-project',scopeData};
+    const scoped={...takeoff('one'),scopeAssignments:{'hidden-scope':'sheet-one'},scopeLink:'https://www.zztakeoff.com/app/takeoff?projectId=zz-project',scopeData};
     const book={lists:[{id:'list',companies:[{id:'co',name:'Private customer',projects:[{id:'pr',name:'Job',takeoffs:[scoped,takeoff('two')]}]}]}],libs:[]};
     const created=await (await call('/api/projects','POST',{name:'AI workbook',book})).json();
     const admin='/api/projects/'+created.id+'/ai-access',api='/api/ai/v1';
@@ -58,7 +58,13 @@ test('AI grants enforce scope, repeated saves, revisions, validation, live broad
       const modified=structuredClone(original.takeoff);delete modified[field];
       assert.equal((await call(api+'/validate','POST',{revision:original.revision,takeoff:modified},key)).status,422);
     }
-    const change={revision:original.revision,takeoff:structuredClone(original.takeoff),requestId:'save-1'};change.takeoff.sheets[0].rows[0].cost=25;
+    const change={revision:original.revision,takeoff:structuredClone(original.takeoff),requestId:'save-1'};change.takeoff.sheets[0].rows[0].cost=25;change.takeoff.sheets[0].color='teal';change.takeoff.scopeAssignments={'scope-0':'sheet-one'};
+    for(const [item,page] of [['hidden-scope','sheet-one'],['missing','sheet-one'],['scope-0','missing']]){
+      const invalid=structuredClone(change);invalid.takeoff.scopeAssignments={[item]:page};
+      assert.equal((await call(api+'/validate','POST',invalid,key)).status,422);
+    }
+    const badColor=structuredClone(change);badColor.takeoff.sheets[0].color='invalid';
+    assert.equal((await call(api+'/validate','POST',badColor,key)).status,422);
     assert.equal((await call(api+'/validate','POST',{...change,takeoff:{...change.takeoff,id:'two'}},key)).status,422);
     assert.equal((await call(api+'/validate','POST',{...change,workbook:book},key)).status,422);
     assert.equal((await call(api+'/save','POST',{...change,revision:'stale'},key)).status,409);
@@ -75,6 +81,11 @@ test('AI grants enforce scope, repeated saves, revisions, validation, live broad
     const collision=structuredClone(change);collision.takeoff.name='Different payload';
     assert.equal((await call(api+'/save','POST',collision,key)).status,409);
     const exported=await (await call('/api/projects/'+created.id+'/export')).json();assert.deepEqual(exported.lists[0].companies[0].projects[0].takeoffs[0].scopeData,scopeData);assert.deepEqual(exported.lists[0].companies[0].projects[0].takeoffs[1],book.lists[0].companies[0].projects[0].takeoffs[1]);
+    const assigned=exported.lists[0].companies[0].projects[0].takeoffs[0];
+    assert.equal(assigned.sheets[0].color,'teal');
+    assert.deepEqual(assigned.scopeAssignments,{'scope-0':'sheet-one','hidden-scope':'sheet-one'});
+    const colored=await (await call(api+'/scope','GET',undefined,key)).json();
+    assert.deepEqual(colored.scopeAssignments,{'scope-0':'sheet-one'});assert.equal(colored.pages[0].color,'teal');
     const history=await (await call(admin+'?list=list&takeoff=one')).json();assert.equal(history.changes[0].id,receipt.changeId);assert.equal(history.changes[0].canUndo,true);assert.ok(!JSON.stringify(history).includes(key));
     const later=access,read=await (await call(api+'/takeoff','GET',undefined,later.key)).json();read.takeoff.name='Edited again';
     const laterReceipt=await (await call(api+'/save','POST',{revision:read.revision,takeoff:read.takeoff,requestId:'later'},later.key)).json();
@@ -219,7 +230,7 @@ test('Explicitly disabled Scope stays private across AI reads and hidden data su
     const login=await fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Scope tester',password:'1313'})});
     const cookie=login.headers.get('set-cookie').split(';')[0];
     const call=(path,method='GET',body,key)=>fetch(base+path,{method,headers:{'Content-Type':'application/json',...(key?{Authorization:'Bearer '+key}:{cookie})},body:body===undefined?undefined:JSON.stringify(body)});
-    const hidden={...takeoff('one'),aiData:true,scopeAiAccess:false,scopeLink:'https://private-scope-link',scopeData:{source:'private-source',items:[{id:'secret',name:'private-scope-name',status:'included'}]}};
+    const hidden={...takeoff('one'),aiData:true,scopeAssignments:{secret:'sheet-one'},scopeAiAccess:false,scopeLink:'https://private-scope-link',scopeData:{source:'private-source',items:[{id:'secret',name:'private-scope-name',status:'included'}]}};
     const book={lists:[{id:'list',companies:[{id:'co',projects:[{id:'pr',takeoffs:[hidden]}]}]}]};
     const workbook=await (await call('/api/projects','POST',{name:'Private Scope',book})).json();
     const grant=await (await call('/api/projects/'+workbook.id+'/ai-access','POST',{list:'list',takeoff:'one'})).json();
@@ -230,11 +241,11 @@ test('Explicitly disabled Scope stays private across AI reads and hidden data su
     assert.equal((await call(api+'/scope','GET',undefined,grant.key)).status,403);
     const rpc=await (await call(api+'/mcp','POST',{jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'read_scope'}},grant.key)).json();assert.equal(rpc.result.isError,true);
     const read=await (await call(api+'/takeoff','GET',undefined,grant.key)).json();
-    for(const extra of [{scopeAiAccess:true},{scopeData:hidden.scopeData},{scopeLink:hidden.scopeLink}])assert.equal((await call(api+'/validate','POST',{revision:read.revision,takeoff:{...read.takeoff,...extra}},grant.key)).status,422);
+    for(const extra of [{scopeAiAccess:true},{scopeData:hidden.scopeData},{scopeLink:hidden.scopeLink},{scopeAssignments:{secret:'sheet-one'}}])assert.equal((await call(api+'/validate','POST',{revision:read.revision,takeoff:{...read.takeoff,...extra}},grant.key)).status,422);
     read.takeoff.name='Normal AI edit';
     const saved=await call(api+'/save','POST',{revision:read.revision,takeoff:read.takeoff,requestId:'private-scope-save'},grant.key);assert.equal(saved.status,200);
     const receipt=await saved.json(),again=await (await call(api+'/takeoff','GET',undefined,grant.key)).json();assert.equal(receipt.revision,again.revision);assert.equal(again.takeoff.scopeData,undefined);
     const exported=await (await call('/api/projects/'+workbook.id+'/export')).json(),actual=exported.lists[0].companies[0].projects[0].takeoffs[0];
-    assert.deepEqual(actual.scopeData,hidden.scopeData);assert.equal(actual.scopeLink,hidden.scopeLink);assert.equal(actual.name,'Normal AI edit');
+    assert.deepEqual(actual.scopeAssignments,hidden.scopeAssignments);assert.deepEqual(actual.scopeData,hidden.scopeData);assert.equal(actual.scopeLink,hidden.scopeLink);assert.equal(actual.name,'Normal AI edit');
   }finally{await app.close();}
 });

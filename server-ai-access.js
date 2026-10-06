@@ -52,6 +52,12 @@ export function mountAiAccess({app,db,session,project,rooms,snapshot,readAiInfor
     for(const key of ['scopeData','scopeLink']){
       if(Object.hasOwn(data.takeoff,key))current[key]=structuredClone(data.takeoff[key]);
     }
+    // Preserve assignments the AI cannot see, while allowing visible items to be unassigned.
+    const visibleIds=new Set((aiVisibleTakeoff(data.takeoff).scopeData?.items||[]).map(item=>item.id));
+    const pageIds=new Set(current.sheets.map(sheet=>sheet.id));
+    const assignments={...current.scopeAssignments};
+    for(const [id,page] of Object.entries(data.takeoff.scopeAssignments||{}))if(!visibleIds.has(id)&&pageIds.has(page))assignments[id]=page;
+    if(Object.hasOwn(current,'scopeAssignments')||Object.keys(assignments).length)current.scopeAssignments=assignments;
     validateBook(next);
     return {...data,next,summary:differences(data.takeoff,current)};
   }
@@ -78,7 +84,8 @@ export function mountAiAccess({app,db,session,project,rooms,snapshot,readAiInfor
     if(name==='read_scope'){
       const {takeoff}=target(grant);
       if(takeoff.scopeAiAccess===false)fail(403,'Scope access is disabled for this estimate. The user can enable Allow AI to read Scope on its Scope page.');
-      return {takeoffId:takeoff.id,scopeData:aiVisibleTakeoff(takeoff).scopeData||null,readOnly:true,guidance:scopeGuidance};
+      const visible=aiVisibleTakeoff(takeoff);
+      return {takeoffId:takeoff.id,scopeData:visible.scopeData||null,scopeAssignments:visible.scopeAssignments||{},pages:takeoff.sheets.map(({id,title,color})=>({id,title,color})),readOnly:true,guidance:scopeGuidance+' Assign visible items through takeoff.scopeAssignments and set sheets[].color using validate_changes/save_takeoff. Measurements and review decisions remain read-only.'};
     }
     if(name==='list_ai_data')return readAiEstimates();
     if(name==='read_ai_data'){

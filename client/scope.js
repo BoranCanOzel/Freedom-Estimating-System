@@ -6,7 +6,7 @@ const statusLabels={included:'Included',excluded:'Excluded',ignored:'Ignored',du
 
 export function setupScope(api, context, bridge) {
   const card=document.getElementById('scopeCard');
-  card.innerHTML='<div class="head"><div class="eyebrow-row"><span class="eyebrow">Scope</span></div><div class="sum-title" id="scope-title"></div><p class="scope-description">Measured work from ZZTakeoff. Review each line before using it in your estimate.</p></div><div class="scroll scope-content"><div class="scope-source"><label>ZZTakeoff project link<input id="scope-source" type="url" placeholder="Paste the ZZTakeoff project link"></label><button type="button" class="btn" id="scope-fetch">Fetch from ZZTakeoff</button><button type="button" class="btn alt" id="scope-connect">Connect ZZTakeoff</button></div><label class="scope-ai-access"><input type="checkbox" id="scope-ai-access"> Allow AI to read Scope</label><p id="scope-message" role="status"></p><div class="scope-tools"><label>Find an item<input id="scope-search" type="search" placeholder="Search scope items"></label><label>Show<select id="scope-filter" aria-label="Scope status"><option value="all">All items</option><option value="included">Included</option><option value="excluded">Excluded</option><option value="ignored">Ignored</option><option value="duplicate">Duplicates</option></select></label><span id="scope-count"></span></div><div id="scope-results"></div></div>';
+  card.innerHTML='<div class="head"><div class="eyebrow-row"><span class="eyebrow">Scope</span></div><div class="sum-title" id="scope-title"></div><p class="scope-description">Measured work from ZZTakeoff. Review each line before using it in your estimate.</p></div><div class="scroll scope-content"><section id="scope-page-colours" aria-label="Estimating page colours"></section><div class="scope-source"><label>ZZTakeoff project link<input id="scope-source" type="url" placeholder="Paste the ZZTakeoff project link"></label><button type="button" class="btn" id="scope-fetch">Fetch from ZZTakeoff</button><button type="button" class="btn alt" id="scope-connect">Connect ZZTakeoff</button></div><label class="scope-ai-access"><input type="checkbox" id="scope-ai-access"> Allow AI to read Scope</label><p id="scope-message" role="status"></p><div class="scope-tools"><label>Find an item<input id="scope-search" type="search" placeholder="Search scope items"></label><label>Show<select id="scope-filter" aria-label="Scope status"><option value="all">All items</option><option value="included">Included</option><option value="excluded">Excluded</option><option value="ignored">Ignored</option><option value="duplicate">Duplicates</option></select></label><span id="scope-count"></span></div><div id="scope-results"></div></div>';
   const $=id=>document.getElementById('scope-'+id);
   let identity='',busy=false,connection=null;
   const key=()=>{const c=context();return `${c.workbook}/${c.list}/${c.takeoff}`;};
@@ -16,6 +16,15 @@ export function setupScope(api, context, bridge) {
     const focused=document.activeElement?.matches('.scope-item-note')?document.activeElement:null;
     const editing=focused?{id:focused.closest('[data-scope-item]').dataset.scopeItem,start:focused.selectionStart,end:focused.selectionEnd,scroll:focused.scrollTop}:null;
     const scope=bridge.getScope();
+    const pageColours=$('page-colours');pageColours.replaceChildren(el('h3','Estimating page colours'));
+    const pageList=el('div','','scope-page-colours-list');
+    const estimatePages=bridge.getScopePages();
+    for(const page of estimatePages){
+      const entry=el('div','','scope-page-colour');
+      entry.append(bridge.scopeColorControl(page.id),el('span',page.num+' - '+(page.title||'Untitled page')));
+      pageList.append(entry);
+    }
+    pageColours.append(el('p','Click a colour to change it. Assign scope items to an estimate page below to use that colour.','scope-description'),pageList);
     $('ai-access').checked=scope.aiAccess===true;
     $('title').textContent=context().name;
     if(document.activeElement!==$('source'))$('source').value=scope.link || '';
@@ -57,16 +66,26 @@ export function setupScope(api, context, bridge) {
     for(const {pages,items:pageItems} of groups.values()){
       const body=el('tbody');table.append(body);
       const header=el('tr','','scope-page-heading'),cell=el('th');cell.colSpan=4;cell.scope='rowgroup';
-      cell.textContent=pages.length?(pages.length>1?'Shared across pages: ':'')+pages.map(p=>p.name).join(' / '):'No page assigned';
+      cell.textContent=pages.length?(pages.length>1?'Shared across pages: ':'')+pages.map(p=>p.name).join(' / '):'No source page assigned';
       const aiCell=el('th');aiCell.append(showAiCheckbox(items.filter(item=>groupKey(item)===groupKey(pageItems[0])),'Show page group '+cell.textContent+' to AI'));
       header.append(cell,aiCell);body.append(header);
       for(const item of pageItems){
       const row=el('tr');row.dataset.scopeItem=item.id;row.dataset.status=item.status;
+      const assigned=estimatePages.find(page=>page.id===scope.assignments[item.id]);
+      const colour=bridge.scopeColorValue(assigned?.color);
+      if(colour){row.style.setProperty('--scope-item-colour',colour);row.classList.add('scope-coloured');}
       const name=el('td');name.append(el('strong',item.name));if(item.group)name.append(el('small',item.group));
       const note=el('textarea','','scope-item-note');note.rows=2;note.maxLength=10000;note.placeholder='Add a note...';note.value=item.note||'';
       note.setAttribute('aria-label','Notes for '+item.name);
       note.oninput=()=>bridge.setScopeItemNote(item.id,note.value);
       name.append(note);
+      const assignment=el('label','','scope-assignment');assignment.append(el('span','Estimate page'));
+      const select=el('select');select.setAttribute('aria-label','Estimate page for '+item.name);
+      select.add(new Option('Unassigned',''));
+      for(const page of estimatePages)select.add(new Option(page.num+' - '+(page.title||'Untitled page'),page.id));
+      select.value=assigned?.id || '';
+      select.onchange=()=>{bridge.setScopePage(item.id,select.value);render();};
+      assignment.append(select);name.append(assignment);
       const status=el('td');status.append(el('span',item.missing?'No longer in source':statusLabels[item.status]||'Included','scope-status'));
       const actions=el('td','','scope-actions');
       for(const [value,label] of [['excluded','Exclude'],['ignored','Ignore'],['duplicate','Duplicate']]){

@@ -157,7 +157,7 @@ body.server-mode .project-settings-row .settings-remove{padding:4px 8px;border:0
 .settings-remove:disabled{opacity:.3;cursor:default}
 .settings-filter-choice{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--rule);font-size:13px;cursor:pointer}
 .settings-filter-choice input{accent-color:var(--slate)}
-body.server-mode .filter-pop,body.server-mode .print-menu,body.server-mode .confirm-pop,body.server-mode .tab-opts,body.server-mode .help-pop{z-index:650}
+body.server-mode .filter-pop,body.server-mode .print-menu,body.server-mode .confirm-pop,body.server-mode .help-pop{z-index:650}
 body.server-mode .filter-pop{max-height:calc(100vh - 340px);overflow:auto}
 body.server-mode .workspace-menu summary:focus-visible,body.server-mode button:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
 body.server-mode #server-welcome{padding-left:calc(var(--workspace-project-width) + 40px)}

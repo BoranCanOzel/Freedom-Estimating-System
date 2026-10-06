@@ -1518,7 +1518,7 @@ test('one project drawer retains hierarchy, custom details and filters', async (
   expect(editSize.width).toBeGreaterThanOrEqual(44);expect(editSize.height).toBeGreaterThanOrEqual(44);
   await expect(page.locator('#projBody')).toContainText('Freedom Customer');
   await expect(page.locator('#projBody')).toContainText('North job');
-  await page.locator('[data-takeoff="ts"]').click(); await expect(page.locator('#title')).toHaveValue('South scope');
+  await page.locator('[data-takeoff="ts"]').click(); await expect(page.locator('#summaryCard')).toBeVisible();
   await page.locator('#projOptions').click();
   await expect(page.locator('#edTitle')).toHaveText('Project settings');
   const drawerBox = await page.locator('#server-drawer').boundingBox(), editorBox = await page.locator('#editor').boundingBox();
@@ -1661,11 +1661,12 @@ test('Scope fetch keeps per-takeoff review marks and never replaces estimate pag
   await expect(page.locator('#scope-message')).toContainText('reading scope items');
   await expect(page.locator('#scope-fetch')).toBeDisabled();
   await expect(page.locator('[data-scope-item]')).toHaveCount(4);
-  await expect(page.locator('.scope-page-heading th:first-child')).toHaveText(['A1 - Floor plan','A2 - Details','No page assigned']);
+  await expect(page.locator('.scope-page-heading th:first-child')).toHaveText(['A1 - Floor plan','A2 - Details','No source page assigned']);
   await page.locator('#scope-search').fill('A2 - Details');
   await expect(page.locator('[data-scope-item]')).toHaveCount(1);
   await page.locator('#scope-search').fill('');
   await page.getByRole('textbox',{name:'Notes for Concrete slab',exact:true}).fill('Night shift only');
+  await page.getByRole('combobox',{name:'Estimate page for Concrete slab',exact:true}).selectOption('sn');
   const allAi=page.getByRole('checkbox',{name:'Show all Scope items to AI',exact:true});
   await expect(allAi).toBeChecked();
   await page.getByRole('checkbox',{name:'Show Concrete slab to AI',exact:true}).uncheck();
@@ -1689,6 +1690,7 @@ test('Scope fetch keeps per-takeoff review marks and never replaces estimate pag
   await page.locator('#scope-fetch').click();
   await expect(page.locator('[data-scope-item="a"]')).toContainText('180 SF');
   await expect(page.getByRole('textbox',{name:'Notes for Concrete slab revised',exact:true})).toHaveValue('Night shift only');
+  await expect(page.getByRole('combobox',{name:'Estimate page for Concrete slab revised',exact:true})).toHaveValue('sn');
   await expect(page.getByRole('checkbox',{name:'Show Concrete slab revised to AI',exact:true})).not.toBeChecked();
   await expect(page.locator('[data-scope-item="a"]')).toHaveAttribute('data-status','excluded');
   await expect(page.locator('[data-scope-item="c"]')).toHaveAttribute('data-status','duplicate');
@@ -1725,7 +1727,7 @@ test('summary shows customer, job address maps and the active takeoff', async ({
   await openWorkbook(page,data);
   const pageMap=page.locator('#workspace-map');
   const zzTakeoff=page.locator('#workspace-zztakeoff');
-  for (const view of ['sheet','summary','scopes','load','wage']) {
+  for (const view of ['sheet','summary','scope','load','wage']) {
     await page.evaluate(view=>window.estimator.openLocation({list:'list',takeoff:'tn',sheet:'sn',view}),view);
     await expect(page.locator('#server-bar #workspace-map')).toHaveCount(0);
     await expect(page.locator(`#${view}Card .eyebrow-row #workspace-map`)).toBeInViewport();
@@ -1733,7 +1735,7 @@ test('summary shows customer, job address maps and the active takeoff', async ({
     await expect(zzTakeoff).toHaveAttribute('href','https://zztakeoff.com/project/north');
     await expect(zzTakeoff).toHaveAttribute('target','_blank');
     await expect(zzTakeoff).toHaveAttribute('rel','noopener noreferrer');
-    if (view === 'sheet') await expect(page.locator('#workspace-toggle-notes + #workspace-map')).toBeVisible();
+    if (view === 'sheet') await expect(page.locator('#workspace-toggle-notes ~ #workspace-map')).toBeVisible();
     await expect(pageMap).toHaveAttribute('href','https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(company.projects[0].address));
   }
   await page.locator('#rail .tab-summary').click();
@@ -2330,6 +2332,8 @@ test('new takeoffs and option pages start without sample content', async ({page}
   const createdTakeoff=page.locator('.p-head[data-takeoff]').filter({hasText:'Blank takeoff'});
   if(!await createdTakeoff.count()) await page.locator('[data-project="north"] > .p-head > .p-name').click();
   await createdTakeoff.click();
+  await expect(page.locator('#summaryCard')).toBeVisible();
+  await page.locator('#rail .tab[data-sheet]').first().click();
   await expect(page.locator('#title')).toHaveValue('');
   await expect(page.locator('#body .name-in')).toHaveCount(1);
   await expect(page.locator('#body .name-in')).toHaveValue('');
@@ -2543,4 +2547,56 @@ test('save from this page searches items and subsections and saves into the sele
   await page.locator('#libCaptureType').selectOption('page');await page.getByRole('button',{name:'Save entire page',exact:true}).click();
   expect(await page.evaluate(()=>window.estimator.exportBook().templates.scopes.at(-1).folder)).toBe('Labor');
   await expect(page.locator('#body .card-btn')).toHaveCount(0);
+});
+
+
+test('Scope assigns measured items to colored pages and replaces the old Scopes tab',async({page})=>{
+  const data=workbook(),takeoff=data.lists[0].companies[0].projects[0].takeoffs[0];
+  takeoff.scopeData={source:'zz',items:[{id:'measured',name:'Measured cutting',status:'included',measurements:'100 LF'}]};
+  takeoff.sheets.push({...sheet('extra','Pourback'),color:'plum'});
+  await openWorkbook(page,data);
+  await expect(page.locator('#rail .tab-opts-btn,#scopesCard')).toHaveCount(0);
+  await page.locator('#rail .tab-scope').click();
+  const choice=page.getByRole('combobox',{name:'Estimate page for Measured cutting'});
+  await choice.selectOption('extra');
+  const row=page.locator('[data-scope-item="measured"]');
+  await expect(row).toHaveClass(/scope-coloured/);
+  expect(await row.evaluate(el=>el.style.getPropertyValue('--scope-item-colour'))).toBe('#7A4A70');
+  await page.getByRole('button',{name:'Change colour for Pourback',exact:true}).click();
+  await page.locator('#tabPalette').getByRole('button',{name:'teal',exact:true}).click();
+  expect(await row.evaluate(el=>el.style.getPropertyValue('--scope-item-colour'))).toBe('#2E7D74');
+  expect(await page.locator('#rail [data-sheet="extra"]').evaluate(el=>el.style.color)).toBe('rgb(46, 125, 116)');
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();
+  await expect(choice).toHaveValue('extra');
+  expect(await row.evaluate(el=>el.style.getPropertyValue('--scope-item-colour'))).toBe('#2E7D74');
+  await page.getByRole('button',{name:'Change colour for Pourback',exact:true}).click();
+  await page.locator('#tabPalette').getByRole('button',{name:'No colour',exact:true}).click();
+  await expect(row).not.toHaveClass(/scope-coloured/);
+  await choice.selectOption('');
+  await expect(choice).toHaveValue('');
+  // API saves update assignments and colors in the open browser.
+  const projects=await (await page.request.get('/api/projects')).json();
+  const projectList=Array.isArray(projects)?projects:projects.projects;
+  const currentName=await page.locator('#server-title').textContent();
+  const current=projectList.find(project=>project.name===currentName);
+  const access=await (await page.request.post('/api/projects/'+current.id+'/ai-access',{data:{list:'list',takeoff:'tn'}})).json();
+  const headers={Authorization:'Bearer '+access.key};
+  const read=await (await page.request.get('/api/ai/v1/takeoff',{headers})).json();
+  read.takeoff.sheets.find(sheet=>sheet.id==='extra').color='amber';
+  read.takeoff.scopeAssignments={measured:'extra'};
+  const saved=await page.request.post('/api/ai/v1/save',{headers,data:{revision:read.revision,takeoff:read.takeoff,requestId:'scope-browser'}});
+  expect(saved.ok()).toBe(true);
+  await expect(choice).toHaveValue('extra');
+  await expect.poll(()=>row.evaluate(el=>el.style.getPropertyValue('--scope-item-colour'))).toBe('#D98B00');
+  await page.screenshot({path:'.tools/scope-colours.png',fullPage:true});
+  await page.locator('#rail .option-close').nth(1).click();
+  await page.locator('.confirm-pop').getByRole('button',{name:'Delete',exact:true}).click();
+  await expect(choice).toHaveValue('');
+  await expect(row).not.toHaveClass(/scope-coloured/);
+  // Old saved navigation safely opens the new Scope page.
+  await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'tn',view:'scopes'}));
+  await expect(page.locator('#scopeCard')).toBeVisible();
+  await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'ts'}));
+  await expect(page.locator('#summaryCard')).toBeVisible();
 });

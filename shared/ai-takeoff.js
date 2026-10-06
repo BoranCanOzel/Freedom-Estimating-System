@@ -18,10 +18,15 @@ export function locateTakeoff(book, listId, takeoffId) {
 }
 export function aiVisibleTakeoff(takeoff){
   const visible=structuredClone(takeoff);
-  if(takeoff.scopeAiAccess===false){delete visible.scopeData;delete visible.scopeLink;}
+  if(takeoff.scopeAiAccess===false){delete visible.scopeData;delete visible.scopeLink;delete visible.scopeAssignments;}
   else if(Array.isArray(visible.scopeData?.items))visible.scopeData.items=visible.scopeData.items.filter(item=>!item.missing&&item.showAi!==false);
+  if(visible.scopeAssignments){
+    const ids=new Set((visible.scopeData?.items||[]).map(item=>item.id));
+    visible.scopeAssignments=Object.fromEntries(Object.entries(visible.scopeAssignments).filter(([id])=>ids.has(id)));
+  }
   return visible;
 }
+export const pageColors=['slate','teal','moss','amber','rust','plum','red','gray'];
 const idSchema={type:'string',minLength:1,maxLength:160};
 const numeric={anyOf:[{type:'number'},{type:'string',pattern:'^$|^-?[0-9]+(\\.[0-9]+)?$'}]};
 export const takeoffSchema={type:'object',required:['id','name','sheets'],properties:{
@@ -32,9 +37,10 @@ export const takeoffSchema={type:'object',required:['id','name','sheets'],proper
   aiDataPrevailingWage:{type:'boolean',readOnly:true,description:'User-selected Prevailing wage label for this reference estimate. True means labeled; false or missing means not labeled, not a determination of wage requirements. Preserve unchanged.'},
   aiDataNightWork:{type:'boolean',readOnly:true,description:'User-selected Night time work label for this reference estimate. True means labeled; false or missing means not labeled. Preserve unchanged.'},
   scopeAiAccess:{type:'boolean',readOnly:true,description:'User-controlled Scope sharing. Missing means true; AI cannot change it.'},
+  scopeAssignments:{type:'object',additionalProperties:idSchema,description:'Map visible imported Scope item IDs to estimating sheet IDs. Assign an item to one estimating page; it inherits that page color. Omit an entry to unassign it. Hidden Scope items cannot be changed.'},
   scopeLink:{type:'string',readOnly:true,description:'Saved ZZTakeoff link. Preserve unchanged.'},
   scopeData:{type:['object','null'],readOnly:true,description:'Last fetched measured Scope and review decisions. Preserve unchanged.',properties:{source:{type:'string'},fetchedAt:{type:'string'},items:{type:'array',items:{type:'object',properties:{id:{type:'string'},name:{type:'string'},group:{type:'string'},pages:{type:'array',items:{type:'object',properties:{id:{type:'string'},name:{type:'string'}}}},measurements:{type:'string'},note:{type:'string',maxLength:10000,readOnly:true,description:'User note for this Scope item.'},status:{enum:['included','excluded','ignored','duplicate']},missing:{type:'boolean'},showAi:{type:'boolean',readOnly:true,description:'User-controlled visibility. Missing means true.'}}}}}},
-  sheets:{type:'array',minItems:1,items:{type:'object',required:['id','rows'],properties:{id:idSchema,title:{type:'string'},flatAddEnabled:{type:'boolean'},rows:{type:'array',items:{type:'object',required:['id'],properties:{id:idSchema,type:{enum:['item','section','sectionEnd']},name:{type:'string'},kind:{type:'string'},count:numeric,time:numeric,days:numeric,cost:numeric,markup:numeric,flatAdd:numeric,note:{type:'string'},sid:idSchema}}}}}}
+  sheets:{type:'array',minItems:1,items:{type:'object',required:['id','rows'],properties:{id:idSchema,title:{type:'string'},color:{type:'string',enum:['',...pageColors],description:'Page and assigned Scope item color. Choose a palette key; omit or use empty text for no color.'},flatAddEnabled:{type:'boolean'},rows:{type:'array',items:{type:'object',required:['id'],properties:{id:idSchema,type:{enum:['item','section','sectionEnd']},name:{type:'string'},kind:{type:'string'},count:numeric,time:numeric,days:numeric,cost:numeric,markup:numeric,flatAdd:numeric,note:{type:'string'},sid:idSchema}}}}}}
 }};
 export const changeSchema={type:'object',required:['revision','takeoff'],additionalProperties:false,properties:{revision:{type:'string',pattern:'^[a-f0-9]{64}$'},takeoff:takeoffSchema,requestId:{type:'string',minLength:1,maxLength:100}}};
 
@@ -42,7 +48,7 @@ export function validateTakeoff(next, before) {
   validateBook({sheets:[next]});
   const fail=message=>{throw Object.assign(new Error(message),{status:422});};
   if(!next || typeof next!=='object' || Array.isArray(next) || next.id!==before.id)fail('Keep the takeoff ID unchanged.');
-  const editable=new Set(['name','note','custom','sheets']);
+  const editable=new Set(['name','note','custom','sheets','scopeAssignments']);
   for(const key of new Set([...Object.keys(before),...Object.keys(next)]))if(!editable.has(key)&&JSON.stringify(next[key])!==JSON.stringify(before[key]))fail('Takeoff field is read-only: '+key);
   if(typeof next.name!=='string'||next.name.length>500)fail('Takeoff name must be text, up to 500 characters.');
   if(!Array.isArray(next.sheets)||!next.sheets.length)fail('Keep at least one option page.');
@@ -63,9 +69,19 @@ export function validateTakeoff(next, before) {
   visit(next);
   if(next.note!==undefined&&typeof next.note!=='string')fail('Takeoff note must be text.');
   if(next.custom!==undefined&&(!next.custom||typeof next.custom!=='object'||Array.isArray(next.custom)))fail('Takeoff custom fields must be an object.');
+  if(next.scopeAssignments!==undefined){
+    if(!next.scopeAssignments||typeof next.scopeAssignments!=='object'||Array.isArray(next.scopeAssignments))fail('scopeAssignments must map Scope item IDs to page IDs.');
+    const visibleIds=new Set((before.scopeAiAccess===false?[]:before.scopeData?.items||[]).filter(item=>!item.missing&&item.showAi!==false).map(item=>item.id));
+    const sheetIds=new Set(next.sheets.map(sheet=>sheet?.id));
+    for(const [itemId,pageId] of Object.entries(next.scopeAssignments)){
+      if(!visibleIds.has(itemId))fail('Only visible Scope items can be assigned.');
+      if(typeof pageId!=='string'||!sheetIds.has(pageId))fail('Scope assignment must reference an existing estimating page.');
+    }
+  }
   const ids=new Set();
   for(const sheet of next.sheets){
     if(!sheet||typeof sheet!=='object'||Array.isArray(sheet))fail('Each option must be an object.');
+    if(sheet.color!==undefined&&sheet.color!==''&&!pageColors.includes(sheet.color))fail('Unsupported page color.');
     if(sheet.title!==undefined&&typeof sheet.title!=='string')fail('Option title must be text.');
     if(!Array.isArray(sheet.rows))fail('Each option needs a rows array.');
     if(sheet.flatAddEnabled!==undefined&&typeof sheet.flatAddEnabled!=='boolean')fail('flatAddEnabled must be true or false.');

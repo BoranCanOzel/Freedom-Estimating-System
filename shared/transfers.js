@@ -38,9 +38,9 @@ export function exportTransfer(book,kind,record){
 
 export function importTransfer(book,kind,record,target,dependencies={},uuid=()=>crypto.randomUUID()){
   const next=structuredClone(book),bundle=structuredClone({record,dependencies}),ids=new Map();
-  function scan(v){if(!v||typeof v!=='object')return;if(typeof v.id==='string'&&!ids.has(v.id))ids.set(v.id,uuid());for(const x of Object.values(v))scan(x);}
+  function scan(v){if(!v||typeof v!=='object')return;if(typeof v.id==='string'&&!ids.has(v.id))ids.set(v.id,uuid());for(const [key,x] of Object.entries(v))if(key!=='scopeData')scan(x);}
   scan(bundle);
-  function rewrite(v){if(!v||typeof v!=='object')return;for(const [k,x]of Object.entries(v)){if(typeof x==='string'&&ids.has(x)&&(/id$/i.test(k)||['active','sid','ref','template','subtype','service','construct'].includes(k)))v[k]=ids.get(x);else rewrite(x);}if(!Array.isArray(v)&&!v.id&&('rows'in v||'sheets'in v||'takeoffs'in v||'projects'in v))v.id=uuid();}
+  function rewrite(v){if(!v||typeof v!=='object')return;if(v.scopeAssignments)v.scopeAssignments=Object.fromEntries(Object.entries(v.scopeAssignments).map(([item,page])=>[ids.get(item)||item,ids.get(page)||page]));for(const [k,x]of Object.entries(v)){if(typeof x==='string'&&ids.has(x)&&(/id$/i.test(k)||['active','sid','ref','template','subtype','service','construct'].includes(k)))v[k]=ids.get(x);else if(k!=='scopeData')rewrite(x);}if(!Array.isArray(v)&&!v.id&&('rows'in v||'sheets'in v||'takeoffs'in v||'projects'in v))v.id=uuid();}
   rewrite(bundle);
   const lists=next.lists||[],companies=lists.flatMap(l=>l.companies||[]),projects=companies.flatMap(c=>c.projects||[]);
   const parent=(kind==='customer'?lists:kind==='project'?companies:projects).find(p=>p.id===target);

@@ -52,3 +52,16 @@ body.dark:not(.medieval) #scopeCard .scope-actions .btn[aria-pressed=true]{color
 #scopeCard .scope-item-note{display:block;box-sizing:border-box;width:100%;min-height:42px;margin-top:8px;padding:6px 8px;resize:vertical;border:1px solid var(--rule);border-radius:4px;background:transparent;color:var(--ink);font:12px/1.5 var(--f-sans)}
 #scopeCard .scope-item-note::placeholder{color:var(--muted)}
 #scopeCard .scope-item-note:focus{outline:2px solid var(--amber);outline-offset:1px;background:var(--card)}
+
+#scope-page-colours{margin-bottom:20px}
+.scope-page-colours-list{display:flex;flex-wrap:wrap;gap:8px 20px}
+.scope-page-colour{display:flex;align-items:center;gap:8px;max-width:100%;font-size:13px}
+.scope-page-colour span{overflow-wrap:anywhere}
+#scopeCard .sow-col{flex-shrink:0;width:24px;height:24px;border-radius:50%;border:1px solid var(--rule);cursor:pointer;padding:0}
+#scopeCard .sow-col.none{background:var(--card)!important;position:relative}
+#scopeCard .sow-col.none::after{content:"";position:absolute;left:4px;right:4px;top:10px;height:2px;background:#B23A2E;transform:rotate(-45deg)}
+#scopeCard .scope-table tr.scope-coloured td:first-child{border-left:5px solid var(--scope-item-colour);background:color-mix(in srgb,var(--scope-item-colour) 12%,var(--card))!important}
+@media print{#scope-page-colours,#scopeCard .sow-col{display:none!important}}
+
+.scope-assignment{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px}
+.scope-assignment select{max-width:260px;min-width:0;width:100%;padding:5px;background:var(--card);color:var(--ink);border:1px solid var(--rule)}

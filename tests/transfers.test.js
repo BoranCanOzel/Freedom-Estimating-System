@@ -49,3 +49,12 @@ test('scoped transfers carry dropdown definitions without replacing destination 
  assert.equal(merged.customFieldSettings.takeoff,undefined); // Existing legacy text field stays a text field.
  assert.deepEqual(merged.customFieldSettings.company,source.customFieldSettings.company);
 });
+
+test('copied takeoffs keep Scope assignments linked to their copied pages',()=>{
+ const source={...takeoff,scopeData:{source:'zz',items:[{id:'measured',name:'Cutting'}]},scopeAssignments:{measured:'s'}};
+ const next=importTransfer(book,'takeoff',source,'p');
+ const copy=next.lists[0].companies[0].projects[0].takeoffs.at(-1);
+ assert.equal(copy.scopeAssignments[copy.scopeData.items[0].id],copy.sheets[0].id);
+ assert.notEqual(copy.sheets[0].id,'s');
+ assert.equal(copy.scopeData.items[0].id,'measured');
+});

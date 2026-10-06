@@ -1098,7 +1098,7 @@
   th.col-empty{background:var(--slate-bg)}
   td.col-empty{background:var(--card)}
 
-  .confirm-pop,.tab-opts{
+  .confirm-pop{
     position:fixed;z-index:320;background:var(--card);border:1px solid var(--rule-strong);
     border-radius:6px;padding:10px;box-shadow:0 16px 34px -16px rgba(0,0,0,.55);
   }
@@ -1113,10 +1113,6 @@
 
   .to-sw{display:flex;gap:3px;flex:none}
   .to-sw .sw{width:15px;height:15px}
-  .tab-opts-btn{
-    margin-left:auto;
-    font-family:var(--f-cond);letter-spacing:.1em;text-transform:uppercase;
-  }
   .tab{transition:transform .14s ease}
   .tab.tab-dragging{
     transition:none;z-index:260;opacity:.97;cursor:grabbing;
@@ -1124,24 +1120,6 @@
   }
   .tab.to-library{box-shadow:0 0 0 2px var(--amber),0 12px 22px -10px rgba(19,23,25,.6)}
 
-  .sow-body{padding:6px 18px 18px;max-width:1100px}
-  .sow-row{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid var(--rule-hair)}
-  .sow-num{
-    flex:none;width:30px;height:30px;border:1px solid var(--rule-strong);border-radius:4px;
-    display:flex;align-items:center;justify-content:center;background:var(--s39);
-    font-family:var(--f-mono);font-size:12px;font-weight:600;color:var(--muted);
-  }
-  .sow-text{
-    flex:1;min-width:0;border:1px solid var(--rule-strong);border-radius:4px;padding:7px 9px;
-    font-family:var(--f-cond);font-weight:600;font-size:14px;
-    color:var(--ink);resize:vertical;background:var(--card);
-  }
-  .sow-text:focus{outline:2px solid var(--amber);outline-offset:-1px}
-  .sow-right{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
-  .sow-total{
-    font-family:var(--f-mono);font-size:14px;font-weight:600;color:var(--slate);
-  }
-  .sow-total .s{color:var(--faint);margin-right:3px}
 
 
   .s-subn{font-family:var(--f-mono);font-size:10.5px;color:var(--faint)}
@@ -1353,31 +1331,6 @@
   @media print{.proj,.proj-tab,.tab-rail{display:none!important}}
 
   /* scope of work view: real columns */
-  .sow-row{
-    display:grid;grid-template-columns:34px 1fr 120px 54px 74px;
-    align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--rule-hair);
-    transition:transform .14s ease;
-  }
-  .sow-headrow{
-    border-bottom:2px solid var(--slate);padding-bottom:6px;
-    font-family:var(--f-cond);font-weight:700;font-size:10.5px;
-    letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
-  }
-  .sow-headrow .sow-num{border:0;background:transparent;height:auto;color:var(--muted)}
-  .sow-c{display:flex;align-items:center;justify-content:center}
-  .sow-c.money-h,.sow-total{justify-content:flex-end}
-  .sow-num{cursor:grab;touch-action:none}
-  .sow-row.sow-dragging{
-    transition:none;position:relative;z-index:20;background:var(--card);
-    box-shadow:0 12px 24px -12px rgba(19,23,25,.6);border-radius:4px;
-  }
-  .sow-col{
-    width:22px;height:22px;border-radius:50%;border:1px solid rgba(19,23,25,.18);cursor:pointer;padding:0;
-  }
-  .sow-col.none{background:var(--card)!important;position:relative}
-  .sow-col.none::after{
-    content:"";position:absolute;left:4px;right:4px;top:9px;height:2px;background:#B23A2E;transform:rotate(-45deg);
-  }
 
   .sheet-notes{min-width:0}
   .pic-btn-row.has-note{opacity:.8}
@@ -2781,7 +2734,7 @@
     thead{display:table-header-group}
     body,.money,.cell-in,.name-in{font-size:10px}
     .item-note{font-size:9px}
-    .rail,.bar,.lib,.lib-tab,.ed,.tab-palette,.tab-opts,.confirm-pop,.lib-ghost{display:none!important}
+    .rail,.bar,.lib,.lib-tab,.ed,.tab-palette,.confirm-pop,.lib-ghost{display:none!important}
     .sheet,.card{display:block;height:auto;min-height:0}
     .h-adds,.sec-add,.col-resizer,.fee-x,.note-btn,.del,.grip,.caret{display:none!important}
     .card{border:0;box-shadow:none}
@@ -2890,20 +2843,6 @@
   </div>
 
   <div class="card" id="scopeCard" hidden></div>
-
-  <div class="card" id="scopesCard" hidden>
-    <div class="head">
-      <div class="eyebrow-row"><span class="eyebrow">Scope of work</span></div>
-      <div class="sum-title">Every option on this job</div>
-    </div>
-    <div class="scroll"><div class="sow-body" id="scopesBody"></div></div>
-    <div class="bar">
-      <button class="btn" id="scAdd">+ Add option</button>
-      <span class="legend">Edit a scope line here and the sheet follows</span>
-      <button class="btn ghost js-export">Excel</button>
-      <button class="btn ghost js-print">Print</button>
-    </div>
-  </div>
 
   <div class="card" id="loadCard" hidden>
     <div class="head">
@@ -3057,7 +2996,7 @@
           <button type="button" id="libNewCon"><strong>Construct</strong><small>An assembly of parts</small></button>
           <button type="button" id="libNewSvc"><strong>Service</strong><small>A base service with add-ons</small></button>
           <button type="button" id="libNewSec"><strong>Section</strong><small>A group of estimating lines</small></button>
-          <button type="button" id="libNewScope"><strong>Scope</strong><small>A reusable option layout</small></button>
+          <button type="button" id="libNewScope"><strong>Scope</strong><small>A reusable page layout</small></button>
         </div>
       </details>
       <details class="lib-save-existing">
@@ -4634,6 +4573,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     const col = tabColor(sh.color);
     b.style.background = col ? col.dot : 'transparent';
     b.title = 'Change colour';
+    b.setAttribute('aria-label', 'Change colour for ' + (sh.title || sh.name || 'page'));
     if (!col) b.classList.add('none');
     b.addEventListener('click', e => {
       e.stopPropagation();
@@ -4644,20 +4584,22 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       grid.className = 'pal-grid';
       const none = document.createElement('button');
       none.type = 'button';
+      none.setAttribute('aria-label', 'No colour');
       none.className = 'sw none' + (sh.color ? '' : ' on');
       none.addEventListener('click', ev => {
         ev.stopPropagation(); delete sh.color; pal.hidden = true;
-        renderTabs(); renderScopes(); save();
+        renderTabs(); save(); document.dispatchEvent(new Event('estimator:projects'));
       });
       grid.appendChild(none);
       TAB_COLORS.forEach(c => {
         const sw = document.createElement('button');
         sw.type = 'button';
         sw.className = 'sw' + (sh.color === c.k ? ' on' : '');
+        sw.setAttribute('aria-label', c.k);
         sw.style.background = c.dot;
         sw.addEventListener('click', ev => {
           ev.stopPropagation(); sh.color = c.k; pal.hidden = true;
-          renderTabs(); renderScopes(); save();
+          renderTabs(); save(); document.dispatchEvent(new Event('estimator:projects'));
         });
         grid.appendChild(sw);
       });
@@ -4674,113 +4616,6 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       }, 0);
     });
     return b;
-  }
-
-  function armScopeRowDrag(e, el, sh){
-    if (e.button > 0) return;
-    const startY = e.clientY;
-    let started = false;
-    const host = el.parentNode;
-
-    const move = ev => {
-      if (!started){
-        if (Math.abs(ev.clientY - startY) < 5) return;
-        started = true;
-        el.classList.add('sow-dragging');
-        document.body.style.userSelect = 'none';
-      }
-      ev.preventDefault();
-      const rows = Array.from(host.children).filter(x => x !== el);
-      for (const r of rows){
-        const b = r.getBoundingClientRect();
-        if (ev.clientY < b.top + b.height / 2){
-          if (r.previousElementSibling !== el) host.insertBefore(el, r);
-          break;
-        }
-        if (r === rows[rows.length - 1] && ev.clientY > b.top + b.height / 2){
-          host.insertBefore(el, r.nextSibling);
-        }
-      }
-      el.style.transform = 'none';
-      const rect = el.getBoundingClientRect();
-      el.style.transform = 'translate(6px,' + (ev.clientY - (rect.top + rect.height / 2)) + 'px)';
-    };
-
-    const up = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-      document.body.style.userSelect = '';
-      el.style.transform = '';
-      el.classList.remove('sow-dragging');
-      if (!started) return;
-      const order = Array.from(host.children).map(x => x.dataset.sheet);
-      book.sheets.sort((a, b2) => order.indexOf(a.id) - order.indexOf(b2.id));
-      renderTabs();
-      renderScopes();
-      save();
-    };
-
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
-  }
-
-  function renderScopes(){
-    const bodyEl = document.getElementById('scopesBody');
-    bodyEl.innerHTML = '';
-
-    const head = document.createElement('div');
-    head.className = 'sow-row sow-headrow';
-    head.innerHTML = '<span class="sow-num">#</span><span class="sow-text-h">Scope of work</span>' +
-      '<span class="sow-c money-h">Grand</span><span class="sow-c">Colour</span><span class="sow-c"></span>';
-    bodyEl.appendChild(head);
-
-    book.sheets.forEach(sh => {
-      const r = document.createElement('div');
-      r.className = 'sow-row';
-      r.dataset.sheet = sh.id;
-
-      const n = document.createElement('span');
-      n.className = 'sow-num';
-      n.textContent = sh.num;
-      const col = tabColor(sh.color);
-      if (col){ n.style.background = col.tint; n.style.color = col.dot; n.style.borderColor = col.dot; }
-      n.title = 'Drag to reorder';
-      n.addEventListener('pointerdown', e => armScopeRowDrag(e, r, sh));
-
-      const ta = document.createElement('textarea');
-      ta.className = 'sow-text';
-      ta.rows = 2;
-      ta.placeholder = 'Describe the scope of work';
-      ta.value = sh.title || '';
-      ta.addEventListener('input', () => { sh.title = ta.value; renderTabs(); save(); });
-
-      const tot = sheetTotals(sh);
-      const money = document.createElement('span');
-      money.className = 'sow-c sow-total';
-      money.innerHTML = '<span class="s">$</span>' + fmt.format(tot.grand);
-
-      const colCell = document.createElement('span');
-      colCell.className = 'sow-c';
-      colCell.appendChild(scopeColorBtn(sh));
-
-      const openCell = document.createElement('span');
-      openCell.className = 'sow-c';
-      const open = document.createElement('button');
-      open.type = 'button';
-      open.className = 'btn alt tiny';
-      open.textContent = 'Open';
-      open.addEventListener('click', () => {
-        book.view = 'sheet';
-        book.active = sh.id;
-        state = sh;
-        showView();
-        save();
-      });
-      openCell.appendChild(open);
-
-      r.append(n, ta, money, colCell, openCell);
-      bodyEl.appendChild(r);
-    });
   }
 
   /* ---------- load calc: disposal volume ---------- */
@@ -5645,15 +5480,6 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     });
     rail.insertBefore(add, railEnd());
 
-    const opts = document.createElement('button');
-    opts.type = 'button';
-    opts.className = 'tab tab-opts-btn';
-    opts.textContent = 'Scopes';
-    opts.title = 'All option scopes and tab colours';
-    opts.setAttribute('aria-selected', String(book.view === 'scopes'));
-    opts.addEventListener('click', () => { book.view = 'scopes'; showView(); save(); });
-    rail.insertBefore(opts, railEnd());
-
     [['load','Load calc'], ['wage','Wage calc']].forEach(([v, label]) => {
       const b = document.createElement('button');
       b.type = 'button';
@@ -5701,7 +5527,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       ['ico type', 'The type icon on the right sets labor, equipment, material and the rest']
     ]],
     ['Getting about', [
-      ['', 'Tabs along the top are the options on this job; Scopes lists every scope'],
+      ['', 'Tabs along the top are the pages on this job; Scope contains measured work and colours'],
       ['', 'Tabs down the right edge open the library, the catalog and your notes'],
       ['', 'Projects at the top left opens saved workbooks, companies, projects and takeoffs'],
       ['', 'Drag a template out of the library onto the sheet, or a line into it to save one']
@@ -5816,25 +5642,24 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     const pageActions = document.getElementById('workspace-page-actions');
     if (pageActions) pageActions.hidden = !hit;
     if (!hit){
-      ['sheetCard','summaryCard','scopeCard','scopesCard','loadCard','wageCard','libToggle'].forEach(id => document.getElementById(id).hidden = true);
+      ['sheetCard','summaryCard','scopeCard','loadCard','wageCard','libToggle'].forEach(id => document.getElementById(id).hidden = true);
       document.body.classList.remove('lib-open');
       document.dispatchEvent(new CustomEvent('estimator:view', {detail:{view:'empty'}}));
       return;
     }
     if (hit) hit.tk.active = book.active;
-    const known = ['summary','scope','scopes','load','wage'];
+    if (book.view === 'scopes') book.view = 'scope';
+    const known = ['summary','scope','load','wage'];
     const v = known.indexOf(book.view) >= 0 ? book.view : 'sheet';
     document.getElementById('sheetCard').hidden = v !== 'sheet';
     document.getElementById('summaryCard').hidden = v !== 'summary';
     document.getElementById('scopeCard').hidden = v !== 'scope';
-    document.getElementById('scopesCard').hidden = v !== 'scopes';
     document.getElementById('loadCard').hidden = v !== 'load';
     document.getElementById('wageCard').hidden = v !== 'wage';
     document.getElementById('libToggle').hidden = v !== 'sheet';
     if (v !== 'sheet') document.body.classList.remove('lib-open');
     renderTabs();
     if (v === 'summary') renderSummary();
-    else if (v === 'scopes') renderScopes();
     else if (v === 'load') renderLoad();
     else if (v === 'wage') renderWage();
     else if (v === 'sheet') { renderAll(); if (document.body.classList.contains('lib-open')) renderLibrary(); }
@@ -7095,6 +6920,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       const at = takeoff.sheets.findIndex(sh => sh.id === optionId);
       if (at < 0) return;
       takeoff.sheets.splice(at, 1);
+      for(const [item,page] of Object.entries(takeoff.scopeAssignments||{}))if(page===optionId)delete takeoff.scopeAssignments[item];
       takeoff.sheets.forEach((sh,i) => { sh.num = i + 1; });
       const next = takeoff.sheets[Math.min(at,takeoff.sheets.length - 1)];
       if (takeoff.active === optionId) takeoff.active = next.id;
@@ -7121,14 +6947,6 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       if (state.id === optionId) state = fresh;
       showView(); save();
     }, 'Reset');
-  });
-
-  document.getElementById('scAdd').addEventListener('click', () => {
-    const sh = seed(nextNum());
-    book.sheets.push(sh);
-    renderTabs();
-    renderScopes();
-    save();
   });
 
   document.getElementById('roundStep').addEventListener('change', e => {
@@ -7211,8 +7029,8 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
   const secOpen = new Set();
 
-  // a scope saved from the library becomes a whole option, so that is what it is called
-  const TPL_TAG = {scope:'Option', section:'Section', item:'Item',
+  // A scope template from the library creates a whole page.
+  const TPL_TAG = {scope:'Page', section:'Section', item:'Item',
                    part:'Part', construct:'Construct', service:'Service'};
 
   function tplTag(t, kind){
@@ -8142,7 +7960,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     state = sh;
     showView();
     save();
-    flash('option ' + sh.num + ' created');
+    flash('page ' + sh.num + ' created');
   }
 
 
@@ -10720,17 +10538,6 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     return html + '</section>';
   }
 
-  function printScopesHtml(){
-    let html = '<section class="psheet"><h2>Scope of work</h2><table class="ptab"><thead><tr>' +
-      '<th>#</th><th>Scope</th><th>Grand</th></tr></thead><tbody>';
-    book.sheets.forEach(sh => {
-      const t = sheetTotals(sh);
-      html += '<tr><td class="pmid">' + sh.num + '</td><td>' + esc(sh.title || '') +
-              '</td><td class="pnum pgrand">' + money$(t.grand) + '</td></tr>';
-    });
-    return html + '</tbody></table></section>';
-  }
-
   function doPrint(all){
     document.body.classList.remove('lib-open');
     document.body.classList.remove('proj-open');
@@ -10740,7 +10547,6 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     box.innerHTML = all
       ? printSummaryHtml() + book.sheets.map(printSheetHtml).join('')
       : (book.view === 'summary' ? printSummaryHtml()
-         : book.view === 'scopes' ? printScopesHtml()
          : printSheetHtml(state));
     document.body.classList.add('print-all');
     window.print();
@@ -11356,7 +11162,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     book.activeTakeoff = tid;
     activeTakeoff();
     state = book.sheets.find(x => x.id === book.active) || book.sheets[0];
-    book.view = 'sheet';
+    book.view = 'summary';
     showView();
     renderProjects();
     save();
@@ -11528,13 +11334,14 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         if (!ids.has(value.id)) ids.set(value.id, id());
         value.id = ids.get(value.id);
       }
-      Object.values(value).forEach(renew);
+      Object.entries(value).forEach(([key,item])=>{if(key!=='scopeData')renew(item);});
     }
     function remap(value){
       if (!value || typeof value !== 'object') return;
+      if(value.scopeAssignments)value.scopeAssignments=Object.fromEntries(Object.entries(value.scopeAssignments).map(([item,page])=>[item,ids.get(page)||page]));
       for (const key of Object.keys(value)){
         if (['sid','active'].includes(key) && ids.has(value[key])) value[key] = ids.get(value[key]);
-        remap(value[key]);
+        if(key!=='scopeData')remap(value[key]);
         if (ids.has(key)){ value[ids.get(key)] = value[key]; delete value[key]; }
       }
     }
@@ -12205,13 +12012,33 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       return hit ? String(hit.pr.address || '').trim() || String(hit.co.address || '').trim() : '';
     },
     getZZTakeoffLink(){const hit=findTakeoff(book.activeTakeoff);return projectWebLink(hit?.tk.scopeLink ?? hit?.pr.zztakeoffLink);},
+    getScopePages(){return book.sheets.map(sh=>({id:sh.id,title:sh.title,num:sh.num,color:sh.color}));},
+    scopeColorControl(id){
+      const sh=book.sheets.find(sh=>sh.id===id);return sh ? scopeColorBtn(sh) : null;
+    },
+    setScopePage(itemId,pageId){
+      const hit=findTakeoff(book.activeTakeoff);
+      if(!hit?.tk.scopeData?.items?.some(item=>item.id===itemId))return;
+      if(pageId&&!book.sheets.some(sh=>sh.id===pageId))return;
+      hit.tk.scopeAssignments ||= {};
+      if(pageId)hit.tk.scopeAssignments[itemId]=pageId;else delete hit.tk.scopeAssignments[itemId];
+      save();
+    },
+    scopeColorValue(key){return tabColor(key)?.dot || '';},
     getScope(){
       const hit=findTakeoff(book.activeTakeoff);
-      return {link:hit?.tk.scopeLink ?? hit?.pr.zztakeoffLink ?? '',data:hit?.tk.scopeData || null,aiAccess:hit?.tk.scopeAiAccess!==false};
+      return {assignments:hit?.tk.scopeAssignments || {},link:hit?.tk.scopeLink ?? hit?.pr.zztakeoffLink ?? '',data:hit?.tk.scopeData || null,aiAccess:hit?.tk.scopeAiAccess!==false};
     },
     setScopeAiAccess(enabled){const hit=findTakeoff(book.activeTakeoff);if(hit){hit.tk.scopeAiAccess=enabled===true;save();}},
     setScopeLink(value){const hit=findTakeoff(book.activeTakeoff);if(hit){hit.tk.scopeLink=value;save();}},
-    setScopeData(data){const hit=findTakeoff(book.activeTakeoff);if(hit){hit.tk.scopeData=structuredClone(data);save();}},
+    setScopeData(data){
+      const hit=findTakeoff(book.activeTakeoff);if(!hit)return;
+      if(hit.tk.scopeData?.source!==data?.source&&hit.tk.scopeAssignments)hit.tk.scopeAssignments={};
+      hit.tk.scopeData=structuredClone(data);
+      const ids=new Set(data?.items?.map(item=>item.id)||[]);
+      for(const id of Object.keys(hit.tk.scopeAssignments||{}))if(!ids.has(id))delete hit.tk.scopeAssignments[id];
+      save();
+    },
     setScopeItemsAiVisibility(ids,enabled){
       const hit=findTakeoff(book.activeTakeoff);if(!hit?.tk.scopeData)return;
       const selected=new Set(ids);
@@ -12268,7 +12095,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       openTakeoff(hit.tk.id);
       const sh = book.sheets.find(s => s.id === location.sheet);
       if (sh) { book.active = hit.tk.active = sh.id; state = sh; }
-      book.view = ['sheet','summary','scope','scopes','load','wage'].includes(location.view) ? location.view : 'sheet';
+      book.view = ['sheet','summary','scope','scopes','load','wage'].includes(location.view) ? location.view : 'summary';
       showView(); renderProjects(); save(); return true;
     },
     exportBook(){ return structuredClone(book); },
