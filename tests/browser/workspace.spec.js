@@ -590,6 +590,93 @@ test('Ctrl selection edits multiple fields and drags nonadjacent items together'
   expect(await page.evaluate(()=>window.estimator.exportBook().sheets[0].rows.map(r=>r.id))).toEqual(['b','d','a','c']);
 });
 
+test('Ctrl deselects immediately and keeps typing in the remaining selection', async ({page}) => {
+  const data=workbook();
+  data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0].rows=['a','b','c'].map(id=>({id,kind:'labor',name:id,count:1,time:1,days:1,cost:10}));
+  await openWorkbook(page,data);
+  const field=id=>page.locator('#body tr[data-id="'+id+'"] .name-in');
+  await field('a').click();
+  await field('b').click({modifiers:['Control']});
+  await field('c').click({modifiers:['Control']});
+  // Removing the focused cell must remove both selection and editing focus.
+  await field('c').click({modifiers:['Control']});
+  await expect(field('c')).not.toHaveClass(/multi-input/);
+  await expect(field('c')).not.toBeFocused();
+  await expect(page.locator('#body .multi-input')).toHaveCount(2);
+  await page.keyboard.insertText('Selected only');
+  for(const id of ['a','b']) await expect(field(id)).toHaveValue('Selected only');
+  await expect(field('c')).toHaveValue('c');
+  // Removing a different cell preserves the current selected editing field.
+  await field('b').click({modifiers:['Control']});
+  await expect(field('a')).toBeFocused();
+  await expect(field('b')).not.toHaveClass(/multi-input/);
+  await field('a').click({modifiers:['Control']});
+  await expect(page.locator('#body .multi-input')).toHaveCount(0);
+  await expect(field('a')).not.toBeFocused();
+  // Toggling the same cell on and off requires exactly one click each time.
+  await field('a').click({modifiers:['Control']});
+  await expect(field('a')).toHaveClass(/multi-input/);
+  await field('a').click({modifiers:['Control']});
+  await expect(page.locator('#body .multi-input')).toHaveCount(0);
+  await expect(field('a')).not.toBeFocused();
+});
+
+test('Shift selects a column range and Ctrl excludes individual cells from bulk edits', async ({page}) => {
+  const data=workbook();
+  data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0].rows=['a','b','c','d','e'].map(id=>({id,kind:'labor',name:id,count:1,time:1,days:1,cost:10}));
+  await openWorkbook(page,data);
+  const cost=id=>page.locator('#body tr[data-id="'+id+'"] input[aria-label="cost"]');
+  await cost('a').click();
+  await cost('e').click({modifiers:['Shift']});
+  await expect(page.locator('#body .multi-input')).toHaveCount(5);
+  await expect(page.locator('#body .multi-input:not([aria-label="cost"])')).toHaveCount(0);
+  // Repeated Shift-click contracts the range around the original anchor.
+  await cost('c').click({modifiers:['Shift']});
+  await expect(page.locator('#body .multi-input')).toHaveCount(3);
+  await cost('e').click({modifiers:['Shift']});
+  await cost('b').click({modifiers:['Control']});
+  await cost('d').click({modifiers:['Control']});
+  await expect(page.locator('#body .multi-input')).toHaveCount(3);
+  await cost('e').fill('45');
+  for(const id of ['a','c','e']) await expect(cost(id)).toHaveValue('45');
+  for(const id of ['b','d']) await expect(cost(id)).toHaveValue(/^10(?:\.00)?$/);
+  await cost('b').click({modifiers:['Control']});
+  await expect(page.locator('#body .multi-input')).toHaveCount(4);
+  await page.keyboard.press('Escape');
+  await cost('e').click();
+  await cost('a').click({modifiers:['Shift']});
+  await expect(page.locator('#body .multi-input')).toHaveCount(5);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#body .multi-input')).toHaveCount(0);
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();
+  for(const id of ['a','c','e']) await expect(cost(id)).toHaveValue(/^45(?:\.00)?$/);
+  for(const id of ['b','d']) await expect(cost(id)).toHaveValue(/^10(?:\.00)?$/);
+});
+
+test('Shift column ranges skip collapsed rows and cells without editable values', async ({page}) => {
+  const data=workbook();
+  const item=id=>({id,kind:'labor',name:id,count:1,time:1,days:1,cost:10});
+  data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0].rows=[
+    item('a'),{id:'section',type:'section',name:'Hidden section',collapsed:true},item('hidden'),
+    {id:'end',type:'sectionEnd'},{...item('blank'),kind:'none'},item('b'),item('c')
+  ];
+  await openWorkbook(page,data);
+  const cost=id=>page.locator('#body tr[data-id="'+id+'"] input[aria-label="cost"]');
+  await page.locator('#body tr[data-id="section"] .caret[aria-expanded="true"]').click();
+  await expect(cost('hidden')).not.toBeVisible();
+  await cost('a').click();
+  // A different column starts a fresh anchor instead of selecting a rectangle.
+  await page.locator('#body tr[data-id="c"] .name-in').click({modifiers:['Shift']});
+  await expect(page.locator('#body .multi-input')).toHaveCount(0);
+  await cost('a').click();
+  await cost('c').click({modifiers:['Shift']});
+  await expect(page.locator('#body .multi-input')).toHaveCount(3);
+  await cost('c').fill('25');
+  for(const id of ['a','b','c']) await expect(cost(id)).toHaveValue('25');
+  await expect(cost('hidden')).toHaveValue(/^10(?:\.00)?$/);
+});
+
 test('section deletion offers keeping items or deleting the complete nested section', async ({page}) => {
   const data=workbook();
   const sh=data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0];

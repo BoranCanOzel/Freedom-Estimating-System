@@ -6374,15 +6374,37 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   const selectedLineIds = new Set();
   const selectedInputs = new Set();
   let singleInputAnchor = null;
+  let rangeInputAnchor = null;
   let copyingSelectedInput = false;
   function clearMultiSelection(){
     singleInputAnchor = null;
+    rangeInputAnchor = null;
     selectedLineIds.clear(); selectedInputs.clear();
     document.querySelectorAll('.multi-row,.multi-input').forEach(el => el.classList.remove('multi-row','multi-input'));
   }
   body.addEventListener('pointerdown', event => {
     const row = event.target.closest('tr[data-type="item"]');
     const input = event.target.closest('input:not([type=checkbox]):not([type=file]),textarea');
+    if (event.shiftKey && row && input && !input.readOnly && !input.disabled){
+      const anchor = rangeInputAnchor;
+      const column = input.closest('td')?.cellIndex;
+      const fields = [...body.querySelectorAll('tr[data-type="item"] input,tr[data-type="item"] textarea')]
+        .filter(el => el.tagName === input.tagName && el.closest('td')?.cellIndex === column &&
+          !el.readOnly && !el.disabled && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden');
+      const start = fields.indexOf(anchor), end = fields.indexOf(input);
+      if (start >= 0 && end >= 0){
+        selectedLineIds.clear(); body.querySelectorAll('.multi-row').forEach(el => el.classList.remove('multi-row'));
+        if (!event.ctrlKey && !event.metaKey){
+          selectedInputs.clear(); body.querySelectorAll('.multi-input').forEach(el => el.classList.remove('multi-input'));
+        }
+        fields.slice(Math.min(start,end), Math.max(start,end) + 1).forEach(el => {
+          selectedInputs.add(el); el.classList.add('multi-input');
+        });
+        singleInputAnchor = null;
+        event.preventDefault(); event.stopPropagation(); input.focus(); input.select();
+        return;
+      }
+    }
     if (event.ctrlKey || event.metaKey){
       if (!row) return;
       if (input && !input.readOnly && !input.disabled){
@@ -6392,11 +6414,23 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
           singleInputAnchor.classList.add('multi-input');
         }
         singleInputAnchor = null;
-        if (selectedInputs.has(input)) selectedInputs.delete(input); else selectedInputs.add(input);
+        rangeInputAnchor = input;
+        const removing = selectedInputs.has(input);
+        if (removing) selectedInputs.delete(input); else selectedInputs.add(input);
         input.classList.toggle('multi-input',selectedInputs.has(input));
-        event.preventDefault(); event.stopPropagation(); input.focus(); input.select();
+        event.preventDefault(); event.stopPropagation();
+        if (removing){
+          // Do not leave the removed cell looking selected or receiving bulk typing.
+          if (input.selectionEnd !== null) input.setSelectionRange(input.selectionEnd, input.selectionEnd);
+          if (document.activeElement === input){
+            input.blur();
+            const next = [...selectedInputs].find(el => el.isConnected && !el.disabled && !el.readOnly && el.getClientRects().length);
+            if (next){ next.focus(); next.select(); }
+          }
+        } else { input.focus(); input.select(); }
       } else if (!event.target.closest('button:not(.grip),select,a')){
         singleInputAnchor = null;
+        rangeInputAnchor = null;
         selectedInputs.clear(); body.querySelectorAll('.multi-input').forEach(el => el.classList.remove('multi-input'));
         const id = row.dataset.id;
         if (selectedLineIds.has(id)) selectedLineIds.delete(id); else selectedLineIds.add(id);
@@ -6406,6 +6440,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     } else {
       if (!(input && selectedInputs.has(input)) && !selectedLineIds.has(row?.dataset.id)) clearMultiSelection();
       if (!selectedInputs.size && row && input && !input.readOnly && !input.disabled) singleInputAnchor = input;
+      if (row && input && !input.readOnly && !input.disabled) rangeInputAnchor = input;
     }
   }, true);
   body.addEventListener('keydown', event => {
