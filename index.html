@@ -202,7 +202,10 @@
 
   /* ---------- masthead ---------- */
   [hidden]{display:none!important}
-  .rail{display:flex;align-items:flex-end;gap:5px;margin-bottom:-1px;flex:none}
+  .rail{display:flex;align-items:flex-end;gap:5px;margin-bottom:-1px;flex:none;
+    min-width:0;max-width:100%;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;
+    scrollbar-color:var(--muted) var(--paper)}
+  .rail>*{flex-shrink:0;white-space:nowrap}
   .tab{
     font-family:var(--f-mono);font-weight:600;font-size:12px;
     background:var(--s1);color:var(--muted);
@@ -3269,7 +3272,8 @@
     if (!el) return;                 // placeholder cell for an emptied fee or unit group
     const z = !n;
     el.classList.toggle('zero', z);
-    el.querySelector('.v').textContent = z ? (dash || '—') : fmt.format(n);
+    const value = el.querySelector('.v'), text = z ? (dash || '—') : fmt.format(n);
+    if (value.textContent !== text) value.textContent = text;
   }
 
   /* ---------- render ---------- */
@@ -3325,8 +3329,12 @@
     el.style.height = el.scrollHeight + 'px';
   }
   function growAll(){
-    document.querySelectorAll('.item-note').forEach(grow);
-    grow(document.getElementById('title'));
+    // Batch geometry reads and writes instead of forcing layout for every note.
+    const fields = [...document.querySelectorAll('.item-note'), document.getElementById('title')]
+      .filter(el => el && el.offsetParent !== null);
+    fields.forEach(el => { el.style.height = 'auto'; });
+    const heights = fields.map(el => el.scrollHeight);
+    fields.forEach((el, i) => { el.style.height = heights[i] + 'px'; });
   }
 
   function openLightbox(url){
@@ -3677,8 +3685,11 @@
       kindMenu.appendChild(opt);
     });
 
+    let paintedKind, paintedDerivedKind;
     function paintKind(){
       const made = derivedKind(row);          // what a service or construct is built from
+      if (paintedKind === row.kind && paintedDerivedKind === made) return;
+      paintedKind = row.kind; paintedDerivedKind = made;
       kindBtn.innerHTML = iconSvg(row.kind, 'kind-ico');
       kindBtn.style.color = 'var(--' + (made || row.kind) + ')';
       kindTip.textContent = KINDS[row.kind] + (made ? ' \u00B7 ' + KINDS[made] : '');
@@ -3824,9 +3835,10 @@
   function applyCollapse(){
     const stack = [];
     const numbering = [];
+    const rows = new Map(state.rows.map(row => [row.id, row]));
     Array.from(body.children).forEach(tr => {
       if (tr.classList.contains('drag-source')) return;
-      const row = rowById(tr.dataset.id);
+      const row = rows.get(tr.dataset.id);
       const ending = tr.dataset.type === 'sectionEnd';
       const depth = Math.max(0, stack.length - (ending ? 1 : 0));
       tr.style.setProperty('--section-depth', depth);
@@ -4522,6 +4534,8 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   const lastCenter = el => { const r = el.getBoundingClientRect(); return r.left + r.width / 2; };
 
   function armTabDrag(e, sh, el){
+    // Touch gestures scroll the tab strip; a tap selects through the click handler.
+    if (e.pointerType === 'touch') return;
     if (e.button > 0) return;
     el = el.closest('.option-tab') || el;
     const startX = e.clientX;
@@ -5531,11 +5545,24 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
   // everything the rail rebuilds goes in front of the help button, which is furniture
   const railEnd = () => document.getElementById('helpBtn') || document.getElementById('status');
+  const tabRail = document.getElementById('rail');
+  tabRail.setAttribute('aria-label', 'Takeoff pages');
+  tabRail.addEventListener('wheel', event => {
+    if (event.ctrlKey || event.deltaX || tabRail.scrollWidth <= tabRail.clientWidth) return;
+    const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? tabRail.clientWidth : 1;
+    const before = tabRail.scrollLeft;
+    tabRail.scrollLeft += event.deltaY * scale;
+    if (tabRail.scrollLeft !== before) event.preventDefault();
+  }, {passive:false});
+  let tabRevealFrame;
 
   function renderTabs(){
     // Option numbers describe their current position, never their creation order.
     book.sheets.forEach((sh, i) => { sh.num = i + 1; });
     const rail = document.getElementById('rail');
+    const scrollLeft = rail.scrollLeft;
+    const previousSelected = rail.querySelector('[aria-selected="true"]');
+    const previousKey = previousSelected?.dataset.sheet || previousSelected?.textContent;
     rail.querySelectorAll('.option-tab').forEach(el => el.remove());
     Array.from(rail.querySelectorAll('.tab')).forEach(el => el.remove());
 
@@ -5581,9 +5608,15 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       tip.className = 'tab-tip';
       tip.setAttribute('aria-hidden', 'true');
       tip.textContent = scope || 'Option ' + sh.num + ' — no scope written yet';
+      t.title = tip.textContent;
       t.appendChild(tip);
 
       t.addEventListener('pointerdown', e => armTabDrag(e, sh, t));
+      t.addEventListener('click', e => {
+        if (e.pointerType !== 'touch') return;
+        book.view = 'sheet'; book.active = sh.id; state = sh;
+        showView(); save();
+      });
       const group = document.createElement('span');
       group.className = 'option-tab';
       const close = document.createElement('button');
@@ -5631,6 +5664,17 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       rail.insertBefore(b, railEnd());
     });
 
+    rail.scrollLeft = scrollLeft;
+    const selected = rail.querySelector('[aria-selected="true"]');
+    const selectedKey = selected?.dataset.sheet || selected?.textContent;
+    cancelAnimationFrame(tabRevealFrame);
+    if (selected && selectedKey !== previousKey) tabRevealFrame = requestAnimationFrame(() => {
+      const tab = (selected.closest('.option-tab') || selected).getBoundingClientRect();
+      const bounds = rail.getBoundingClientRect();
+      const zoom = bounds.width / rail.offsetWidth || 1;
+      if (tab.left < bounds.left) rail.scrollLeft += (tab.left - bounds.left) / zoom;
+      else if (tab.right > bounds.right) rail.scrollLeft += (tab.right - bounds.right) / zoom;
+    });
   }
 
   // a drawer handing over to another drawer skips the slide, so the edge never
@@ -6194,7 +6238,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     layout();
     body.innerHTML = '';
     refs.clear();
-    state.rows.forEach(r => body.appendChild(makeRow(r)));
+    body.replaceChildren(...state.rows.map(makeRow));
     renumber();
     applyCollapse();
     document.getElementById('title').value = state.title;
@@ -6205,7 +6249,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     renderSheetLoad();
     recalc();
     syncNotesButton();
-    growAll();
+    grow(document.getElementById('title'));
   }
 
   function recalc(persist = true){
@@ -6705,9 +6749,11 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
   /* ---------- storage ---------- */
   let timer;
+  let inputEvent;
+  document.addEventListener('input', event => { inputEvent = event; }, true);
   function save(){
     if (window.freedomSession) {
-      window.freedomSession.changed();
+      window.freedomSession.changed(!!inputEvent && inputEvent.eventPhase !== Event.NONE);
       return;
     }
     clearTimeout(timer);
@@ -6928,14 +6974,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     reader.readAsText(f);
   });
 
-  document.getElementById('add').addEventListener('click', () => {
-    const row = {id:id(), kind:'labor', name:'', note:'', count:1, time:1, days:1, cost:'', markup:0};
-    state.rows.push(row);
-    body.appendChild(makeRow(row));
-    renumber();
-    recalc();
-    refs.get(row.id).name.focus();
-  });
+  document.getElementById('add').addEventListener('click', () => addItemRow(null));
 
   // hovering the markup total swaps every percent in the column for its dollar value
   const mkTotalCell = document.getElementById('tMk').parentElement;
@@ -7675,7 +7714,8 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     {name:'Labor',icon:'<path d="M5 14v-3a7 7 0 0 1 14 0v3M9 5v6m6-6v6M3 14h18v4H3zM7 21h10"/>'},
     {name:'Disposal',icon:'<path d="M3 7h18M5 7l2 12h10l2-12M9 7V4h6v3M9 10l1 6m5-6-1 6M6 21h2m8 0h2"/>'},
     {name:'Blades',icon:'<path d="m12 2 2 3 4-1v4l4 2-3 3 1 4-4 1-2 4-3-3-4 1-1-4-4-2 3-3-1-4 4-1z"/><circle cx="12" cy="12" r="3"/>'},
-    {name:'Concrete Pour',icon:'<path d="m3 17 8-3 10 3-8 4zM6 8l5 2 5-5-5-3zM11 10l2 5m1-7 3 7M3 17v3l10 3 8-4v-2"/>'}
+    {name:'Concrete Pour',icon:'<path d="m3 17 8-3 10 3-8 4zM6 8l5 2 5-5-5-3zM11 10l2 5m1-7 3 7M3 17v3l10 3 8-4v-2"/>'},
+    {name:'Equipment',icon:'<path d="M3 17V9h7l3 8M6 9V5h5l3 7h4l3 5v3h-3M8 20h6M3 17h18"/><circle cx="5" cy="20" r="3"/><circle cx="16" cy="20" r="3"/>'}
   ];
   function renderMainLibraryFolders(entries){
     const dock=document.getElementById('libMainFolders');dock.replaceChildren();
@@ -10220,8 +10260,14 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
   function addItemRow(at){
     const row = {id:id(), kind:'labor', name:'', note:'', count:1, time:1, days:1, cost:'', markup:0};
+    clearMultiSelection();
+    clearSheetDropPreview(false);
     if (at == null) state.rows.push(row); else state.rows.splice(at, 0, row);
-    renderAll();
+    const next = state.rows[state.rows.indexOf(row) + 1];
+    body.insertBefore(makeRow(row), next ? refs.get(next.id)?.tr || null : null);
+    renumber();
+    applyCollapse();
+    recalc();
     const ref = refs.get(row.id);
     if (ref && ref.name) ref.name.focus();
     return row;

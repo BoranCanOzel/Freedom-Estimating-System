@@ -193,17 +193,32 @@ class LiveProject {
     this.socket.onerror = () => {};
   }
   sendUpdate(update) { this.socket.send(JSON.stringify({ type: 'update', update: encode(update), seq: this.seq })); }
+  scheduleChanges() {
+    if (!this.ready || this.closed || this.applying) return;
+    this.pendingChanges = true;
+    clearTimeout(this.changeTimer);
+    this.changeTimer = setTimeout(() => this.flushChanges(), 180);
+    this.changeDeadline ||= setTimeout(() => this.flushChanges(), 800);
+    this.paintStatus();
+  }
+  flushChanges() {
+    if (this.pendingChanges) this.changed();
+  }
   changed() {
+    clearTimeout(this.changeTimer); clearTimeout(this.changeDeadline);
+    this.changeDeadline = null; this.pendingChanges = false;
     if (!this.ready || this.closed || this.applying) return;
     const next = bridge.getShared();
     const sequence = this.seq;
     if (JSON.stringify(this.baseline) !== JSON.stringify(next)) writeBook(this.doc, this.baseline, next);
-    this.baseline = clone(next);
+    // getShared returns a detached snapshot; cloning it again doubles the work.
+    this.baseline = next;
     this.historyLocation = clone(bridge.getLocation());
     const latest = this.history.undoStack.at(-1);
     if (latest && this.seq !== sequence) latest.meta.set('after', this.historyLocation);
     document.dispatchEvent(new Event('estimator:history'));
     this.sendPresence();
+    this.paintStatus();
   }
   travelHistory(redo = false) {
     if (!this.ready || this.closed) return;
@@ -229,7 +244,7 @@ class LiveProject {
   }
   paintStatus() {
     if (this.failed || this.cacheFailed) return;
-    status(!this.synced ? 'Offline · reconnecting · edits kept on this device' : this.acked < this.seq ? 'Saving…' : 'All changes saved');
+    status(!this.synced ? 'Offline · reconnecting · edits kept on this device' : this.pendingChanges || this.acked < this.seq ? 'Saving…' : 'All changes saved');
   }
   sendPresence(pointer) {
     if (this.ready) {
@@ -615,9 +630,10 @@ for (const id of ['saveFile', 'saveFile2']) {
   $(id).addEventListener('click', event => { event.stopImmediatePropagation(); $('server-export').click(); }, true);
 }
 $('server-signout').onclick = () => run(async () => { await closeProject(); await api('/logout', { method: 'POST' }); location.reload(); });
-window.freedomSession = { changed: () => connection?.changed(), notify: text => message(text) };
+window.freedomSession = { changed: defer => defer ? connection?.scheduleChanges() : connection?.changed(), notify: text => message(text) };
 setupHistory(bridge, () => connection);
-window.addEventListener('beforeunload', event => { if (connection && connection.seq > connection.acked) { event.preventDefault(); event.returnValue = ''; } });
+window.addEventListener('beforeunload', event => { connection?.flushChanges(); if (connection && connection.seq > connection.acked) { event.preventDefault(); event.returnValue = ''; } });
+window.addEventListener('pagehide', () => connection?.flushChanges());
 let lastPointer = 0;
 document.addEventListener('pointermove', event => {
   if (!connection?.ready || Date.now() - lastPointer < 60) return;
@@ -632,7 +648,7 @@ document.addEventListener('pointerleave', () => connection?.sendPresence({ visib
 document.addEventListener('focusin', () => connection?.sendPresence());
 document.addEventListener('scroll', () => connection?.paintPeers(), {capture:true, passive:true});
 window.addEventListener('resize', () => connection?.paintPeers());
-document.addEventListener('visibilitychange', () => { if (document.hidden) connection?.sendPresence({ visible: false }); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { connection?.flushChanges(); connection?.sendPresence({ visible: false }); } });
 async function signedIn(name) {
   user = name; $('server-signout').textContent = name + ' · Sign out';
   let preferences = {cursor:'classic',lastWorkbook:null};

@@ -915,6 +915,105 @@ test('option tabs still reorder with separate close buttons', async ({page}) => 
   await expect(labels).toHaveText(['1 - Concrete cutting and r…','2 - Second']);
 });
 
+test('many option tabs scroll within the window and keep the selected page visible', async ({page}) => {
+  const data=workbook(), tk=data.lists[0].companies[0].projects[0].takeoffs[0];
+  tk.sheets=Array.from({length:24},(_,i)=>sheet('option-'+i,'Scope for option '+(i+1)));
+  await openWorkbook(page,data);
+  const rail=page.locator('#rail');
+  const size=await rail.evaluate(el=>({width:el.clientWidth,content:el.scrollWidth,right:el.getBoundingClientRect().right,viewport:innerWidth}));
+  expect(size.content).toBeGreaterThan(size.width);
+  expect(size.right).toBeLessThanOrEqual(size.viewport);
+  await rail.hover();
+  await page.mouse.wheel(0,600);
+  await expect.poll(()=>rail.evaluate(el=>el.scrollLeft)).toBeGreaterThan(0);
+  const before=await rail.evaluate(el=>el.scrollLeft);
+  await page.locator('#title').fill('Renamed first page');
+  expect(await rail.evaluate(el=>el.scrollLeft)).toBeCloseTo(before,0);
+  await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'tn',sheet:'option-23',view:'sheet'}));
+  const selected=rail.locator('[data-sheet="option-23"]');
+  await expect(selected).toBeInViewport();
+  await expect(selected).toHaveAttribute('aria-selected','true');
+  await rail.locator('.tab-add').click();
+  await expect(rail.locator('.option-tab')).toHaveCount(25);
+  await expect(rail.locator('[aria-selected="true"]')).toBeInViewport();
+  await page.setViewportSize({width:800,height:900});
+  expect(await rail.evaluate(el=>el.getBoundingClientRect().right <= innerWidth)).toBe(true);
+  await rail.evaluate(el=>{el.scrollLeft=0;});
+  await rail.locator('.tab-summary').click();
+  await expect(page.locator('#summaryCard')).toBeVisible();
+});
+
+test('large takeoffs batch typing saves and add items without rebuilding existing rows', async ({page}) => {
+  const data=workbook(), sh=data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0];
+  sh.rows=Array.from({length:180},(_,i)=>({...sh.rows[0],id:'large-'+i,name:'Line '+i}));
+  await openWorkbook(page,data);
+  const field=page.locator('#body input[aria-label="Item name"]').first();
+  await field.focus();
+  await field.press('End');
+  await page.evaluate(()=>{
+    const original=window.estimator.getShared;
+    window.snapshotReads=0;
+    window.estimator.getShared=function(...args){window.snapshotReads++;return original.apply(this,args);};
+    window.retainedRow=document.querySelector('#body tr');
+  });
+  const suffix=' responsive typing';
+  await field.pressSequentially(suffix,{delay:10});
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  expect(await page.evaluate(()=>window.snapshotReads)).toBeLessThan(suffix.length/2);
+  await expect(field).toHaveValue('Line 0'+suffix);
+  await page.evaluate(()=>{window.retainedIcon=document.querySelector('#body .kind-btn svg');});
+  await page.locator('#body input[aria-label="cost"]').first().fill('200');
+  await expect(page.locator('#tGrand .v')).toHaveText('23,252.25');
+  expect(await page.evaluate(()=>window.retainedIcon===document.querySelector('#body .kind-btn svg'))).toBe(true);
+  await page.locator('#add').click();
+  await expect(page.locator('#body tr[data-type="item"]')).toHaveCount(181);
+  expect(await page.evaluate(()=>window.retainedRow===document.querySelector('#body tr'))).toBe(true);
+  await expect(page.locator('#body input[aria-label="Item name"]').last()).toBeFocused();
+  await page.keyboard.press('Control+z');
+  await expect(page.locator('#body tr[data-type="item"]')).toHaveCount(180);
+  await expect(field).toHaveValue('Line 0'+suffix);
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();
+  await expect(field).toHaveValue('Line 0'+suffix);
+  await expect(page.locator('#body tr[data-type="item"]')).toHaveCount(180);
+});
+
+test('pending takeoff typing survives remote edits and an offline reconnect', async ({page,browser,baseURL}) => {
+  await openWorkbook(page);
+  const context=await browser.newContext({baseURL});
+  try {
+    const peer=await context.newPage();
+    await peer.goto('/');
+    await peer.locator('#server-login-name').fill('Typing peer '+Date.now());
+    await peer.locator('#server-login-password').fill('1313');
+    await peer.locator('#server-login-form button').click();
+    await expect(peer.locator('#server-login')).not.toBeVisible();
+    const name=await page.locator('#server-title').textContent();
+    await peer.locator('#server-list .server-project').filter({hasText:name}).click();
+    await expect(peer.locator('#title')).toHaveValue('North scope');
+    const selector='#body input[aria-label="Item name"]';
+    await page.locator(selector).first().fill('Pending local name');
+    await peer.locator('#title').fill('Remote scope');
+    await expect(page.locator('#title')).toHaveValue('Remote scope');
+    await expect(peer.locator(selector).first()).toHaveValue('Pending local name');
+    await page.context().setOffline(true);
+    await page.evaluate(()=>{
+      const original=window.estimator.getShared;
+      window.offlineSnapshots=0;
+      window.estimator.getShared=function(...args){window.offlineSnapshots++;return original.apply(this,args);};
+    });
+    await page.locator(selector).first().fill('Offline typed name');
+    await expect.poll(()=>page.evaluate(()=>window.offlineSnapshots)).toBeGreaterThan(0);
+    await peer.locator('#title').fill('Scope edited during outage');
+    await page.context().setOffline(false);
+    await expect(peer.locator(selector).first()).toHaveValue('Offline typed name',{timeout:20000});
+    await expect(page.locator('#server-status')).toHaveText('All changes saved');
+    await page.reload();
+    await expect(page.locator(selector).first()).toHaveValue('Offline typed name');
+    await expect(page.locator('#title')).toHaveValue('Scope edited during outage');
+  } finally { await context.close(); }
+});
+
 test('Ctrl+Z and Ctrl+Y undo workbook edits, additions, deletions and editor drafts', async ({page}) => {
   const errors=[]; page.on('pageerror',e=>errors.push(e.message));
   await openWorkbook(page);
@@ -2304,15 +2403,15 @@ test('main library icon folders accept dragged items and allow moving them back 
   await openWorkbook(page,data);await page.locator('#libToggle').click();
   await page.locator('#library').evaluate(el=>Promise.all(el.getAnimations().map(animation=>animation.finished)));
   const dock=page.locator('#libMainFolders');
-  await expect(dock.getByRole('button')).toHaveCount(4);
-  for(const name of ['Labor','Disposal','Blades','Concrete Pour'])await expect(dock.getByRole('button',{name:name+' folder',exact:true})).toBeVisible();
+  await expect(dock.getByRole('button')).toHaveCount(5);
+  for(const name of ['Labor','Disposal','Blades','Concrete Pour','Equipment'])await expect(dock.getByRole('button',{name:name+' folder',exact:true})).toBeVisible();
   const drag=async(target)=>{
     const source=await page.locator('#libAll .tpl-name').filter({hasText:'Test crew'}).boundingBox(),dest=await target.boundingBox();
     await page.mouse.move(source.x+source.width/2,source.y+source.height/2);await page.mouse.down();
     await page.mouse.move(dest.x+dest.width/2,dest.y+dest.height/2,{steps:16});await page.mouse.up();
   };
   const folder=()=>page.evaluate(()=>window.estimator.exportBook().templates.items.find(t=>t.id==='crew').folder||'');
-  for(const name of ['Labor','Disposal','Blades','Concrete Pour']){
+  for(const name of ['Labor','Disposal','Blades','Concrete Pour','Equipment']){
     await drag(dock.getByRole('button',{name:name+' folder',exact:true}));
     await expect.poll(folder).toBe(name);
     await dock.getByRole('button',{name:name+' folder',exact:true}).click();
@@ -2325,7 +2424,7 @@ test('main library icon folders accept dragged items and allow moving them back 
   await expect(page.locator('#libAll .tpl-name').filter({hasText:'Test crew'})).toBeVisible();
   await expect(page.locator('#server-status')).toHaveText('All changes saved');
   await page.reload();await page.locator('#libToggle').click();
-  await expect(page.locator('#libMainFolders button')).toHaveCount(4);
+  await expect(page.locator('#libMainFolders button')).toHaveCount(5);
   await expect.poll(folder).toBe('');
 });
 

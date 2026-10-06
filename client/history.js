@@ -19,7 +19,7 @@ export function setupHistory(bridge, connection) {
   }
   function before(event) {
     flush();
-    if (event.type !== 'beforeinput') { connection()?.history.stopCapturing(); lastInput=null; }
+    if (event.type !== 'beforeinput') { connection()?.flushChanges(); connection()?.history.stopCapturing(); lastInput=null; }
     syncDraft();
   }
   function after(event) {
