@@ -1,4 +1,11 @@
 const positive = value => (typeof value === 'number' || typeof value === 'string') && String(value).trim() !== '' && Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : 0;
+const costHeading = name => /^(?:\d+[.)\s-]*)?(?:labor|labour|crew|equipment|materials?|parts?|services?|construction|costs?|breakdown)$/i.test(String(name||'').trim());
+function workName(source,stack,sheet){
+  const own=String(source.name||'').trim();
+  if(own&&!costHeading(own))return own;
+  const parent=[...stack].reverse().find(row=>row.id!==source.id&&String(row.name||'').trim()&&!costHeading(row.name));
+  return parent?.name||sheet.title||own||'Unnamed work';
+}
 export const timelineSchema = {
   type:'object', additionalProperties:false, description:'Planning settings only; never changes estimating quantities or prices. Read read_timeline for generated task IDs and assumptions.',
   properties:{
@@ -26,7 +33,7 @@ export function timelineSources(takeoff){
       if(row.kind==='none'||(!String(row.name||'').trim()&&!positive(row.cost)))continue;
       const source=stack.at(-1)||row;
       if(!groups.has(source.id)){
-        const task={id:source.id,sheetId:sheet.id,section:!!stack.length,name:source.name||'Unnamed work',path:stack.map(s=>s.name||'Unnamed section').join(' / '),page:sheet.title||'Untitled page',color:sheet.color||'',laborHours:0,baseDuration:0,baseCrew:0,sourceRowIds:[],issues:[]};
+        const task={id:source.id,sheetId:sheet.id,section:!!stack.length,name:workName(source,stack,sheet),sourceName:source.name||'Unnamed work',path:stack.map(s=>s.name||'Unnamed section').join(' / '),page:sheet.title||'Untitled page',color:sheet.color||'',laborHours:0,baseDuration:0,baseCrew:0,sourceRowIds:[],issues:[]};
         groups.set(source.id,task);tasks.push(task);
       }
       const task=groups.get(source.id);task.sourceRowIds.push(row.id);

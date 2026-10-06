@@ -2826,7 +2826,7 @@ test('Timeline derives 8-hour days, saves adjustments, supports AI and opens sou
   await expect(page.locator('#timeline-stats')).toContainText('2026-10-14');
   await page.getByRole('spinbutton',{name:'People for Interior demolition',exact:true}).fill('4');
   await page.getByRole('spinbutton',{name:'People for Interior demolition',exact:true}).blur();
-  await expect(page.locator('[data-timeline-task="demo"] .timeline-bar')).toHaveText('8h');
+  await expect(page.locator('[data-timeline-task="demo"] .timeline-bar')).toContainText('8h');
   await page.locator('#timeline-mode').selectOption('parallel-pages');
   await expect(page.locator('#timeline-stats')).toContainText('7 people');
   await expect(page.locator('#timeline-stats')).toContainText('1.5 workdays');
@@ -2847,15 +2847,15 @@ test('Timeline derives 8-hour days, saves adjustments, supports AI and opens sou
   read.takeoff.timeline.tasks.push({id:'sub',startHour:16,durationHours:8,crew:2});
   expect((await page.request.post('/api/ai/v1/save',{headers,data:{revision:read.revision,takeoff:read.takeoff,requestId:'timeline-plan'}})).ok()).toBe(true);
   await expect(page.getByRole('spinbutton',{name:'Start day for Trench preparation',exact:true})).toHaveValue('3');
-  await expect(page.locator('[data-timeline-task="sub"] .timeline-bar')).toHaveText('8h');
+  await expect(page.locator('[data-timeline-task="sub"] .timeline-bar')).toContainText('8h');
   await page.locator('[data-timeline-task="sub"] button').click();
   await expect(page.locator('#sheetCard')).toBeVisible();
   await expect(page.locator('#body tr[data-id="sub"]')).toBeInViewport();
   await page.locator('#rail .tab-timeline').click();
   await page.getByRole('button',{name:'Reset Trench preparation',exact:true}).click();
-  await expect(page.locator('[data-timeline-task="sub"] .timeline-bar')).toHaveText('4h');
+  await expect(page.locator('[data-timeline-task="sub"] .timeline-bar')).toContainText('4h');
   await page.getByRole('checkbox',{name:'Include Concrete finish',exact:true}).uncheck();
-  await expect(page.locator('[data-timeline-task="finish"]')).toContainText('Excluded');
+  await expect(page.locator('[data-timeline-edit="finish"]')).toContainText('Excluded');
   await expect(page.locator('#timeline-stats')).toContainText('4 people');
 });
 
@@ -2871,9 +2871,9 @@ test('Timeline leaves unknown durations for review and makes long schedules navi
   await page.getByRole('spinbutton',{name:'Duration hours for Mobilization',exact:true}).blur();
   await expect(page.locator('.timeline-bar')).toHaveCount(2);
   await page.locator('#timeline-next').click();
-  await expect(page.locator('#timeline-window')).toContainText('15');
-  await expect(page.locator('[data-timeline-task="mobilize"]')).toContainText('Before this window');
-  await expect(page.locator('[data-timeline-task="row-sn"] .timeline-bar')).toHaveText('160h');
+  await expect(page.locator('#timeline-window')).toContainText('8');
+  await expect(page.locator('[data-timeline-task="mobilize"]')).toHaveCount(0);
+  await expect(page.locator('[data-timeline-task="row-sn"] .timeline-bar')).toContainText('160h');
   await page.locator('#timeline-hours').fill('0');await page.locator('#timeline-hours').blur();
   await expect(page.locator('#timeline-error')).toContainText('1 to 24');
   expect(await page.evaluate(()=>window.estimator.getTimelineTakeoff().timeline.hoursPerDay)).toBeUndefined();
@@ -2882,4 +2882,40 @@ test('Timeline leaves unknown durations for review and makes long schedules navi
   await expect(page.locator('#timelineCard')).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   await page.screenshot({path:'.tools/timeline-phone.png'});
+});
+
+test('Timeline groups repeated Labor subsections into readable scope lanes without changing saved work',async({page})=>{
+  const data=workbook(),tk=data.lists[0].companies[0].projects[0].takeoffs[0];
+  const names=['Remove existing light fixtures','Remove partition walls','Remove suspended ceiling','Saw cut slab','Remove plumbing fixtures','Remove existing flooring','Load out demolition debris','Clean and prepare work area'];
+  tk.sheets[0].title='A001 - Interior Demolition';tk.sheets[0].color='rust';tk.sheets[0].rows=[];
+  names.forEach((name,i)=>tk.sheets[0].rows.push(
+    {id:'work-'+i,type:'section',name},
+    {id:'labor-'+i,type:'section',name:'Labor'},
+    {id:'crew-'+i,kind:'labor',name:'Labor',count:i===7?1:3,time:i===7?1:8,days:1,cost:100},
+    {id:'labor-end-'+i,type:'sectionEnd',sid:'labor-'+i},{id:'work-end-'+i,type:'sectionEnd',sid:'work-'+i}
+  ));
+  const starts=[32,24,56,48,28,16,40,24];
+  tk.timeline={hoursPerDay:8,tasks:starts.map((startHour,i)=>({id:'labor-'+i,startHour}))};
+  await openWorkbook(page,data);await page.locator('#rail .tab-timeline').click();
+  const before=await page.evaluate(()=>JSON.stringify(window.estimator.getTimelineTakeoff()));
+  await expect(page.locator('[data-timeline-scope]')).toHaveCount(1);
+  await expect(page.locator('.timeline-scope-row>.timeline-label strong')).toHaveText('A001 - Interior Demolition');
+  await expect(page.locator('.timeline-work-key strong')).toHaveText([names[5],names[7],names[1],names[4],names[0],names[6],names[3]]);
+  await expect(page.locator('[data-timeline-key="labor-7"]')).toContainText('1 person');
+  await expect(page.locator('[data-timeline-task="labor-7"] .timeline-bar')).toHaveText('2');
+  expect(await page.locator('#timeline-chart').evaluate(el=>el.scrollHeight<=el.clientHeight+1)).toBe(true);
+  for(const theme of ['light','dark','medieval']){
+    await page.evaluate(theme=>window.estimator.setTheme(theme),theme);
+    await page.locator('#timelineCard>.scroll').evaluate(el=>{el.scrollTop=240;});
+    await page.screenshot({path:'.tools/timeline-scope-lanes-'+theme+'.png'});
+  }
+  await page.locator('#timeline-scale').selectOption('14');
+  await expect(page.locator('.timeline-work-key strong')).toHaveCount(8);
+  await page.locator('#timeline-scale').selectOption('1');
+  await expect(page.locator('#timeline-chart')).toContainText('No scheduled work in these days');
+  await page.locator('#timeline-next').click();await page.locator('#timeline-next').click();
+  await expect(page.locator('[data-timeline-key="labor-5"]')).toContainText(names[5]);
+  expect(await page.evaluate(()=>JSON.stringify(window.estimator.getTimelineTakeoff()))).toBe(before);
+  await page.locator('[data-timeline-key="labor-5"]').click();
+  await expect(page.locator('#body tr[data-id="labor-5"]')).toBeInViewport();
 });

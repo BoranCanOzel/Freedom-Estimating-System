@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {deriveTimeline,validateTimeline,workDate,timelinePeakCrew} from '../shared/timeline.js';
+import {scopeLanes} from '../client/timeline-chart.js';
 const labor=(id,count=2,time=8,days=2)=>({id,kind:'labor',name:id,count,time,days,cost:100});
 const section=id=>({id,type:'section',name:id});
 const end=id=>({id:id+'-end',type:'sectionEnd',sid:id});
@@ -46,4 +47,28 @@ test('invalid schedule settings, duplicate task IDs and invalid overrides are re
 test('empty estimates do not create fake work or dates',()=>{
   const result=deriveTimeline({sheets:[{id:'a',rows:[{...labor('blank'),name:'',cost:''}]}]});
   assert.equal(result.tasks.length,0);assert.equal(result.days,0);assert.equal(result.finishDate,'');
+});
+
+test('generic Labor subsections use the actual work name and retain source IDs and overrides',()=>{
+  const source={sheets:[{id:'demo',title:'A001 - Interior Demolition',rows:[
+    {id:'fixture',type:'section',name:'Remove existing light'},
+    {id:'labor-section',type:'section',name:'Labor'},labor('electrician'),end('labor-section'),end('fixture'),
+    {id:'wall',type:'section',name:'Remove partition'},
+    {id:'wall-labor',type:'section',name:'Labor'},labor('demolition'),end('wall-labor'),end('wall')
+  ]}],timeline:{tasks:[{id:'labor-section',startHour:32},{id:'wall-labor',startHour:8}]}};
+  const before=structuredClone(source),result=deriveTimeline(source);
+  assert.deepEqual(result.tasks.map(t=>t.name),['Remove existing light','Remove partition']);
+  assert.equal(result.tasks[0].id,'labor-section');assert.equal(result.tasks[0].sourceName,'Labor');
+  assert.equal(result.tasks[0].path,'Remove existing light / Labor');assert.equal(result.tasks[0].startHour,32);
+  assert.equal(result.tasks[1].startHour,8);assert.deepEqual(source,before);
+});
+
+test('scope lanes show work chronologically, pack adjacent tasks and separate overlaps without moving work',()=>{
+  const source=takeoff();source.timeline={tasks:[{id:'parent',startHour:8,durationHours:8},{id:'child',startHour:0,durationHours:12},{id:'pour',startHour:24}]};
+  const draft=deriveTimeline(source),before=structuredClone(draft),groups=scopeLanes(draft.tasks,0,24);
+  assert.equal(groups.length,1);assert.equal(groups[0].id,'a');assert.equal(groups[0].lanes,2);
+  assert.deepEqual(groups[0].tasks.map(t=>[t.id,t.lane]),[['child',0],['parent',1]]);
+  assert.deepEqual(draft,before);
+  assert.equal(scopeLanes(draft.tasks,24,32)[0].id,'b');
+  const adjacent=deriveTimeline(takeoff());assert.equal(scopeLanes(adjacent.tasks,0,24)[0].lanes,1);
 });
