@@ -108,7 +108,7 @@ export function setupWorkspace() {
   detailCopy.textContent = $('toggleNotes').textContent; detailCopy.hidden = $('toggleNotes').hidden;
   detailCopy.onclick = () => $('toggleNotes').click();
   document.querySelector('#sheetCard .eyebrow-row').append(detailCopy);
-  move('sumSections', 'workspace-summary'); move('sumDetail', 'workspace-summary');
+  move('sumSections', 'workspace-summary'); move('sumSubsections', 'workspace-summary'); move('sumDetail', 'workspace-summary');
   move('loadFoldAll', 'workspace-load'); move('sheetLoadBtn', 'workspace-load-toggle');
   move('hiddenCols', 'workspace-columns');
   const pageActions = document.createElement('div');

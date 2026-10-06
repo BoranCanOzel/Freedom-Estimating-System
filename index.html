@@ -2888,7 +2888,8 @@
       <section id="sumCostBreakdown" aria-label="Cost breakdown"></section>
     </div>
     <div class="bar">
-      <button class="btn alt" id="sumSections">Expand sections</button>
+      <button class="btn alt" id="sumSections">Expand all sections</button>
+      <button class="btn alt" id="sumSubsections">Collapse all subsections</button>
       <button class="btn alt" id="sumDetail">Show detail</button>
       <span class="legend">Click an option to open its breakdown</span>
       <button class="btn ghost js-export">Excel</button>
@@ -5902,6 +5903,14 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       (slices?'<svg class="cost-pie" viewBox="0 0 200 200" role="img" aria-label="Cost distribution by category"><title>Cost distribution by category; amounts and percentages listed above</title>'+slices+'</svg>':'<p>'+(negative?'Pie chart unavailable when categories include credits. Signed amounts are shown above.':'Add priced items to see the cost distribution.')+'</p>');
   }
 
+  function summarySubsectionKeys(){
+    return book.sheets.flatMap(sh => {
+      const sections = sheetSections(sh);
+      return sections.filter((section, i) => sections[i + 1]?.depth > section.depth)
+        .map(section => JSON.stringify([sh.id, section.row.id]));
+    });
+  }
+
   function renderSummary(){
     renderCostBreakdown();
     const t = document.getElementById('sumTable');
@@ -6051,7 +6060,12 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     dBtn.textContent = detail ? 'Hide detail' : 'Show detail';
     const anyOpen = book.sheets.some(sh => book.sumOpen[sh.id]);
     const sBtn = document.getElementById('sumSections');
-    sBtn.textContent = anyOpen ? 'Collapse sections' : 'Expand sections';
+    sBtn.textContent = anyOpen ? 'Collapse all sections' : 'Expand all sections';
+    const subsectionKeys = summarySubsectionKeys();
+    const subBtn = document.getElementById('sumSubsections');
+    subBtn.disabled = !subsectionKeys.length;
+    subBtn.textContent = subsectionKeys.some(key => !book.sumSectionClosed[key])
+      ? 'Collapse all subsections' : 'Expand all subsections';
   }
 
   function esc(str){
@@ -6985,7 +6999,15 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     book.sumOpen = book.sumOpen || {};
     const anyOpen = book.sheets.some(sh => book.sumOpen[sh.id]);
     book.sheets.forEach(sh => { book.sumOpen[sh.id] = !anyOpen; });
-    if (!anyOpen) book.sumSectionClosed = {};
+    renderSummary();
+    save();
+  });
+
+  document.getElementById('sumSubsections').addEventListener('click', () => {
+    book.sumSectionClosed = book.sumSectionClosed || {};
+    const keys = summarySubsectionKeys();
+    const collapse = keys.some(key => !book.sumSectionClosed[key]);
+    keys.forEach(key => { if (collapse) book.sumSectionClosed[key] = true; else delete book.sumSectionClosed[key]; });
     renderSummary();
     save();
   });

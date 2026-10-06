@@ -2259,7 +2259,10 @@ test('summary sections collapse descendants independently and preserve totals an
   await toggle('child').click();await expect(row('grandchild')).toBeVisible();
   await toggle('parent').click();
   await page.locator('#workspace-view > summary').click();await page.locator('#sumSections').click();
-  await page.locator('#sumSections').click();await page.locator('#workspace-view > summary').press('Escape');
+  await page.locator('#sumSections').click();
+  await expect(row('grandchild')).toHaveCount(0);
+  await page.locator('#sumSubsections').click();await page.locator('#sumSubsections').click();
+  await page.locator('#workspace-view > summary').press('Escape');
   await expect(row('grandchild')).toBeVisible();
   const saved=await page.evaluate(()=>window.estimator.getShared());
   expect(saved.lists[0].companies[0].projects[0].takeoffs[0].sheets[0].rows).toEqual(originalRows);
@@ -2649,4 +2652,40 @@ test('AI saves section and subsection UP quantities and labels with live calcula
   await expect(section('child').locator('.sec-unit').locator('..').locator('.v')).toHaveText('0.30');
   await expect(section('parent').getByLabel('Section unit label')).toHaveValue('LF');
   await expect(page.locator('#tGrand .v')).toHaveText('300.00');
+});
+
+
+test('summary bulk section and subsection controls stay independent across pages',async({page})=>{
+  const data=workbook(),tk=data.lists[0].companies[0].projects[0].takeoffs[0];
+  tk.sheets=['a','b'].map(id=>({...sheet(id,id),rows:[
+    {id:id+'-parent',type:'section',name:'Parent '+id},
+    {id:id+'-child',type:'section',name:'Child '+id},
+    {id:id+'-nested',type:'section',name:'Nested '+id},
+    ...sheet(id,id).rows,
+    {id:id+'-nested-end',type:'sectionEnd',sid:id+'-nested'},
+    {id:id+'-child-end',type:'sectionEnd',sid:id+'-child'},
+    {id:id+'-parent-end',type:'sectionEnd',sid:id+'-parent'}
+  ]}));
+  await openWorkbook(page,data);
+  await page.locator('#rail .tab-summary').click();
+  const rows=page.locator('#sumTable .s-sec'),nested=page.locator('#sumTable .s-nested');
+  const sections=page.locator('#sumSections'),subsections=page.locator('#sumSubsections');
+  const total=await page.locator('#sumTable tfoot').innerText();
+  await page.locator('#workspace-view > summary').click();
+  await expect(sections).toHaveText('Expand all sections');
+  await sections.click();await expect(rows).toHaveCount(6);
+  await subsections.click();await expect(subsections).toHaveText('Expand all subsections');
+  await expect(rows).toHaveCount(2);await expect(nested).toHaveCount(0);
+  await sections.click();await expect(rows).toHaveCount(0);
+  await sections.click();await expect(rows).toHaveCount(2);
+  await subsections.click();await expect(rows).toHaveCount(6);
+  // The subsection control does not reopen closed pages.
+  await sections.click();await subsections.click();await subsections.click();
+  await expect(rows).toHaveCount(0);
+  await sections.click();await expect(rows).toHaveCount(6);
+  expect(await page.locator('#sumTable tfoot').innerText()).toBe(total);
+  await page.locator('#workspace-view > summary').press('Escape');
+  await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'ts',view:'summary'}));
+  await page.locator('#workspace-view > summary').click();
+  await expect(subsections).toBeDisabled();
 });
