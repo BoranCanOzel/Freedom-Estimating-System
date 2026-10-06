@@ -3054,7 +3054,7 @@
   // are made of them. Hybrid is what a service or construct reads as when its
   // contents span more than one main type, so it is derived, never picked.
   const MAIN_KINDS = ['labor','equip','material'];
-  const PICK_KINDS = Object.keys(KINDS).filter(k => k !== 'hybrid');
+  const PICK_KINDS = ['none', ...MAIN_KINDS];
 
   function mainKindsIn(list, into){
     (list || []).forEach(p => {
