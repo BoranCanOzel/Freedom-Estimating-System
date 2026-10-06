@@ -2877,7 +2877,8 @@ test('Timeline renders explicit 8-hour plans, saves adjustments, supports AI and
   expect((await page.request.post('/api/ai/v1/save',{headers,data:{revision:read.revision,takeoff:read.takeoff,requestId:'timeline-plan'}})).ok()).toBe(true);
   await expect(page.getByRole('spinbutton',{name:'Start day for Trench preparation',exact:true})).toHaveValue('3');
   await expect(page.locator('[data-timeline-task="sub"] .timeline-bar')).toContainText('8h');
-  await page.locator('[data-timeline-task="sub"] button').click();
+  await page.locator('#timeline-expand').click();
+  await page.locator('[data-timeline-task="sub"] .timeline-label').click();
   await expect(page.locator('#sheetCard')).toBeVisible();
   await expect(page.locator('#body tr[data-id="sub"]')).toBeInViewport();
   await page.locator('#rail .tab-timeline').click();
@@ -2900,9 +2901,14 @@ test('Timeline leaves unknown durations for review and makes long schedules navi
   await page.getByRole('spinbutton',{name:'Duration hours for Mobilization',exact:true}).fill('8');
   await page.getByRole('spinbutton',{name:'Duration hours for Mobilization',exact:true}).blur();
   await expect(page.locator('.timeline-bar')).toHaveCount(2);
+  await expect(page.locator('#timeline-scale')).toHaveValue('0');
+  await expect(page.locator('#timeline-window')).toContainText('21');
+  await expect(page.locator('#timeline-next')).toBeDisabled();
+  await expect(page.locator('.timeline-grid-head .timeline-days>div')).toHaveCount(11);
+  await page.locator('#timeline-scale').selectOption('7');
   await page.locator('#timeline-next').click();
   await expect(page.locator('#timeline-window')).toContainText('8');
-  await expect(page.locator('[data-timeline-task="mobilize"]')).toHaveCount(0);
+  await expect(page.locator('[data-timeline-task="mobilize"] .timeline-bar')).toHaveCount(0);
   await expect(page.locator('[data-timeline-task="row-sn"] .timeline-bar')).toContainText('160h');
   await page.locator('#timeline-hours').fill('0');await page.locator('#timeline-hours').blur();
   await expect(page.locator('#timeline-error')).toContainText('1 to 24');
@@ -2931,9 +2937,11 @@ test('Timeline groups repeated Labor subsections into readable scope lanes witho
   const before=await page.evaluate(()=>JSON.stringify(window.estimator.getTimelineTakeoff()));
   await expect(page.locator('[data-timeline-scope]')).toHaveCount(1);
   await expect(page.locator('.timeline-scope-row>.timeline-label strong')).toHaveText('Interior demolition');
-  await expect(page.locator('.timeline-work-key strong')).toHaveText([names[5],names[7],names[1],names[4],names[0],names[6],names[3]]);
-  await expect(page.locator('[data-timeline-key="labor-7"]')).toContainText('1 person');
-  await expect(page.locator('[data-timeline-task="labor-7"] .timeline-bar')).toHaveText('2');
+  await expect(page.locator('.timeline-task-row:visible')).toHaveCount(0);
+  await page.locator('#timeline-expand').click();
+  await expect(page.locator('.timeline-task-row .timeline-label strong')).toHaveText([names[5],names[7],names[1],names[4],names[0],names[6],names[3],names[2]]);
+  await expect(page.locator('[data-timeline-task="labor-7"] .timeline-label')).toContainText('1 person');
+  await expect(page.locator('[data-timeline-task="labor-7"] .timeline-bar')).toHaveAttribute('title',/1 working hours/);
   expect(await page.locator('#timeline-chart').evaluate(el=>el.scrollHeight<=el.clientHeight+1)).toBe(true);
   for(const theme of ['light','dark','medieval']){
     await page.evaluate(theme=>window.estimator.setTheme(theme),theme);
@@ -2941,13 +2949,13 @@ test('Timeline groups repeated Labor subsections into readable scope lanes witho
     await page.screenshot({path:'.tools/timeline-scope-lanes-'+theme+'.png'});
   }
   await page.locator('#timeline-scale').selectOption('14');
-  await expect(page.locator('.timeline-work-key strong')).toHaveCount(8);
+  await expect(page.locator('.timeline-task-row .timeline-label strong')).toHaveCount(8);
   await page.locator('#timeline-scale').selectOption('1');
   await expect(page.locator('#timeline-chart')).toContainText('No scheduled work in these days');
   await page.locator('#timeline-next').click();await page.locator('#timeline-next').click();
-  await expect(page.locator('[data-timeline-key="labor-5"]')).toContainText(names[5]);
+  await expect(page.locator('[data-timeline-task="labor-5"] .timeline-label')).toContainText(names[5]);
   expect(await page.evaluate(()=>JSON.stringify(window.estimator.getTimelineTakeoff()))).toBe(before);
-  await page.locator('[data-timeline-key="labor-5"]').click();
+  await page.locator('[data-timeline-task="labor-5"] .timeline-label').click();
   await expect(page.locator('#body tr[data-id="labor-5"]')).toBeInViewport();
 });
 
@@ -2966,9 +2974,20 @@ test('Timeline left column contains main scopes of work, with their subsections 
   tk.timeline={tasks:tk.sheets[0].rows.filter(row=>row.type==='section'&&row.name==='Labor').map((row,i)=>({id:row.id,startHour:i*4,durationHours:4,crew:2}))};
   await openWorkbook(page,data);await page.locator('#rail .tab-timeline').click();
   await expect(page.locator('.timeline-scope-row>.timeline-label strong')).toHaveText(['Interior demolition','Plumbing trench']);
-  await expect(page.locator('[data-timeline-scope="demo"] .timeline-work-key strong')).toHaveText(['Remove walls','Remove ceilings']);
-  await expect(page.locator('[data-timeline-scope="trench"] .timeline-work-key strong')).toHaveText(['Saw cut','Excavate']);
+  await expect(page.locator('[data-timeline-scope="demo"] .timeline-task-row .timeline-label strong')).toHaveText(['Remove walls','Remove ceilings']);
+  await expect(page.locator('[data-timeline-scope="trench"] .timeline-task-row .timeline-label strong')).toHaveText(['Saw cut','Excavate']);
   await expect(page.locator('.timeline-bar')).toHaveCount(4);
+  await expect(page.locator('.timeline-task-row:visible')).toHaveCount(0);
+  await expect(page.locator('.timeline-work-list')).toHaveCount(0);
+  const before=await page.evaluate(()=>JSON.stringify(window.estimator.getTimelineTakeoff()));
+  await page.getByRole('button',{name:'Expand Interior demolition activities',exact:true}).click();
+  await expect(page.locator('.timeline-task-row:visible')).toHaveCount(2);
+  await page.locator('#timeline-expand').click();
+  await expect(page.locator('.timeline-task-row:visible')).toHaveCount(4);
+  const geometry=await page.locator('[data-timeline-task="demo-labor-0"] .timeline-bar').evaluate(bar=>({bar:bar.getBoundingClientRect().width,track:bar.parentElement.getBoundingClientRect().width,height:bar.getBoundingClientRect().height}));
+  expect(geometry.bar/geometry.track).toBeCloseTo(0.25,2);
+  expect(geometry.height).toBeLessThanOrEqual(20);
+  expect(await page.evaluate(()=>JSON.stringify(window.estimator.getTimelineTakeoff()))).toBe(before);
   await page.evaluate(()=>window.estimator.setTheme('medieval'));
   await page.locator('#timelineCard>.scroll').evaluate(el=>{el.scrollTop=240;});
   await page.screenshot({path:'.tools/timeline-main-scopes.png'});
