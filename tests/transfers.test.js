@@ -59,12 +59,19 @@ test('copied takeoffs keep Scope assignments linked to their copied pages',()=>{
  assert.equal(copy.scopeData.items[0].id,'measured');
 });
 
-test('copied takeoffs keep timeline overrides linked to copied source rows',()=>{
+test('copied takeoffs keep timeline tasks, resources and costs linked to copied source rows',()=>{
  const source=structuredClone(takeoff);
- source.timeline={hoursPerDay:8,tasks:[{id:source.sheets[0].rows[0].id,startHour:8,crew:2}]};
+ source.timeline={hoursPerDay:8,tasks:[{id:source.sheets[0].rows[0].id,startHour:8,crew:2,resources:[{id:source.sheets[0].rows[1].id,quantity:2}]}],costs:[{id:'hotel-cost',day:1,kind:'hotel',amount:200,taskId:source.sheets[0].rows[0].id,sourceRowId:source.sheets[0].rows[1].id}]};
+ const snapshot=JSON.stringify(source);
  const next=importTransfer(book,'takeoff',source,'p');
  const copy=next.lists[0].companies[0].projects[0].takeoffs.at(-1);
  assert.notEqual(copy.timeline.tasks[0].id,source.timeline.tasks[0].id);
  assert.equal(copy.timeline.tasks[0].id,copy.sheets[0].rows[0].id);
  assert.equal(copy.timeline.tasks[0].crew,2);
+ assert.equal(copy.timeline.tasks[0].resources[0].id,copy.sheets[0].rows[1].id);
+ assert.equal(copy.timeline.costs[0].taskId,copy.timeline.tasks[0].id);
+ assert.equal(copy.timeline.costs[0].sourceRowId,copy.sheets[0].rows[1].id);
+ assert.notEqual(copy.timeline.costs[0].id,source.timeline.costs[0].id);
+ assert.equal(copy.timeline.costs[0].amount,200);
+ assert.equal(JSON.stringify(source),snapshot);
 });

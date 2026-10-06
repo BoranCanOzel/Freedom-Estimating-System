@@ -12097,6 +12097,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       return hit ? String(hit.pr.address || '').trim() || String(hit.co.address || '').trim() : '';
     },
     getZZTakeoffLink(){const hit=findTakeoff(book.activeTakeoff);return projectWebLink(hit?.tk.scopeLink ?? hit?.pr.zztakeoffLink);},
+    timelineItemIcon(kind){return iconSvg(kind,'timeline-icon');},
     getTimelineTakeoff(){
       const hit=findTakeoff(book.activeTakeoff);return hit?structuredClone({id:hit.tk.id,name:hit.tk.name,sheets:hit.tk.sheets,timeline:hit.tk.timeline}):null;
     },

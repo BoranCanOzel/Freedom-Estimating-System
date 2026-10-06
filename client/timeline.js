@@ -1,5 +1,6 @@
 import './timeline.css';
 import {renderScopeLanes} from './timeline-chart.js';
+import {setupTimelineDetails,renderDailyCosts} from './timeline-details.js';
 import {deriveTimeline,validateTimeline,workDate,timelinePeakCrew} from '../shared/timeline.js';
 
 const el=(tag,text,cls)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;};
@@ -9,7 +10,7 @@ export function setupTimeline(bridge){
   card.innerHTML='<div class="head"><div class="eyebrow-row"><span class="eyebrow">Timeline</span></div><div class="sum-title" id="timeline-title"></div><p class="timeline-intro">An AI-created work plan. Your estimate stays separate from the schedule.</p></div><div class="scroll timeline-content"><form id="timeline-settings" class="timeline-settings"><label>Hours / workday<input id="timeline-hours" type="number" min="1" max="24" step="0.5"></label><label>Start date<input id="timeline-date" type="date"></label><label class="timeline-check"><input id="timeline-weekends" type="checkbox">Skip weekends</label></form><p id="timeline-error" role="alert"></p><div id="timeline-stats" class="timeline-stats"></div><details class="timeline-assumptions"><summary>How planning works</summary><p id="timeline-guidance"></p><p>AI chooses the work sequence, durations, and crews. Start and duration use working hours. You can adjust saved tasks here; changing crew size does not retime work.</p></details><div class="timeline-chart-heading"><h3>Project timeline</h3><div><button type="button" class="btn alt tiny" id="timeline-expand">Expand activities</button><label class="timeline-scale-label">Show <select id="timeline-scale" aria-label="Timeline day window"><option value="0" selected>Entire plan</option><option value="1">1 day</option><option value="3">3 days</option><option value="7">7 days</option><option value="14">14 days</option></select></label><button type="button" class="btn alt tiny" id="timeline-prev">Previous days</button><span id="timeline-window"></span><button type="button" class="btn alt tiny" id="timeline-next">Next days</button></div></div><p class="timeline-chart-help">Main scopes share one time axis. Expand a scope to see its planned activities. Faint spans include gaps; solid bars show scheduled work.</p><div id="timeline-chart" class="timeline-chart"></div><details class="timeline-adjustments" open><summary>Adjust tasks</summary><p>Every task needs a start, crew size, and duration. Blank fields leave the task unscheduled. Start day 1 begins at hour 0; day 1.5 starts halfway through the first workday. Give tasks the same start to overlap them.</p><div class="timeline-table-scroll"><table class="timeline-table"><thead><tr><th>Task / page</th><th>Start day</th><th>People</th><th>Duration (hours)</th><th>Include</th><th></th></tr></thead><tbody id="timeline-tasks"></tbody></table></div></details></div>';
   const $=id=>document.getElementById('timeline-'+id);
   let firstDay=0,windowSize=0,identity='';
-  const expanded=new Set();
+  const expanded=new Set(),details=setupTimelineDetails(bridge);
   function change(update){
     try{
       const takeoff=bridge.getTimelineTakeoff();if(!takeoff)return;
@@ -42,8 +43,8 @@ export function setupTimeline(bridge){
   function render(){
     if(bridge.getLocation().view!=='timeline')return;
     const takeoff=bridge.getTimelineTakeoff();if(!takeoff)return;
-    if(identity!==takeoff.id){identity=takeoff.id;firstDay=0;expanded.clear();$('error').textContent='';}
-    const draft=deriveTimeline(takeoff),settings=draft.settings;
+    if(identity!==takeoff.id){identity=takeoff.id;firstDay=0;expanded.clear();details.close();$('error').textContent='';}
+    const draft=deriveTimeline(takeoff),settings=draft.settings;details.update(draft);
     $('title').textContent=takeoff.name||'Takeoff timeline';
     $('hours').value=settings.hoursPerDay;$('date').value=settings.startDate;$('weekends').checked=settings.skipWeekends;
     $('guidance').textContent=draft.guidance;
@@ -52,7 +53,7 @@ export function setupTimeline(bridge){
     card.querySelector('.timeline-chart-heading').hidden=!draft.hasPlan;
     card.querySelector('.timeline-chart-help').hidden=!draft.hasPlan;
     $('stats').replaceChildren();
-    for(const [label,value] of [['Scheduled span',draft.days?number(draft.endHour/settings.hoursPerDay)+' workdays':'Not scheduled'],['Estimated labor',number(draft.laborHours)+' person-hours'],['Planned peak crew',number(draft.peakCrew)+' people'],['Needs scheduling',String(draft.unscheduled)],['Finish date',draft.finishDate||'No date set']]){
+    for(const [label,value] of [['Plan span',draft.days?number(draft.endHour/settings.hoursPerDay)+' workdays':'Not scheduled'],['Estimated labor',number(draft.laborHours)+' person-hours'],['Planned peak crew',number(draft.peakCrew)+' people'],['Needs scheduling',String(draft.unscheduled)],['Finish date',draft.finishDate||'No date set']]){
       const metric=el('div');metric.append(el('span',label),el('strong',value));$('stats').append(metric);
     }
     const count=Math.max(1,draft.days),windowDays=windowSize||count;
@@ -64,7 +65,7 @@ export function setupTimeline(bridge){
     $('prev').disabled=firstDay===0;$('next').disabled=firstDay+windowDays>=count;
     $('window').textContent='Days '+(firstDay+1)+'–'+(firstDay+windowDays);
     const chart=$('chart');chart.replaceChildren();
-    if(!draft.tasks.length){
+    if(!draft.hasPlan){
       const empty=el('div','','timeline-empty');empty.append(el('h3','No timeline plan yet'),el('p','Ask your connected AI to create a work plan using this estimate and '+settings.hoursPerDay+'-hour workdays. It will choose the tasks, starts, durations, and crews. Nothing is scheduled automatically.'));
       const access=el('button','AI Access','btn alt');access.type='button';access.onclick=()=>document.getElementById('takeoff-ai-access')?.click();empty.append(access);chart.append(empty);
     }
@@ -73,7 +74,9 @@ export function setupTimeline(bridge){
       const tickDays=Math.max(1,Math.ceil(windowDays/14));
       grid.style.setProperty('--timeline-days',Math.ceil(windowDays/tickDays));
       grid.style.setProperty('--timeline-step',tickDays/windowDays*100+'%');
-      const header=el('div','','timeline-grid-row timeline-grid-head');header.append(el('div','Scope of work','timeline-label'));
+      const header=el('div','','timeline-grid-head');
+      header.append(renderDailyCosts(draft,firstDay,windowDays,tickDays,bridge,details.costs));
+      const dayRow=el('div','','timeline-grid-row timeline-date-row');dayRow.append(el('div','Scope of work','timeline-label'));
       const days=el('div','','timeline-days');
       for(let day=firstDay;day<firstDay+windowDays;day+=tickDays){
         const span=Math.min(tickDays,firstDay+windowDays-day);
@@ -81,8 +84,8 @@ export function setupTimeline(bridge){
         const date=workDate(settings.startDate,day,settings.skipWeekends);
         heading.append(el('small',date||settings.hoursPerDay+'h'));days.append(heading);
       }
-      header.append(days);grid.append(header);
-      renderScopeLanes(grid,draft,firstDay,windowDays,bridge,expanded,id=>{if(expanded.has(id))expanded.delete(id);else expanded.add(id);render();});
+      dayRow.append(days);header.append(dayRow);grid.append(header);
+      renderScopeLanes(grid,draft,firstDay,windowDays,bridge,expanded,id=>{if(expanded.has(id))expanded.delete(id);else expanded.add(id);render();},details);
       const crew=el('div','','timeline-grid-row timeline-crew');crew.append(el('div','Peak people scheduled','timeline-label'));
       const totals=el('div','','timeline-days');
       for(let day=firstDay;day<firstDay+windowDays;day+=tickDays){
@@ -106,7 +109,7 @@ export function setupTimeline(bridge){
       }
       const include=el('td'),check=el('input');check.type='checkbox';check.checked=!task.excluded;check.setAttribute('aria-label','Include '+task.name);check.onchange=()=>editTask(task.id,'excluded',!check.checked);include.append(check);row.append(include);
       const actions=el('td'),reset=el('button','Remove','btn alt tiny');reset.type='button';reset.disabled=Object.keys(task.override).length===0;reset.setAttribute('aria-label','Remove '+task.name+' from timeline');
-      reset.onclick=()=>change(next=>{next.tasks=(next.tasks||[]).filter(t=>t.id!==task.id);});actions.append(reset);row.append(actions);$('tasks').append(row);
+      reset.onclick=()=>change(next=>{next.tasks=(next.tasks||[]).filter(t=>t.id!==task.id);for(const cost of next.costs||[])if(cost.taskId===task.id)delete cost.taskId;});actions.append(reset);row.append(actions);$('tasks').append(row);
     }
   }
   document.addEventListener('estimator:view',render);

@@ -69,3 +69,31 @@ test('generic Labor names retain actual work context within their main scope',()
   const result=deriveTimeline(source);assert.equal(result.tasks[0].name,'Remove walls');assert.equal(result.tasks[0].sourceName,'Labor');
   assert.deepEqual(scopeLanes(result.tasks,0,24).map(g=>g.name),['Interior demolition','Plumbing trench']);
 });
+
+test('equipment is reference-only until AI assigns it, and daily costs are explicit allowances',()=>{
+  const source=takeoff();source.sheets[0].rows.splice(2,0,{id:'excavator',name:'Mini excavator',kind:'equip',count:1,time:8,days:2,cost:95,note:'Use narrow bucket'});
+  let result=deriveTimeline(source);assert.equal(result.hasPlan,false);assert.equal(result.availableResources.find(r=>r.id==='excavator').estimateRate,95);
+  source.timeline={tasks:[{id:'parent',startHour:0,durationHours:8,crew:2,notes:'Protect occupied areas.',resources:[{id:'excavator',quantity:1,notes:'Trench excavation only.'}]}],costs:[
+    {id:'trip',day:1,kind:'travel',amount:120,taskId:'parent',notes:'Crew transport'},
+    {id:'stay',day:3,kind:'hotel',label:'Two rooms',amount:300},
+    {id:'unknown',day:3,kind:'meals'}
+  ]};
+  const before=structuredClone(source);validateTimeline(source);result=deriveTimeline(source);
+  assert.equal(result.tasks[0].resources[0].name,'Mini excavator');assert.equal(result.tasks[0].resources[0].kind,'equip');assert.equal(result.tasks[0].notes,'Protect occupied areas.');
+  assert.equal(result.costs[1].amount,300);assert.equal(result.costs[2].amount,undefined);assert.equal(result.days,3);assert.deepEqual(source,before);
+  source.sheets[0].rows=source.sheets[0].rows.filter(r=>r.id!=='excavator');assert.equal(deriveTimeline(source).tasks[0].resources[0].missing,true);
+});
+test('invalid resources and travel or hotel costs cannot reference other takeoffs or tasks',()=>{
+  const source={...takeoff(),timeline:{tasks:[{id:'parent',startHour:0,durationHours:8,crew:2}]}};
+  for(const resource of [{id:'elsewhere'},{id:'crew',quantity:-1},{id:'crew',notes:2},{id:'crew',invented:true}]){
+    const copy=structuredClone(source);copy.timeline.tasks[0].resources=[resource];assert.throws(()=>validateTimeline(copy));
+  }
+  for(const cost of [{id:'c',day:0,kind:'hotel'},{id:'c',day:1.5,kind:'hotel'},{id:'c',day:1,kind:'unknown'},{id:'c',day:1,kind:'hotel',amount:-5},{id:'c',day:1,kind:'hotel',taskId:'elsewhere'},{id:'c',day:1,kind:'travel',sourceRowId:'elsewhere'},{id:'c',day:1,kind:'hotel',amount:Infinity}]){
+    assert.throws(()=>validateTimeline({...source,timeline:{...source.timeline,costs:[cost]}}));
+  }
+  const copy=structuredClone(source);copy.timeline.tasks[0].resources=[{id:'crew'},{id:'crew'}];assert.throws(()=>validateTimeline(copy));
+});
+test('a cost-only plan displays its assigned days without inventing work',()=>{
+  const result=deriveTimeline({...takeoff(),timeline:{costs:[{id:'hotel',day:4,kind:'hotel',amount:200}]}});
+  assert.equal(result.hasPlan,true);assert.equal(result.days,4);assert.deepEqual(result.tasks,[]);
+});

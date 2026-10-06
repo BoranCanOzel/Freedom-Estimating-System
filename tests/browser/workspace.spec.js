@@ -2879,6 +2879,7 @@ test('Timeline renders explicit 8-hour plans, saves adjustments, supports AI and
   await expect(page.locator('[data-timeline-task="sub"] .timeline-bar')).toContainText('8h');
   await page.locator('#timeline-expand').click();
   await page.locator('[data-timeline-task="sub"] .timeline-label').click();
+  await page.locator('#timeline-detail-dialog').getByRole('button',{name:'Open in estimate',exact:true}).click();
   await expect(page.locator('#sheetCard')).toBeVisible();
   await expect(page.locator('#body tr[data-id="sub"]')).toBeInViewport();
   await page.locator('#rail .tab-timeline').click();
@@ -2904,7 +2905,7 @@ test('Timeline leaves unknown durations for review and makes long schedules navi
   await expect(page.locator('#timeline-scale')).toHaveValue('0');
   await expect(page.locator('#timeline-window')).toContainText('21');
   await expect(page.locator('#timeline-next')).toBeDisabled();
-  await expect(page.locator('.timeline-grid-head .timeline-days>div')).toHaveCount(11);
+  await expect(page.locator('.timeline-date-row .timeline-days>div')).toHaveCount(11);
   await page.locator('#timeline-scale').selectOption('7');
   await page.locator('#timeline-next').click();
   await expect(page.locator('#timeline-window')).toContainText('8');
@@ -2956,6 +2957,7 @@ test('Timeline groups repeated Labor subsections into readable scope lanes witho
   await expect(page.locator('[data-timeline-task="labor-5"] .timeline-label')).toContainText(names[5]);
   expect(await page.evaluate(()=>JSON.stringify(window.estimator.getTimelineTakeoff()))).toBe(before);
   await page.locator('[data-timeline-task="labor-5"] .timeline-label').click();
+  await page.locator('#timeline-detail-dialog').getByRole('button',{name:'Open in estimate',exact:true}).click();
   await expect(page.locator('#body tr[data-id="labor-5"]')).toBeInViewport();
 });
 
@@ -2991,4 +2993,52 @@ test('Timeline left column contains main scopes of work, with their subsections 
   await page.evaluate(()=>window.estimator.setTheme('medieval'));
   await page.locator('#timelineCard>.scroll').evaluate(el=>{el.scrollTop=240;});
   await page.screenshot({path:'.tools/timeline-main-scopes.png'});
+});
+
+test('AI assigns equipment and daily costs to rich timeline details without repricing the estimate',async({page})=>{
+  const data=workbook(),tk=data.lists[0].companies[0].projects[0].takeoffs[0];
+  tk.sheets[0].rows.push({id:'excavator',kind:'equip',name:'Mini excavator',count:1,time:8,days:2,cost:95,note:'Narrow bucket required'});
+  tk.timeline={tasks:[{id:'row-sn',startHour:0,durationHours:16,crew:3}]};
+  await openWorkbook(page,data);await page.locator('#rail .tab-timeline').click();
+  const before=await page.evaluate(()=>JSON.stringify(window.estimator.getTimelineTakeoff().sheets));
+  await expect(page.locator('.timeline-resource-badge')).toHaveCount(0);
+  await page.getByRole('button',{name:'Details for North scope',exact:true}).click();
+  const dialog=page.locator('#timeline-detail-dialog');await expect(dialog).toContainText('No equipment or resources assigned by AI yet.');
+  await dialog.getByRole('button',{name:'Close',exact:true}).click();
+  await page.locator('#takeoff-ai-access').click();await page.locator('#ai-access-generate').click();
+  await expect(page.locator('#ai-access-connection')).toHaveValue(/Authorization: Bearer/);
+  const connection=await page.locator('#ai-access-connection').inputValue();const headers={Authorization:'Bearer '+/Authorization: Bearer ([a-f0-9]+)/.exec(connection)[1]};
+  await page.locator('#ai-access-close').click();
+  const reference=await (await page.request.get('/api/ai/v1/timeline',{headers})).json();
+  expect(reference.availableResources.find(r=>r.id==='excavator').kind).toBe('equip');
+  const read=await (await page.request.get('/api/ai/v1/takeoff',{headers})).json();
+  Object.assign(read.takeoff.timeline.tasks[0],{notes:'Protect finishes before trenching.',resources:[{id:'excavator',quantity:1,notes:'Use for interior trench excavation.'}]});
+  read.takeoff.timeline.costs=[{id:'travel',day:1,kind:'travel',amount:125,taskId:'row-sn',notes:'Crew transport to site.'},{id:'hotel',day:2,kind:'hotel',label:'Two rooms',amount:300,notes:'Two rooms for the traveling crew.'},{id:'meals',day:2,kind:'meals'}];
+  expect((await page.request.post('/api/ai/v1/save',{headers,data:{revision:read.revision,takeoff:read.takeoff,requestId:'equipment-plan'}})).ok()).toBe(true);
+  await expect(page.locator('.timeline-cost-chip')).toHaveCount(3);
+  await expect(page.locator('.timeline-scope-toggle .timeline-resource-badge svg')).toHaveCount(1);
+  await expect(page.locator('.timeline-scope-toggle .timeline-resource-badge')).toHaveAttribute('title',/Mini excavator/);
+  const layout=await page.locator('.timeline-cost-row').evaluate(el=>({costBottom:el.getBoundingClientRect().bottom,dayTop:document.querySelector('.timeline-date-row').getBoundingClientRect().top}));
+  expect(layout.costBottom).toBeLessThanOrEqual(layout.dayTop+1);
+  await page.getByRole('button',{name:'Details for North scope',exact:true}).click();
+  await expect(dialog).toContainText('Protect finishes before trenching.');await expect(dialog).toContainText('Mini excavator');
+  await expect(dialog).toContainText('Assigned quantity: 1');await expect(dialog).toContainText('Narrow bucket required');
+  await expect(dialog).toContainText('Use for interior trench excavation.');await expect(dialog).toContainText('$125.00');
+  await page.screenshot({path:'.tools/timeline-equipment-details.png'});
+  await page.keyboard.press('Escape');await expect(dialog).not.toBeVisible();
+  await page.getByRole('button',{name:/^Hotel:/}).click();await expect(dialog).toContainText('Two rooms');await expect(dialog).toContainText('$300.00');
+  await dialog.getByRole('button',{name:'Close',exact:true}).click();
+  await page.getByRole('button',{name:/^Meals:/}).click();await expect(dialog).toContainText('Not priced');
+  await dialog.getByRole('button',{name:'Close',exact:true}).click();
+  await page.locator('#timeline-expand').click();await expect(page.locator('.timeline-bar .timeline-icon')).toHaveCount(1);
+  for(const theme of ['light','dark','medieval']){
+    await page.evaluate(theme=>window.estimator.setTheme(theme),theme);await page.locator('#timelineCard>.scroll').evaluate(el=>{el.scrollTop=230;});
+    await page.screenshot({path:'.tools/timeline-equipment-'+theme+'.png'});
+  }
+  expect(await page.evaluate(()=>JSON.stringify(window.estimator.getTimelineTakeoff().sheets))).toBe(before);
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');await page.reload();
+  await expect(page.locator('.timeline-cost-chip')).toHaveCount(3);
+  await page.getByRole('button',{name:'Remove Concrete cutting from timeline',exact:true}).click();
+  await expect(page.locator('.timeline-scope-bar')).toHaveCount(0);await expect(page.locator('.timeline-cost-chip')).toHaveCount(3);
+  expect(await page.evaluate(()=>window.estimator.getTimelineTakeoff().timeline.costs[0].taskId)).toBeUndefined();
 });

@@ -148,6 +148,38 @@ Example fragment to merge into the full takeoff read before validating/saving:
 
 Opening Timeline, editing estimate rows, or changing display zoom never creates a plan or adds activities. The user can adjust or remove saved tasks in Timeline. AI access uses the existing external AI connection; the page itself does not invoke a model.
 
+#### Equipment, work details, and daily costs
+
+`read_timeline` includes `availableResources`: named takeoff item rows and nested part/service rows, with their existing `id`, `kind`, page, section path, estimate note, input quantity, and input rate. These are references only. Equipment appearing in the estimate is **not assigned automatically**. Read the full estimate for pricing context; an input rate is not a total cost or necessarily a daily rate.
+
+Assign resources explicitly in each saved task's `resources` array, reusing the existing resource row ID. Set the planned `quantity` and `notes` describing the equipment's use. The optional task `notes` field explains the work method, sequencing, access or other useful execution details. Resource names and icons come from the referenced estimate items. Scope and activity bars open a detail panel with the plan notes, crew, timing, assigned resources and linked daily costs. The panel has a separate Open in estimate button.
+
+Use `takeoff.timeline.costs` for travel, hotel, meals, or other planning allowances above the day axis. Each entry requires a fresh unique `id`, a 1-based workday `day`, and a `kind` of `travel`, `hotel`, `meals`, or `other`. Optional fields are `label`, `amount`, `notes`, `taskId` and `sourceRowId`:
+
+- `amount` is the **total USD allowance for that entry on that day**, not a unit rate. Use known supported amounts; omit it when unknown. Zero is an explicitly free allowance. The display shows missing amounts as Not priced.
+- Write one entry for each day on which a cost applies. For example, two rooms at a confirmed $150 per room for one night is one hotel entry with amount 300; create another entry for another night. No amount is multiplied, repeated, or spread automatically. Day numbers use the plan's working-day axis, including its skip-weekends setting; calendar-night stays across weekends must be explained and allocated explicitly by AI.
+- `taskId` optionally links the cost to a saved timeline task. Omit it for a shared project allowance. `sourceRowId` optionally links an existing estimate resource row that supports the cost. Both references must belong to this takeoff. Removing a task through the UI retains its costs as shared allowances.
+- These are planning annotations, **never new estimate charges**. Referencing an already-priced travel/hotel row must not add it to the estimate again. Resource assignments likewise never change estimating quantities or rates.
+- Daily chips aggregate entries by kind within the displayed day or day range. Clicking a chip lists the individual amounts, notes, linked work and source reference. Resource icons appear only for explicit assignments.
+
+Example fields inside `takeoff.timeline` (merge with the complete plan and preserve unrelated entries):
+
+```json
+{
+  "tasks": [{
+    "id": "existing-scope-id", "startHour": 0, "durationHours": 16, "crew": 3,
+    "notes": "Protect occupied areas before excavation.",
+    "resources": [{"id": "existing-excavator-row-id", "quantity": 1, "notes": "Use narrow bucket for interior trenching."}]
+  }],
+  "costs": [
+    {"id": "new-travel-uuid", "day": 1, "kind": "travel", "amount": 120, "taskId": "existing-scope-id", "notes": "Confirmed crew transport allowance."},
+    {"id": "new-hotel-uuid", "day": 1, "kind": "hotel", "label": "Two rooms", "amount": 300, "notes": "Confirmed one-night allowance."}
+  ]
+}
+```
+
+When removing source equipment or tasks in an AI edit, remove/reassign their resource and cost references too. Source rows deleted outside the timeline appear as needing review; do not invent replacement equipment. Full takeoff validation rejects foreign/missing resource IDs, duplicate assignments, negative quantities or costs, invalid days, and unknown fields.
+
 ### Section and subsection UP quantities and unit labels
 
 AI may create or edit UP columns and set independent UP quantities and labels on any section or nested subsection. A subsection is another `type:"section"` start row inside its parent. Use the same validate/save endpoints or MCP tools; no separate permission or endpoint is needed.

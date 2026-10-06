@@ -37,6 +37,27 @@ button.timeline-label{cursor:pointer}button.timeline-label:hover strong{text-dec
 .timeline-scope-toggle{display:grid;grid-template-columns:14px 1fr;column-gap:4px;align-content:center}.timeline-scope-toggle small{grid-column:2}.timeline-caret{grid-row:span 2;font-size:14px}
 .timeline-task-row>.timeline-label{padding:6px 10px 6px 32px;font-size:12px}.timeline-task-row>.timeline-label strong{font-weight:400}.timeline-task-row>.timeline-label small{font-size:10px;margin-top:3px}
 .timeline-task-row:hover>.timeline-label,.timeline-task-row:hover>.timeline-track{background-color:color-mix(in srgb,var(--scope-color) 6%,var(--card))}
+.timeline-icon-wrap{display:inline-flex;vertical-align:middle;flex:none;align-items:center;justify-content:center}
+.timeline-icon{width:14px;height:14px;flex:none}
+.timeline-resource-badges{display:inline-flex;vertical-align:middle;gap:5px;margin-left:7px;color:var(--amber)}
+.timeline-resource-badge{display:inline-flex;align-items:center}
+.timeline-bar .timeline-icon{width:12px;height:12px;margin-right:4px}
+.timeline-cost-row{min-height:30px}.timeline-cost-row>.timeline-label{font-size:11px;padding:8px 12px}
+.timeline-cost-row .timeline-days>div{display:flex;flex-wrap:wrap;gap:3px;align-content:center;justify-content:center;padding:4px 2px}
+.timeline-cost-chip{display:inline-flex;align-items:center;gap:3px;max-width:100%;min-height:22px;border:1px solid var(--rule);border-radius:3px;padding:2px 4px;background:var(--card);color:var(--ink);font:11px var(--f-sans);cursor:pointer}
+.timeline-cost-chip span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.timeline-cost-chip:hover{border-color:var(--amber)}
+.timeline-no-cost{opacity:.35;font-size:11px}
+.timeline-detail-dialog{width:min(680px,calc(100vw - 24px));max-height:85vh;padding:0;border:1px solid var(--rule);border-radius:8px;background:var(--card);color:var(--ink);box-shadow:0 12px 60px #0006;overflow:auto}
+.timeline-detail-dialog::backdrop{background:#0007}
+.timeline-detail-head{display:flex;align-items:center;justify-content:space-between;gap:16px;position:sticky;top:0;z-index:1;padding:16px 20px;background:var(--card);border-bottom:1px solid var(--rule)}
+.timeline-detail-head h2{font:600 22px var(--f-cond);margin:0}.timeline-detail-body{padding:0 20px 20px;font:13px var(--f-sans)}
+.timeline-detail-task{padding:18px 0;border-bottom:1px solid var(--rule)}.timeline-detail-task:last-child{border:0;padding-bottom:0}
+.timeline-detail-task h3{font:600 19px var(--f-cond);margin:0 0 6px}.timeline-detail-task h4{font-size:13px;margin:20px 0 10px}
+.timeline-detail-muted{font-size:12px;color:var(--muted);line-height:1.5;margin:6px 0}
+.timeline-detail-note{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6;margin:8px 0}
+.timeline-detail-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}.timeline-detail-stats>div{padding:10px;border:1px solid var(--rule);border-radius:4px}.timeline-detail-stats small,.timeline-detail-stats strong{display:block}.timeline-detail-stats small{color:var(--muted);margin-bottom:6px}
+.timeline-detail-resource{display:flex;gap:12px;align-items:start;padding:12px;border:1px solid var(--rule);border-radius:4px;margin-bottom:8px}.timeline-detail-resource>.timeline-icon-wrap{color:var(--amber);padding-top:2px}.timeline-detail-resource>div{min-width:0}
+.timeline-detail-costs article{padding:12px 0;border-bottom:1px solid var(--rule-hair)}.timeline-detail-cost-title{display:flex;align-items:center;gap:8px}.timeline-detail-cost-title b{margin-left:auto;white-space:nowrap}.timeline-detail-cost-title>.timeline-icon-wrap{color:var(--amber)}
 .timeline-chart-help{font-size:12px;color:var(--muted);margin:0 0 12px;line-height:1.5}
 .timeline-scale-label{display:flex;align-items:center;gap:7px}.timeline-scale-label select{font:12px var(--f-sans);padding:6px;border:1px solid var(--rule);background:var(--card);color:var(--ink);border-radius:4px}
 .timeline-pending{padding:14px;background:var(--card);color:var(--muted);font-size:12px}.timeline-pending>strong{color:var(--ink)}.timeline-pending>div{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:8px}.timeline-pending small{color:var(--muted)}

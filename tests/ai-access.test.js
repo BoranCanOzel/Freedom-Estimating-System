@@ -61,7 +61,7 @@ test('AI grants enforce scope, repeated saves, revisions, validation, live broad
       assert.equal((await call(api+'/validate','POST',{revision:original.revision,takeoff:modified},key)).status,422);
     }
     const change={revision:original.revision,takeoff:structuredClone(original.takeoff),requestId:'save-1'};change.takeoff.sheets[0].rows[0].cost=25;change.takeoff.sheets[0].color='teal';change.takeoff.scopeAssignments={'scope-0':'sheet-one'};
-    change.takeoff.timeline={hoursPerDay:8,startDate:'2026-10-09',tasks:[{id:'row-one',startHour:8,durationHours:4,crew:2}]};
+    change.takeoff.timeline={hoursPerDay:8,startDate:'2026-10-09',tasks:[{id:'row-one',startHour:8,durationHours:4,crew:2,notes:'Use the assigned crew.',resources:[{id:'row-one',quantity:2}]}],costs:[{id:'travel',day:2,kind:'travel',amount:80,taskId:'row-one',sourceRowId:'row-one'}]};
     const badTimeline=structuredClone(change);badTimeline.takeoff.timeline.tasks[0].id='row-two';
     assert.equal((await call(api+'/validate','POST',badTimeline,key)).status,422);
     for(const [item,page] of [['hidden-scope','sheet-one'],['missing','sheet-one'],['scope-0','missing']]){
@@ -92,6 +92,7 @@ test('AI grants enforce scope, repeated saves, revisions, validation, live broad
     const timeline=await (await call(api+'/timeline','GET',undefined,key)).json();
     assert.equal(timeline.takeoffId,'one');assert.equal(timeline.tasks.length,1);assert.equal(timeline.tasks[0].startHour,8);assert.equal(timeline.tasks[0].durationHours,4);assert.equal(timeline.peakCrew,2);assert.equal(timeline.finishDate,'2026-10-12');
     assert.equal(timeline.tasks[0].color,'teal');assert.equal(timeline.laborHours,1);
+    assert.equal(timeline.tasks[0].resources[0].name,'Cutting');assert.equal(timeline.costs[0].amount,80);assert.equal(timeline.costs[0].source.id,'row-one');
     assert.deepEqual(assigned.scopeAssignments,{'scope-0':'sheet-one','hidden-scope':'sheet-one'});
     const colored=await (await call(api+'/scope','GET',undefined,key)).json();
     assert.deepEqual(colored.scopeAssignments,{'scope-0':'sheet-one'});assert.equal(colored.pages[0].color,'teal');

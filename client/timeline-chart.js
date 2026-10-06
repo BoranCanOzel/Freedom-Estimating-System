@@ -1,3 +1,4 @@
+import {resourceBadges,timelineIcon} from './timeline-details.js';
 const el=(tag,text,cls)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;};
 const number=value=>Number(value.toFixed(2)).toLocaleString();
 const crew=value=>value?number(value)+(value===1?' person':' people'):'Crew not set';
@@ -23,7 +24,7 @@ export function scopeLanes(tasks,from,to){
   }).sort((a,b)=>a.tasks[0].startHour-b.tasks[0].startHour);
 }
 
-export function renderScopeLanes(grid,draft,firstDay,windowDays,bridge,expanded=new Set(),onToggle=()=>{}){
+export function renderScopeLanes(grid,draft,firstDay,windowDays,bridge,expanded=new Set(),onToggle=()=>{},details){
   const hours=draft.settings.hoursPerDay,from=firstDay*hours,to=(firstDay+windowDays)*hours;
   const groups=scopeLanes(draft.tasks,0,Infinity);
   const place=(node,start,end)=>{
@@ -40,6 +41,7 @@ export function renderScopeLanes(grid,draft,firstDay,windowDays,bridge,expanded=
     const open=expanded.has(group.id);
     label.setAttribute('aria-expanded',String(open));label.setAttribute('aria-label',(open?'Collapse ':'Expand ')+group.name+' activities');
     label.append(el('span',open?'\u25be':'\u25b8','timeline-caret'),el('strong',group.name),el('small',group.page===group.name?group.tasks.length+' planned activities':group.page));
+    label.querySelector('strong').append(resourceBadges(group.tasks.flatMap(t=>t.resources||[]),bridge));
     label.onclick=()=>onToggle(group.id);
     const track=el('div','','timeline-track');
     const start=group.tasks[0].startHour,end=Math.max(...group.tasks.map(task=>task.endHour));
@@ -57,7 +59,7 @@ export function renderScopeLanes(grid,draft,firstDay,windowDays,bridge,expanded=
         if(b<=from||a>=to)continue;
         const segment=el('button','','timeline-scope-bar');segment.type='button';place(segment,a,b);
         segment.title=group.name+' / Day '+number(a/hours+1)+' / '+number(b-a)+' working hours';
-        segment.setAttribute('aria-label','Show activities for '+group.name);segment.onclick=()=>onToggle(group.id);track.append(segment);
+        segment.setAttribute('aria-label','Details for '+group.name);segment.onclick=()=>details.scope(group.id);track.append(segment);
       }
     }
     row.append(label,track);wrap.append(row);
@@ -66,13 +68,17 @@ export function renderScopeLanes(grid,draft,firstDay,windowDays,bridge,expanded=
       const work=el('div','','timeline-grid-row timeline-task-row');work.dataset.timelineTask=task.id;
       const name=el('button','','timeline-label');name.type='button';name.title=task.path;
       name.append(el('strong',task.name),el('small',number(task.durationHours)+'h / '+crew(task.crew)));
-      name.onclick=()=>bridge.openTimelineTask(task.sheetId,task.id);
+      name.querySelector('small').append(resourceBadges(task.resources||[],bridge));
+      name.onclick=()=>details.task(task.id);
       const line=el('div','','timeline-track');
       if(visible(task)){
         const bar=el('button','','timeline-bar');bar.type='button';place(bar,task.startHour,task.endHour);
-        if((Math.min(task.endHour,to)-Math.max(task.startHour,from))/(to-from)>=0.04)bar.textContent=number(task.durationHours)+'h';
+        if((Math.min(task.endHour,to)-Math.max(task.startHour,from))/(to-from)>=0.04){
+          if(task.resources?.some(r=>r.kind==='equip'&&!r.missing))bar.append(timelineIcon('equip',bridge));
+          bar.append(document.createTextNode(number(task.durationHours)+'h'));
+        }
         bar.title=task.name+' / Day '+number(task.startHour/hours+1)+' / '+number(task.durationHours)+' working hours / '+crew(task.crew);
-        bar.setAttribute('aria-label','Open '+task.name+' in estimate');bar.onclick=name.onclick;line.append(bar);
+        bar.setAttribute('aria-label','Details for '+task.name);bar.onclick=name.onclick;line.append(bar);
       }
       work.append(name,line);detail.append(work);
     }
