@@ -117,7 +117,7 @@ test('AI grants enforce scope, repeated saves, revisions, validation, live broad
     assert.equal((await rpc('tools/list')).result.tools.length,9);
     assert.equal(JSON.parse((await rpc('tools/call',{name:'read_takeoff',arguments:{}})).result.content[0].text).takeoff.id,'one');
     const restoredTimeline=JSON.parse((await rpc('tools/call',{name:'read_timeline',arguments:{}})).result.content[0].text);
-    assert.equal(restoredTimeline.tasks[0].durationHours,1);assert.equal(restoredTimeline.settings.hoursPerDay,8);
+    assert.deepEqual(restoredTimeline.tasks,[]);assert.equal(restoredTimeline.hasPlan,false);assert.equal(restoredTimeline.availableWork[0].id,'row-one');assert.equal(restoredTimeline.settings.hoursPerDay,8);
     assert.deepEqual(JSON.parse((await rpc('tools/call',{name:'read_scope',arguments:{}})).result.content[0].text).scopeData,shownScope);
     await call(admin+'/'+fresh.id,'DELETE');assert.equal((await call(api+'/scope','GET',undefined,fresh.key)).status,403);assert.equal((await call(api+'/takeoff','GET',undefined,fresh.key)).status,403);assert.equal((await call(api+'/timeline','GET',undefined,fresh.key)).status,403);
     const permanent=await grant();inspect=new DatabaseSync(join(dataDir,'projects.sqlite'));

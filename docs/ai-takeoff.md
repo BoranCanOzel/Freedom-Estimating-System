@@ -114,37 +114,39 @@ Use the usual revision-checked validate/save endpoints or MCP tools. `read_scope
 
 ### Work timeline (8-hour days by default)
 
-Call `read_timeline` (MCP) or GET `/api/ai/v1/timeline` to read the authorized takeoff's calculated planning draft, source task IDs, person-hours, elapsed working hours, planned peak crew, dates, and assumptions. The Timeline tab uses this same calculation. No external AI call is needed to generate the draft.
+**AI creates the schedule. The app does not automatically generate, sequence, or retime work.** Call `read_timeline` (MCP) or GET `/api/ai/v1/timeline` to read the saved plan and `availableWork`, a separate reference list of source IDs, scope names, and direct labor facts. When no plan has been saved, `tasks` is empty and `hasPlan` is false, even if the estimate contains labor. Merely reading the endpoint does not save anything.
 
-Task `name` uses the actual work heading: a generic subsection such as Labor inherits the nearest meaningful parent name. `sourceName` keeps the original heading and `path` keeps its section context. IDs and overrides remain attached to the same source rows. The chart groups activities by their top-level scope-of-work section (`scopeId` and `scopeName`), with all nested subsections inside that scope row. Work outside any section uses the page as its group. Activities display chronologically, with overlapping work on separate tracks. Changing the displayed day window does not reschedule anything.
+When the user asks for a schedule:
 
-Direct labor assumes Count = people, Time = hours per day, Days = working days. Person-hours = Count * Time * Days. Labor lines within the same section overlap, so its default elapsed duration is the longest Time * Days and its planned crew is the sum of those lines' people. Nested sections use their own direct rows; parent totals are never counted twice. Unsectioned items become individual tasks. Blank seed rows are ignored. Material or equipment quantities do not establish labor durations. Incomplete labor and service/assembly tasks need a reviewed manual duration. An unknown duration blocks automatic successors until it is filled, excluded, or a successor gets an explicit start.
+1. Read `read_takeoff`, `read_timeline`, and relevant AI Information. Review the full estimate, source scope, and the user's crew and sequencing requirements.
+2. Choose which activities to schedule, their real work order, shared crew availability, durations, dependencies and waiting periods. Ask about material unknowns; do not treat estimate row order as a construction sequence. Do not schedule both a parent and its children for the same work.
+3. Write explicit `takeoff.timeline.tasks` in the full takeoff JSON. Every scheduled task needs its source `id`, `startHour`, `durationHours`, and `crew`. Validate and save through the existing revision-checked endpoints. Do not change estimate prices or quantities while planning unless requested.
+4. Read the timeline again to check the saved result, unscheduled tasks, overlapping crews, and finish date. Explain assumptions to the user. The app displays your plan; it does not verify construction dependencies, crew availability, holidays or critical path.
 
-The default sequence follows estimate order. `parallel-pages` sequences each page separately from hour zero, assuming separate crews. This is a planning assumption, not a verified dependency or resource constraint. Review actual work order, crew availability, cure times, mobilization and quantity-priced labor before presenting a committed schedule. Planned crew counts assume the listed crew is assigned throughout the task. Changing crew assumes constant productivity.
-
-Edit `takeoff.timeline` in the full JSON from `read_takeoff`, then use the usual revision-checked validate/save workflow. It changes planning only, never estimate quantities or prices. The user can make the same edits in Timeline. For example:
+Example fragment to merge into the full takeoff read before validating/saving:
 
 ```json
 {
   "hoursPerDay": 8,
   "startDate": "2026-10-12",
   "skipWeekends": true,
-  "mode": "sequential",
   "tasks": [
-    {"id": "existing-section-id", "startHour": 0, "crew": 3},
-    {"id": "existing-subsection-id", "startHour": 8, "durationHours": 4, "crew": 2}
+    {"id": "existing-scope-id", "startHour": 0, "durationHours": 16, "crew": 3},
+    {"id": "existing-other-scope-id", "startHour": 16, "durationHours": 4, "crew": 2}
   ]
 }
 ```
 
-- `hoursPerDay` is 1 to 24; default 8. `startDate` is YYYY-MM-DD or blank for relative days. Weekends are skipped by default; a weekend start moves to Monday. Dates describe workdays, without clock times or holiday rules.
-- Reuse task IDs returned by `read_timeline`, which are source section or unsectioned row IDs. Do not invent IDs or copy calculated task fields into overrides. Remove overrides when deleting their source rows. An override for an existing section with no direct work is dormant until it has work again.
-- `startHour` counts working hours from the beginning, not calendar hours or person-hours. At 8 hours/day, 8 starts on Day 2 and 4 starts halfway through Day 1. Omit it for automatic sequencing. Give tasks equal starts to overlap them.
-- `crew` must be positive. With no duration override, duration becomes estimated person-hours / crew. `durationHours` must be positive and takes priority over inferred duration. It represents elapsed working hours, not person-hours. No duration is invented for missing labor data.
-- `excluded: true` removes a task from the schedule while keeping its estimate. Delete an override field or task entry to restore automatic behavior. Changing workday length preserves explicit start and duration hours.
-- Task bars inherit `sheets[].color`, shared with Summary and Scope. To recolor them, edit the page color. There is no separate timeline color field.
+- Reuse source IDs from `availableWork`. It contains sections (including parent scopes) and unsectioned items. Preserve unrelated saved task entries when making a narrow change. Task `name` uses actual work context rather than a generic Labor heading; `sourceName` and `path` retain the source context. These returned fields are reference data, not editable task fields.
+- `scopeId` and `scopeName` identify the main scope-of-work row on the left. Nested planned tasks remain within that scope row; unsectioned work uses the page. Task colors inherit `sheets[].color`.
+- `startHour` is working hours from the beginning. At 8 hours/day, 8 starts on Day 2 and 4 starts halfway through Day 1. Equal start times overlap tasks. Later starts may leave deliberate gaps. Nothing shifts automatically when another task changes.
+- `durationHours` is explicit elapsed working time, not person-hours. `crew` is explicit planned people. Both must be positive. Missing start, duration or crew leaves the saved entry unscheduled for review. No missing value is filled from estimate quantities. Changing crew does not calculate a new duration.
+- `availableWork` labor facts use Count * Time * Days for direct person-hours only when those fields mean people, hours per day and days. `baseDuration` and `baseCrew` describe direct labor inputs; they are not proposed schedules. Parent reference rows do not repeat child labor totals. Review quantity pricing, equipment/material-only work, assembly labor and shared crews using the full estimate.
+- `hoursPerDay` defaults to 8 (allowed 1 to 24). `startDate` is YYYY-MM-DD or blank. Weekends are skipped by default; a weekend start moves to Monday. Changing day length preserves saved working hours. Holidays and clock times are not modeled.
+- `excluded: true` hides a task from the schedule while keeping its saved entry. Remove an entry to remove it from the plan. Empty `tasks: []` clears the plan; missing estimate activities are never recreated. Remove obsolete entries when deleting source rows.
+- The old `mode` field is accepted for compatibility but ignored. There is no automatic sequential or parallel-page scheduling. Legacy partial entries retain their saved values and require explicit missing fields before they can be scheduled.
 
-After saving, read the timeline again to check unscheduled tasks, overlapping crews, and finish date. Do not claim that the draft checks dependencies, crew availability, holidays, or critical path; those are not modeled yet.
+Opening Timeline, editing estimate rows, or changing display zoom never creates a plan or adds activities. The user can adjust or remove saved tasks in Timeline. AI access uses the existing external AI connection; the page itself does not invoke a model.
 
 ### Section and subsection UP quantities and unit labels
 

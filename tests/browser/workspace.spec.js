@@ -2797,12 +2797,42 @@ test('Summary column headings stick flush to the scroll area without a gap',asyn
   await page.screenshot({path:'.tools/summary-sticky-header.png'});
 });
 
-test('Timeline derives 8-hour days, saves adjustments, supports AI and opens source work',async({page})=>{
+test('Timeline stays empty until AI saves a plan and never recreates removed tasks',async({page})=>{
+  const data=workbook();data.lists[0].companies[0].projects[0].takeoffs[0].sheets.push(sheet('extra','Other work'));
+  await openWorkbook(page,data);await page.locator('#rail .tab-timeline').click();
+  await expect(page.locator('#timeline-chart')).toContainText('No timeline plan yet');
+  await expect(page.locator('.timeline-bar')).toHaveCount(0);
+  await expect(page.locator('#timeline-tasks tr')).toHaveCount(0);
+  await expect(page.locator('#timeline-stats')).not.toBeVisible();
+  await page.locator('#timeline-hours').fill('10');await page.locator('#timeline-hours').blur();
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');await page.reload();
+  await expect(page.locator('#timeline-chart')).toContainText('No timeline plan yet');
+  await page.screenshot({path:'.tools/timeline-awaiting-ai.png'});
+  await page.locator('#timeline-chart').getByRole('button',{name:'AI Access',exact:true}).click();
+  await page.locator('#ai-access-generate').click();await expect(page.locator('#ai-access-connection')).toHaveValue(/Authorization: Bearer/);
+  const connection=await page.locator('#ai-access-connection').inputValue();
+  const headers={Authorization:'Bearer '+/Authorization: Bearer ([a-f0-9]+)/.exec(connection)[1]};
+  await page.locator('#ai-access-close').click();
+  const reference=await (await page.request.get('/api/ai/v1/timeline',{headers})).json();
+  expect(reference.tasks).toEqual([]);expect(reference.availableWork.map(t=>t.id)).toEqual(['row-sn','row-extra']);
+  const read=await (await page.request.get('/api/ai/v1/takeoff',{headers})).json();
+  read.takeoff.timeline={hoursPerDay:8,tasks:[{id:'row-sn',startHour:8,durationHours:4,crew:2}]};
+  expect((await page.request.post('/api/ai/v1/save',{headers,data:{revision:read.revision,takeoff:read.takeoff,requestId:'create-ai-plan'}})).ok()).toBe(true);
+  await expect(page.locator('.timeline-bar')).toHaveCount(1);await expect(page.locator('#timeline-tasks tr')).toHaveCount(1);
+  await expect(page.locator('[data-timeline-task="row-extra"]')).toHaveCount(0);
+  await page.getByRole('button',{name:'Remove Concrete cutting from timeline',exact:true}).click();
+  await expect(page.locator('#timeline-chart')).toContainText('No timeline plan yet');
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');await page.reload();
+  await expect(page.locator('#timeline-chart')).toContainText('No timeline plan yet');
+});
+
+test('Timeline renders explicit 8-hour plans, saves adjustments, supports AI and opens source work',async({page})=>{
   const data=workbook(),tk=data.lists[0].companies[0].projects[0].takeoffs[0];
   const labor=(id,name,count,time,days)=>({id,name,kind:'labor',count,time,days,cost:100});
   tk.sheets[0].color='teal';
   tk.sheets[0].rows=[{id:'demo',type:'section',name:'Interior demolition'},labor('crew','Demo crew',2,8,2),{id:'sub',type:'section',name:'Trench preparation'},labor('prep','Prep crew',1,4,1),{id:'sub-end',type:'sectionEnd',sid:'sub'},{id:'demo-end',type:'sectionEnd',sid:'demo'}];
   tk.sheets.push({...sheet('pour','Concrete'),color:'rust',rows:[labor('finish','Concrete finish',3,8,1)]});
+  tk.timeline={tasks:[{id:'demo',startHour:0,durationHours:16,crew:2},{id:'sub',startHour:16,durationHours:4,crew:1},{id:'finish',startHour:20,durationHours:8,crew:3}]};
   await openWorkbook(page,data);
   const original=await page.evaluate(()=>JSON.stringify(window.estimator.getTimelineTakeoff().sheets));
   await page.locator('#rail .tab-timeline').click();
@@ -2826,25 +2856,24 @@ test('Timeline derives 8-hour days, saves adjustments, supports AI and opens sou
   await expect(page.locator('#timeline-stats')).toContainText('2026-10-14');
   await page.getByRole('spinbutton',{name:'People for Interior demolition',exact:true}).fill('4');
   await page.getByRole('spinbutton',{name:'People for Interior demolition',exact:true}).blur();
-  await expect(page.locator('[data-timeline-task="demo"] .timeline-bar')).toContainText('8h');
-  await page.locator('#timeline-mode').selectOption('parallel-pages');
-  await expect(page.locator('#timeline-stats')).toContainText('7 people');
-  await expect(page.locator('#timeline-stats')).toContainText('1.5 workdays');
+  await expect(page.locator('[data-timeline-task="demo"] .timeline-bar')).toContainText('16h');
+  await expect(page.locator('#timeline-mode')).toHaveCount(0);
+  await expect(page.locator('#timeline-stats')).toContainText('4 people');
+  await expect(page.locator('#timeline-stats')).toContainText('3.5 workdays');
   expect(await page.evaluate(()=>JSON.stringify(window.estimator.getTimelineTakeoff().sheets))).toBe(original);
   await expect(page.locator('#server-status')).toHaveText('All changes saved');
   await page.reload();
   await expect(page.locator('#timelineCard')).toBeVisible();
   await expect(page.getByRole('spinbutton',{name:'People for Interior demolition',exact:true})).toHaveValue('4');
-  await expect(page.locator('#timeline-mode')).toHaveValue('parallel-pages');
   await page.locator('#takeoff-ai-access').click();await page.locator('#ai-access-generate').click();
   await expect(page.locator('#ai-access-connection')).toHaveValue(/Authorization: Bearer/);
   const connection=await page.locator('#ai-access-connection').inputValue();
   const headers={Authorization:'Bearer '+/Authorization: Bearer ([a-f0-9]+)/.exec(connection)[1]};
   await page.locator('#ai-access-close').click();
   const draft=await (await page.request.get('/api/ai/v1/timeline',{headers})).json();
-  expect(draft.tasks.map(t=>t.id)).toEqual(['demo','sub','finish']);expect(draft.peakCrew).toBe(7);
+  expect(draft.tasks.map(t=>t.id)).toEqual(['demo','sub','finish']);expect(draft.peakCrew).toBe(4);
   const read=await (await page.request.get('/api/ai/v1/takeoff',{headers})).json();
-  read.takeoff.timeline.tasks.push({id:'sub',startHour:16,durationHours:8,crew:2});
+  Object.assign(read.takeoff.timeline.tasks.find(t=>t.id==='sub'),{startHour:16,durationHours:8,crew:2});
   expect((await page.request.post('/api/ai/v1/save',{headers,data:{revision:read.revision,takeoff:read.takeoff,requestId:'timeline-plan'}})).ok()).toBe(true);
   await expect(page.getByRole('spinbutton',{name:'Start day for Trench preparation',exact:true})).toHaveValue('3');
   await expect(page.locator('[data-timeline-task="sub"] .timeline-bar')).toContainText('8h');
@@ -2852,8 +2881,8 @@ test('Timeline derives 8-hour days, saves adjustments, supports AI and opens sou
   await expect(page.locator('#sheetCard')).toBeVisible();
   await expect(page.locator('#body tr[data-id="sub"]')).toBeInViewport();
   await page.locator('#rail .tab-timeline').click();
-  await page.getByRole('button',{name:'Reset Trench preparation',exact:true}).click();
-  await expect(page.locator('[data-timeline-task="sub"] .timeline-bar')).toContainText('4h');
+  await page.getByRole('button',{name:'Remove Trench preparation from timeline',exact:true}).click();
+  await expect(page.locator('[data-timeline-task="sub"]')).toHaveCount(0);
   await page.getByRole('checkbox',{name:'Include Concrete finish',exact:true}).uncheck();
   await expect(page.locator('[data-timeline-edit="finish"]')).toContainText('Excluded');
   await expect(page.locator('#timeline-stats')).toContainText('4 people');
@@ -2863,10 +2892,11 @@ test('Timeline leaves unknown durations for review and makes long schedules navi
   const data=workbook(),tk=data.lists[0].companies[0].projects[0].takeoffs[0];
   tk.sheets[0].rows.unshift({id:'mobilize',name:'Mobilization',kind:'equip',count:1,time:8,days:1,cost:100});
   tk.sheets[0].rows[1].time=8;tk.sheets[0].rows[1].days=20;
+  tk.timeline={tasks:[{id:'mobilize',startHour:0,crew:1},{id:'row-sn',startHour:8,durationHours:160,crew:1}]};
   await openWorkbook(page,data);await page.locator('#rail .tab-timeline').click();
   await expect(page.locator('[data-timeline-task="mobilize"]')).toContainText('Needs duration');
-  await expect(page.locator('[data-timeline-task="row-sn"]')).toContainText('Waiting for prior duration');
-  await expect(page.locator('.timeline-bar')).toHaveCount(0);
+  await expect(page.locator('[data-timeline-task="row-sn"] .timeline-bar')).toContainText('160h');
+  await expect(page.locator('.timeline-bar')).toHaveCount(1);
   await page.getByRole('spinbutton',{name:'Duration hours for Mobilization',exact:true}).fill('8');
   await page.getByRole('spinbutton',{name:'Duration hours for Mobilization',exact:true}).blur();
   await expect(page.locator('.timeline-bar')).toHaveCount(2);
@@ -2896,7 +2926,7 @@ test('Timeline groups repeated Labor subsections into readable scope lanes witho
   ));
   tk.sheets[0].rows.push({id:'scope-demo-end',type:'sectionEnd',sid:'scope-demo'});
   const starts=[32,24,56,48,28,16,40,24];
-  tk.timeline={hoursPerDay:8,tasks:starts.map((startHour,i)=>({id:'labor-'+i,startHour}))};
+  tk.timeline={hoursPerDay:8,tasks:starts.map((startHour,i)=>({id:'labor-'+i,startHour,durationHours:i===7?1:8,crew:i===7?1:3}))};
   await openWorkbook(page,data);await page.locator('#rail .tab-timeline').click();
   const before=await page.evaluate(()=>JSON.stringify(window.estimator.getTimelineTakeoff()));
   await expect(page.locator('[data-timeline-scope]')).toHaveCount(1);
@@ -2933,6 +2963,7 @@ test('Timeline left column contains main scopes of work, with their subsections 
     ));
     tk.sheets[0].rows.push({id:id+'-end',type:'sectionEnd',sid:id});
   }
+  tk.timeline={tasks:tk.sheets[0].rows.filter(row=>row.type==='section'&&row.name==='Labor').map((row,i)=>({id:row.id,startHour:i*4,durationHours:4,crew:2}))};
   await openWorkbook(page,data);await page.locator('#rail .tab-timeline').click();
   await expect(page.locator('.timeline-scope-row>.timeline-label strong')).toHaveText(['Interior demolition','Plumbing trench']);
   await expect(page.locator('[data-timeline-scope="demo"] .timeline-work-key strong')).toHaveText(['Remove walls','Remove ceilings']);

@@ -7,17 +7,17 @@ function workName(source,stack,sheet){
   return parent?.name||sheet.title||own||'Unnamed work';
 }
 export const timelineSchema = {
-  type:'object', additionalProperties:false, description:'Planning settings only; never changes estimating quantities or prices. Read read_timeline for generated task IDs and assumptions.',
+  type:'object', additionalProperties:false, description:'Explicit AI-authored plan, separate from estimating prices. No schedule is generated automatically. Read read_timeline.availableWork for source IDs and estimate facts.',
   properties:{
     hoursPerDay:{type:'number',minimum:1,maximum:24,default:8},
     startDate:{type:'string',pattern:'^$|^\\d{4}-\\d{2}-\\d{2}$',description:'Optional first work date; blank shows Day 1, Day 2, etc.'},
     skipWeekends:{type:'boolean',default:true},
-    mode:{type:'string',enum:['sequential','parallel-pages'],default:'sequential',description:'Sequence tasks in estimate order, or start each page at hour zero with its own crew.'},
+    mode:{type:'string',enum:['sequential','parallel-pages'],deprecated:true,description:'Legacy setting preserved for compatibility; ignored. Every planned task needs explicit timing.'},
     tasks:{type:'array',items:{type:'object',required:['id'],additionalProperties:false,properties:{
       id:{type:'string',minLength:1,maxLength:160,description:'Source section or unsectioned item ID from read_timeline. Reuse it; do not invent a task ID.'},
-      startHour:{type:'number',minimum:0,maximum:100000,description:'Working hours from the start. 8 means Day 2 at an 8-hour workday. Omit to sequence automatically.'},
-      durationHours:{type:'number',exclusiveMinimum:0,maximum:100000,description:'Elapsed working hours for this task, not person-hours. Omit to derive from labor.'},
-      crew:{type:'number',exclusiveMinimum:0,maximum:10000,description:'Planned people. With no duration override, divides estimated labor-hours to derive duration.'},
+      startHour:{type:'number',minimum:0,maximum:100000,description:'Explicit working hours from the start. 8 means Day 2 at an 8-hour workday. Required to schedule; never inferred.'},
+      durationHours:{type:'number',exclusiveMinimum:0,maximum:100000,description:'Explicit elapsed working hours, not person-hours. Required to schedule; never inferred.'},
+      crew:{type:'number',exclusiveMinimum:0,maximum:10000,description:'Explicit planned people. Required to schedule. Editing this does not change duration.'},
       excluded:{type:'boolean',description:'Exclude from the schedule, retaining the estimate.'}
     }}}
   }
@@ -27,17 +27,19 @@ export function timelineSources(takeoff){
   const tasks=[];
   for(const sheet of takeoff.sheets || []){
     const stack=[],groups=new Map();
-    for(const row of sheet.rows || []){
-      if(row.type==='section'){stack.push(row);continue;}
-      if(row.type==='sectionEnd'){stack.pop();continue;}
-      if(row.kind==='none'||(!String(row.name||'').trim()&&!positive(row.cost)))continue;
-      const source=stack.at(-1)||row;
+    function sourceTask(source){
       if(!groups.has(source.id)){
         const scope=stack[0];
-        const task={id:source.id,sheetId:sheet.id,scopeId:scope?.id||sheet.id,scopeName:scope?.name||sheet.title||'Untitled scope',section:!!stack.length,name:workName(source,stack,sheet),sourceName:source.name||'Unnamed work',path:stack.map(s=>s.name||'Unnamed section').join(' / '),page:sheet.title||'Untitled page',color:sheet.color||'',laborHours:0,baseDuration:0,baseCrew:0,sourceRowIds:[],issues:[]};
+        const task={id:source.id,sheetId:sheet.id,scopeId:scope?.id||sheet.id,scopeName:scope?.name||sheet.title||'Untitled scope',section:source.type==='section',name:workName(source,stack,sheet),sourceName:source.name||'Unnamed work',path:stack.map(s=>s.name||'Unnamed section').join(' / '),page:sheet.title||'Untitled page',color:sheet.color||'',laborHours:0,baseDuration:0,baseCrew:0,sourceRowIds:[],issues:[]};
         groups.set(source.id,task);tasks.push(task);
       }
-      const task=groups.get(source.id);task.sourceRowIds.push(row.id);
+      return groups.get(source.id);
+    }
+    for(const row of sheet.rows || []){
+      if(row.type==='section'){stack.push(row);sourceTask(row);continue;}
+      if(row.type==='sectionEnd'){stack.pop();continue;}
+      if(row.kind==='none'||(!String(row.name||'').trim()&&!positive(row.cost)))continue;
+      const task=sourceTask(stack.at(-1)||row);task.sourceRowIds.push(row.id);
       if(row.kind==='labor'){
         const people=positive(row.count),hours=positive(row.time),days=positive(row.days);
         if(people&&hours&&days&&Number.isFinite(task.laborHours+people*hours*days)&&Number.isFinite(task.baseCrew+people)){task.laborHours+=people*hours*days;task.baseDuration=Math.max(task.baseDuration,hours*days);task.baseCrew+=people;}
@@ -95,31 +97,24 @@ export function timelinePeakCrew(tasks,start=0,end=Infinity){
 }
 
 export function deriveTimeline(takeoff){
-  const settings={hoursPerDay:8,startDate:'',skipWeekends:true,mode:'sequential',...takeoff.timeline};
-  const dayHours=positive(settings.hoursPerDay)||8,overrides=new Map((settings.tasks||[]).map(t=>[t.id,t]));
-  let cursor=0,blocked=false;
-  const pageCursors=new Map(),blockedPages=new Set();
-  const tasks=timelineSources(takeoff).map(source=>{
-    const override=overrides.get(source.id)||{},parallel=settings.mode==='parallel-pages';
-    const inferred=positive(positive(override.crew)?source.laborHours/override.crew:source.baseDuration);
-    const durationHours=positive(override.durationHours)||(source.issues.length?0:inferred);
-    const missing=durationHours<=0,priorBlocked=parallel?blockedPages.has(source.sheetId):blocked;
-    const explicitStart=typeof override.startHour==='number'&&Number.isFinite(override.startHour)&&override.startHour>=0;
-    const startHour=explicitStart?override.startHour:(parallel?pageCursors.get(source.sheetId)||0:cursor);
-    const excluded=override.excluded===true;
-    const scheduled=!excluded&&!missing&&(!priorBlocked||explicitStart);
-    const endHour=startHour+durationHours;
-    if(!excluded){
-      if(missing){if(parallel)blockedPages.add(source.sheetId);else blocked=true;}
-      else if(scheduled){if(parallel){pageCursors.set(source.sheetId,Math.max(pageCursors.get(source.sheetId)||0,endHour));if(explicitStart)blockedPages.delete(source.sheetId);}else{cursor=Math.max(cursor,endHour);if(explicitStart)blocked=false;}}
-    }
-    return {...source,override,crew:positive(override.crew)||source.baseCrew,durationHours,startHour:scheduled?startHour:null,endHour:scheduled?endHour:null,scheduled,excluded,
-      status:excluded?'Excluded':missing?'Needs duration':!scheduled?'Waiting for prior duration':Object.keys(override).some(k=>k!=='id')?'Adjusted':'Automatic'};
+  const settings={hoursPerDay:8,startDate:'',skipWeekends:true,...takeoff.timeline};
+  const dayHours=positive(settings.hoursPerDay)||8,availableWork=timelineSources(takeoff);
+  const sources=new Map(availableWork.map(task=>[task.id,task]));
+  const saved=Array.isArray(settings.tasks)?settings.tasks:[];
+  const tasks=saved.map(override=>{
+    const source=sources.get(override.id),excluded=override.excluded===true;
+    const startHour=typeof override.startHour==='number'&&Number.isFinite(override.startHour)&&override.startHour>=0?override.startHour:null;
+    const durationHours=positive(override.durationHours),crew=positive(override.crew);
+    const missing=[];
+    if(startHour===null)missing.push('start');if(!durationHours)missing.push('duration');if(!crew)missing.push('crew');
+    const scheduled=!!source&&!excluded&&!missing.length;
+    return {...(source||{id:override.id,name:'Source work no longer available',page:'',path:'',issues:[],laborHours:0}),override,crew,durationHours,
+      startHour:scheduled?startHour:null,endHour:scheduled?startHour+durationHours:null,scheduled,excluded,
+      status:excluded?'Excluded':!source?'Source needs review':missing.length?'Needs '+missing.join(', '):'Planned'};
   });
-  const scheduled=tasks.filter(t=>t.scheduled),endHour=scheduled.reduce((max,t)=>Math.max(max,t.endHour),0);
-  const days=Math.ceil(endHour/dayHours);
-  return {settings:{hoursPerDay:dayHours,startDate:settings.startDate,skipWeekends:settings.skipWeekends,mode:settings.mode},tasks,
-    laborHours:tasks.filter(t=>!t.excluded).reduce((sum,t)=>sum+t.laborHours,0),endHour,days,peakCrew:timelinePeakCrew(tasks),
+  const endHour=tasks.filter(t=>t.scheduled).reduce((max,t)=>Math.max(max,t.endHour),0),days=Math.ceil(endHour/dayHours);
+  return {settings:{hoursPerDay:dayHours,startDate:settings.startDate,skipWeekends:settings.skipWeekends},tasks,availableWork,hasPlan:saved.length>0,
+    laborHours:availableWork.reduce((sum,t)=>sum+t.laborHours,0),endHour,days,peakCrew:timelinePeakCrew(tasks),
     finishDate:days?workDate(settings.startDate,days-1,settings.skipWeekends):'',unscheduled:tasks.filter(t=>!t.excluded&&!t.scheduled).length,
-    guidance:'Planning draft: direct labor Count means people, Time means hours per day, Days means working days. Labor within one section overlaps; sections sequence in estimate order unless page crews run in parallel. Non-labor-only tasks and incomplete labor need a manual duration. Subsections own their direct rows; parent rollups are not counted again. Review quantity-priced labor, shared crews, dependencies, curing and mobilization. Overrides never change estimating prices or quantities.'};
+    guidance:'AI creates the plan. Only saved tasks with explicit start hours, duration hours, and crew are scheduled. Estimate facts in availableWork are reference only: Count x Time x Days represents direct labor person-hours when those fields mean people, hours per day, and days. AI must review dependencies, shared crews, quantity pricing, mobilization and cure times. Opening the timeline or changing the estimate never creates, adds, sequences or retimes tasks. Plan edits never change estimate prices or quantities.'};
 }
