@@ -149,6 +149,26 @@ export function timelinePeakCrew(tasks,start=0,end=Infinity){
   return peak;
 }
 
+export function timelineResourceUsage(tasks,hoursPerDay=8){
+  const groups=new Map();
+  for(const task of tasks){
+    if(task.excluded)continue;
+    for(const resource of task.resources||[]){
+      if(resource.missing)continue;
+      if(!groups.has(resource.id))groups.set(resource.id,{id:resource.id,name:resource.name,kind:resource.kind,page:resource.page,path:resource.path,assignments:[]});
+      groups.get(resource.id).assignments.push({taskId:task.id,scheduled:task.scheduled,startHour:task.startHour,endHour:task.endHour,quantity:resource.quantity});
+    }
+  }
+  return [...groups.values()].map(resource=>{
+    const scheduled=resource.assignments.filter(a=>a.scheduled).sort((a,b)=>a.startHour-b.startHour);
+    let plannedHours=0,end=-Infinity;
+    for(const item of scheduled){plannedHours+=Math.max(0,item.endHour-Math.max(end,item.startHour));end=Math.max(end,item.endHour);}
+    const quantityIncomplete=scheduled.some(a=>a.quantity===undefined);
+    return {...resource,plannedHours,workdays:plannedHours/hoursPerDay,scheduledTasks:scheduled.length,pendingTasks:resource.assignments.length-scheduled.length,
+      peakQuantity:scheduled.length&&!quantityIncomplete?timelinePeakCrew(scheduled.map(a=>({...a,crew:a.quantity}))):null};
+  }).sort((a,b)=>(a.kind==='equip'?0:1)-(b.kind==='equip'?0:1)||a.name.localeCompare(b.name)||a.page.localeCompare(b.page));
+}
+
 export function deriveTimeline(takeoff){
   const settings={hoursPerDay:8,startDate:'',skipWeekends:true,...takeoff.timeline};
   const dayHours=positive(settings.hoursPerDay)||8,availableWork=timelineSources(takeoff),availableResources=timelineResources(takeoff);
@@ -169,7 +189,7 @@ export function deriveTimeline(takeoff){
   });
   const costs=(Array.isArray(settings.costs)?settings.costs:[]).map(cost=>({...cost,source:resourceMap.get(cost.sourceRowId)||null}));
   const endHour=Math.max(tasks.filter(t=>t.scheduled).reduce((max,t)=>Math.max(max,t.endHour),0),costs.reduce((max,cost)=>Math.max(max,cost.day*dayHours),0)),days=Math.ceil(endHour/dayHours);
-  return {settings:{hoursPerDay:dayHours,startDate:settings.startDate,skipWeekends:settings.skipWeekends},tasks,availableWork,availableResources,costs,hasPlan:saved.length>0||costs.length>0,
+  return {settings:{hoursPerDay:dayHours,startDate:settings.startDate,skipWeekends:settings.skipWeekends},tasks,availableWork,availableResources,resourceUsage:timelineResourceUsage(tasks,dayHours),costs,hasPlan:saved.length>0||costs.length>0,
     laborHours:availableWork.reduce((sum,t)=>sum+t.laborHours,0),endHour,days,peakCrew:timelinePeakCrew(tasks),
     finishDate:days?workDate(settings.startDate,days-1,settings.skipWeekends):'',unscheduled:tasks.filter(t=>!t.excluded&&!t.scheduled).length,
     guidance:'AI creates the plan. Only saved tasks with explicit start hours, duration hours, and crew are scheduled. Estimate facts in availableWork are reference only: Count x Time x Days represents direct labor person-hours when those fields mean people, hours per day, and days. AI must review dependencies, shared crews, quantity pricing, mobilization and cure times. Opening the timeline or changing the estimate never creates, adds, sequences or retimes tasks. Plan edits never change estimate prices or quantities.'};

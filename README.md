@@ -150,6 +150,8 @@ Dates and daily crew totals display the supplied plan. Review real dependencies,
 
 Click a scope or activity bar for detailed work notes, crew/timing, AI-assigned equipment and resources, quantities and use notes. Small resource icons reuse the library's item symbols. The detail panel includes **Open in estimate**. AI chooses assignments from `read_timeline.availableResources`; nothing is assigned automatically. Daily travel, hotel, meals and other allowances appear as compact icons above the days; click one for its itemized breakdown. AI writes these in `timeline.costs`, using one explicit total per entry/day. Unknown amounts show Not priced. These annotations never add charges to the estimate.
 
+Below the timeline statistics, compact equipment/resource cards show planned hours, equivalent workdays, and peak simultaneous quantity. Click a card to see the activities using it. Totals follow AI-assigned task durations, merge overlapping hours per resource, and exclude idle gaps and excluded tasks. The AI can read these totals in `read_timeline.resourceUsage`.
+
 ## Nested takeoff sections
 
 Use **+ Subsection** on a section header to add a child. Indentation and branch lines show the hierarchy; each section collapses independently and its subtotal includes all descendants. Moving or duplicating a section carries its entire subtree. Removing a section header keeps its contents at the parent level.

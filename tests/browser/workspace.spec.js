@@ -3002,6 +3002,7 @@ test('AI assigns equipment and daily costs to rich timeline details without repr
   await openWorkbook(page,data);await page.locator('#rail .tab-timeline').click();
   const before=await page.evaluate(()=>JSON.stringify(window.estimator.getTimelineTakeoff().sheets));
   await expect(page.locator('.timeline-resource-badge')).toHaveCount(0);
+  await expect(page.locator('#timeline-resources')).toContainText('No equipment or resources assigned by AI yet.');
   await page.getByRole('button',{name:'Details for North scope',exact:true}).click();
   const dialog=page.locator('#timeline-detail-dialog');await expect(dialog).toContainText('No equipment or resources assigned by AI yet.');
   await dialog.getByRole('button',{name:'Close',exact:true}).click();
@@ -3016,6 +3017,18 @@ test('AI assigns equipment and daily costs to rich timeline details without repr
   read.takeoff.timeline.costs=[{id:'travel',day:1,kind:'travel',amount:125,taskId:'row-sn',notes:'Crew transport to site.'},{id:'hotel',day:2,kind:'hotel',label:'Two rooms',amount:300,notes:'Two rooms for the traveling crew.'},{id:'meals',day:2,kind:'meals'}];
   expect((await page.request.post('/api/ai/v1/save',{headers,data:{revision:read.revision,takeoff:read.takeoff,requestId:'equipment-plan'}})).ok()).toBe(true);
   await expect(page.locator('.timeline-cost-chip')).toHaveCount(3);
+  const resourceCard=page.getByRole('button',{name:'Planned use for Mini excavator',exact:true});
+  await expect(resourceCard).toContainText('2 workdays');await expect(resourceCard).toContainText('16h');await expect(resourceCard).toContainText('Peak qty 1');
+  await resourceCard.click();await expect(dialog).toContainText('Concrete cutting');await expect(dialog).toContainText('Use for interior trench excavation.');await page.keyboard.press('Escape');
+  const useSummary=await (await page.request.get('/api/ai/v1/timeline',{headers})).json();
+  expect(useSummary.resourceUsage[0].plannedHours).toBe(16);expect(useSummary.resourceUsage[0].peakQuantity).toBe(1);
+  for(const theme of ['light','dark','medieval']){
+    await page.evaluate(theme=>window.estimator.setTheme(theme),theme);await page.locator('#timelineCard>.scroll').evaluate(el=>{el.scrollTop=0;});
+    await page.screenshot({path:'.tools/timeline-resource-summary-'+theme+'.png'});
+  }
+  const desktop=page.viewportSize();await page.setViewportSize({width:390,height:844});await resourceCard.scrollIntoViewIfNeeded();
+  const bounds=await resourceCard.boundingBox();expect(bounds.x).toBeGreaterThanOrEqual(0);expect(bounds.x+bounds.width).toBeLessThanOrEqual(390);
+  await page.screenshot({path:'.tools/timeline-resource-summary-mobile.png'});await page.setViewportSize(desktop);
   await expect(page.locator('.timeline-scope-toggle .timeline-resource-badge svg')).toHaveCount(1);
   await expect(page.locator('.timeline-scope-toggle .timeline-resource-badge')).toHaveAttribute('title',/Mini excavator/);
   const layout=await page.locator('.timeline-cost-row').evaluate(el=>({costBottom:el.getBoundingClientRect().bottom,dayTop:document.querySelector('.timeline-date-row').getBoundingClientRect().top}));
@@ -3040,5 +3053,6 @@ test('AI assigns equipment and daily costs to rich timeline details without repr
   await expect(page.locator('.timeline-cost-chip')).toHaveCount(3);
   await page.getByRole('button',{name:'Remove Concrete cutting from timeline',exact:true}).click();
   await expect(page.locator('.timeline-scope-bar')).toHaveCount(0);await expect(page.locator('.timeline-cost-chip')).toHaveCount(3);
+  await expect(page.locator('.timeline-resource-card')).toHaveCount(0);
   expect(await page.evaluate(()=>window.estimator.getTimelineTakeoff().timeline.costs[0].taskId)).toBeUndefined();
 });

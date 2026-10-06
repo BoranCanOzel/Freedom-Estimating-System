@@ -97,3 +97,23 @@ test('a cost-only plan displays its assigned days without inventing work',()=>{
   const result=deriveTimeline({...takeoff(),timeline:{costs:[{id:'hotel',day:4,kind:'hotel',amount:200}]}});
   assert.equal(result.hasPlan,true);assert.equal(result.days,4);assert.deepEqual(result.tasks,[]);
 });
+
+test('resource usage merges overlapping hours, skips gaps and adds simultaneous quantities without changing assignments',()=>{
+  const source=takeoff();source.sheets[0].rows.push({id:'excavator',name:'Mini excavator',kind:'equip'});
+  assert.deepEqual(deriveTimeline(source).resourceUsage,[]);
+  source.timeline={tasks:[
+    {id:'parent',startHour:0,durationHours:16,crew:1,resources:[{id:'excavator',quantity:1}]},
+    {id:'child',startHour:8,durationHours:12,crew:1,resources:[{id:'excavator',quantity:2}]},
+    {id:'pour',startHour:24,durationHours:8,crew:1,resources:[{id:'excavator',quantity:1}]}
+  ]};
+  const before=structuredClone(source);let usage=deriveTimeline(source).resourceUsage[0];
+  assert.equal(usage.plannedHours,28);assert.equal(usage.workdays,3.5);assert.equal(usage.peakQuantity,3);
+  assert.equal(usage.scheduledTasks,3);assert.equal(usage.pendingTasks,0);assert.deepEqual(source,before);
+  source.timeline.tasks[1].startHour=16;usage=deriveTimeline(source).resourceUsage[0];assert.equal(usage.peakQuantity,3);
+  source.timeline.tasks[2].startHour=28;usage=deriveTimeline(source).resourceUsage[0];assert.equal(usage.peakQuantity,2);
+  delete source.timeline.tasks[1].resources[0].quantity;assert.equal(deriveTimeline(source).resourceUsage[0].peakQuantity,null);
+  source.timeline.tasks[1].excluded=true;usage=deriveTimeline(source).resourceUsage[0];assert.equal(usage.plannedHours,24);assert.equal(usage.peakQuantity,1);
+  delete source.timeline.tasks[2].crew;usage=deriveTimeline(source).resourceUsage[0];assert.equal(usage.plannedHours,16);assert.equal(usage.pendingTasks,1);
+  source.timeline.hoursPerDay=10;assert.equal(deriveTimeline(source).resourceUsage[0].workdays,1.6);
+  source.sheets[0].rows=source.sheets[0].rows.filter(r=>r.id!=='excavator');assert.deepEqual(deriveTimeline(source).resourceUsage,[]);
+});

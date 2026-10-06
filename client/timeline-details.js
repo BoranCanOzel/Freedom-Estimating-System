@@ -38,6 +38,23 @@ export function renderDailyCosts(draft,firstDay,windowDays,tickDays,bridge,onOpe
   row.append(cells);return row;
 }
 
+export function renderResourceSummary(container,draft,bridge,onOpen){
+  container.replaceChildren();container.hidden=!draft.hasPlan;
+  const head=el('div','','timeline-resources-head');head.append(el('h3','Equipment & resources'),el('small','Planned use'));container.append(head);
+  if(!draft.resourceUsage.length){container.append(el('p','No equipment or resources assigned by AI yet.','timeline-detail-muted'));return;}
+  const cards=el('div','','timeline-resource-cards');
+  for(const resource of draft.resourceUsage){
+    const card=el('button','','timeline-resource-card');card.type='button';card.dataset.resourceId=resource.id;
+    card.setAttribute('aria-label','Planned use for '+resource.name);card.onclick=()=>onOpen(resource.id);
+    const name=el('span','','timeline-resource-name');name.append(timelineIcon(resource.kind,bridge),el('strong',resource.name));
+    const duration=el('span','','timeline-resource-duration');duration.append(el('b',resource.scheduledTasks?num(resource.workdays)+(resource.workdays===1?' workday':' workdays'):'Needs scheduling'));
+    if(resource.scheduledTasks)duration.append(el('span',num(resource.plannedHours)+'h'));
+    const meta=[resource.scheduledTasks?resource.peakQuantity===null?'Quantity not set':'Peak qty '+num(resource.peakQuantity):'',resource.assignments.length+(resource.assignments.length===1?' activity':' activities'),resource.pendingTasks?resource.pendingTasks+' unscheduled':''].filter(Boolean).join(' / ');
+    card.append(name,duration,el('small',resource.page,'timeline-resource-page'),el('small',meta));cards.append(card);
+  }
+  container.append(cards,el('p','Based on assigned task durations. Overlapping hours count once per item; peak quantity adds simultaneous assignments.','timeline-resource-explainer'));
+}
+
 export function setupTimelineDetails(bridge){
   const dialog=el('dialog','','timeline-detail-dialog');dialog.id='timeline-detail-dialog';dialog.setAttribute('aria-labelledby','timeline-detail-title');
   const top=el('div','','timeline-detail-head'),title=el('h2');title.id='timeline-detail-title';
@@ -82,12 +99,12 @@ export function setupTimelineDetails(bridge){
       title.textContent=costLabels[selection.kind]+' / '+(selection.from===selection.to?'Day '+selection.from:'Days '+selection.from+'-'+selection.to);
       body.append(costList(draft.costs.filter(c=>c.day>=selection.from&&c.day<=selection.to&&c.kind===selection.kind)));
     }else{
-      const tasks=draft.tasks.filter(t=>selection.type==='task'?t.id===selection.id:(t.scopeId||t.sheetId)===selection.id&&!t.excluded);
-      title.textContent=selection.type==='task'?'Activity details':tasks[0]?.scopeName||'Scope details';
+      const tasks=draft.tasks.filter(t=>selection.type==='task'?t.id===selection.id:selection.type==='resource'?!t.excluded&&t.resources.some(r=>r.id===selection.id):(t.scopeId||t.sheetId)===selection.id&&!t.excluded);
+      title.textContent=selection.type==='task'?'Activity details':selection.type==='resource'?draft.resourceUsage.find(r=>r.id===selection.id)?.name||'Resource details':tasks[0]?.scopeName||'Scope details';
       if(!tasks.length)body.append(empty('This work is no longer in the plan.'));
       tasks.forEach(task=>body.append(taskCard(task)));
     }
   }
   const open=value=>{selection=value;render();if(!dialog.open)dialog.showModal();};
-  return {update(value){draft=value;if(dialog.open)render();},close(){dialog.close();selection=null;},task:id=>open({type:'task',id}),scope:id=>open({type:'scope',id}),costs:(from,to,kind)=>open({type:'costs',from,to,kind})};
+  return {update(value){draft=value;if(dialog.open)render();},close(){dialog.close();selection=null;},task:id=>open({type:'task',id}),scope:id=>open({type:'scope',id}),resource:id=>open({type:'resource',id}),costs:(from,to,kind)=>open({type:'costs',from,to,kind})};
 }

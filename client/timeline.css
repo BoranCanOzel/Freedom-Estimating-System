@@ -14,6 +14,14 @@ body.server-mode #timelineCard .eyebrow-row>.btn.ghost,body.server-mode #timelin
 .timeline-stats>div{padding:14px;border:1px solid var(--rule);border-radius:6px;background:var(--card)}
 .timeline-stats span,.timeline-stats strong{display:block}.timeline-stats span{font-size:12px;color:var(--muted);margin-bottom:8px}.timeline-stats strong{font:600 20px var(--f-cond);color:var(--ink)}
 .timeline-assumptions{font-size:13px;color:var(--muted);line-height:1.6;margin:14px 0}
+.timeline-resources{margin:0 0 20px}.timeline-resources[hidden]{display:none}
+.timeline-resources-head{display:flex;align-items:baseline;gap:12px;margin-bottom:10px}.timeline-resources-head h3{font:600 16px var(--f-cond);margin:0}.timeline-resources-head small{color:var(--muted);font-size:11px}
+.timeline-resource-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(220px,100%),1fr));gap:10px}
+.timeline-resource-card{display:flex;flex-direction:column;gap:8px;min-width:0;padding:12px 14px;text-align:left;border:1px solid var(--rule);border-radius:6px;background:var(--card);color:var(--ink);font:12px var(--f-sans);cursor:pointer}
+.timeline-resource-card:hover{border-color:var(--amber);background:color-mix(in srgb,var(--amber) 5%,var(--card))}.timeline-resource-card:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.timeline-resource-name{display:flex;align-items:center;gap:8px;overflow-wrap:anywhere}.timeline-resource-name .timeline-icon-wrap{color:var(--amber)}
+.timeline-resource-duration{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px}.timeline-resource-duration b{font:600 21px var(--f-cond)}.timeline-resource-duration>span,.timeline-resource-card small{color:var(--muted)}
+.timeline-resource-page{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}.timeline-resource-explainer{font-size:11px;color:var(--muted);line-height:1.5;margin:8px 0 0}
 .timeline-assumptions summary,.timeline-adjustments summary{cursor:pointer;color:var(--ink);font-weight:600}
 .timeline-chart-heading{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:22px 0 12px;flex-wrap:wrap}
 .timeline-chart-heading h3{font:600 18px var(--f-cond);margin:0}
