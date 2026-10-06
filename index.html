@@ -9700,7 +9700,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     box.appendChild(head);
     const sel = document.createElement('select');
     sel.className = 'ed-select';
-    projectTree().forEach(co => {
+    projectTree().toSorted((a, b) => String(a.name || 'Untitled company').trim().localeCompare(String(b.name || 'Untitled company').trim(), 'en', {sensitivity:'base', numeric:true})).forEach(co => {
       const o = document.createElement('option');
       o.value = co.id;
       o.textContent = co.name || 'Untitled company';
