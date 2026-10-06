@@ -9,10 +9,11 @@ export function setupScope(api, context, bridge) {
   card.innerHTML='<div class="head"><div class="eyebrow-row"><span class="eyebrow">Scope</span></div><div class="sum-title" id="scope-title"></div><p class="scope-description">Measured work from ZZTakeoff. Review each line before using it in your estimate.</p></div><div class="scroll scope-content"><section id="scope-page-colours" aria-label="Estimating page colours"></section><div class="scope-source"><label>ZZTakeoff project link<input id="scope-source" type="url" placeholder="Paste the ZZTakeoff project link"></label><button type="button" class="btn" id="scope-fetch">Fetch from ZZTakeoff</button><button type="button" class="btn alt" id="scope-connect">Connect ZZTakeoff</button></div><label class="scope-ai-access"><input type="checkbox" id="scope-ai-access"> Allow AI to read Scope</label><p id="scope-message" role="status"></p><div class="scope-tools"><label>Find an item<input id="scope-search" type="search" placeholder="Search scope items"></label><label>Show<select id="scope-filter" aria-label="Scope status"><option value="all">All items</option><option value="included">Included</option><option value="excluded">Excluded</option><option value="ignored">Ignored</option><option value="duplicate">Duplicates</option></select></label><span id="scope-count"></span></div><div id="scope-results"></div></div>';
   const $=id=>document.getElementById('scope-'+id);
   let identity='',busy=false,connection=null;
+  const noteVisibility=new Map();
   const key=()=>{const c=context();return `${c.workbook}/${c.list}/${c.takeoff}`;};
   function render() {
     if(bridge.getLocation().view!=='scope')return;
-    if(identity!==key()){identity=key();$('search').value='';$('filter').value='all';$('message').textContent='';}
+    if(identity!==key()){identity=key();noteVisibility.clear();$('search').value='';$('filter').value='all';$('message').textContent='';}
     const focused=document.activeElement?.matches('.scope-item-note')?document.activeElement:null;
     const editing=focused?{id:focused.closest('[data-scope-item]').dataset.scopeItem,start:focused.selectionStart,end:focused.selectionEnd,scroll:focused.scrollTop}:null;
     const scope=bridge.getScope();
@@ -76,9 +77,24 @@ export function setupScope(api, context, bridge) {
       if(colour){row.style.setProperty('--scope-item-colour',colour);row.classList.add('scope-coloured');}
       const name=el('td');name.append(el('strong',item.name));if(item.group)name.append(el('small',item.group));
       const note=el('textarea','','scope-item-note');note.rows=2;note.maxLength=10000;note.placeholder='Add a note...';note.value=item.note||'';
+      note.id='scope-note-'+encodeURIComponent(item.id);
       note.setAttribute('aria-label','Notes for '+item.name);
-      note.oninput=()=>bridge.setScopeItemNote(item.id,note.value);
-      name.append(note);
+      note.hidden=!(noteVisibility.get(item.id) ?? !!note.value.trim());
+      const noteToggle=el('button','','btn alt tiny scope-note-toggle');noteToggle.type='button';
+      noteToggle.setAttribute('aria-controls',note.id);
+      const syncNoteToggle=()=>{
+        const label=note.hidden?(note.value.trim()?'Show note':'Add note'):'Hide note';
+        noteToggle.textContent=label;
+        noteToggle.setAttribute('aria-label',label+' for '+item.name);
+        noteToggle.setAttribute('aria-expanded',String(!note.hidden));
+      };
+      noteToggle.onclick=()=>{
+        note.hidden=!note.hidden;noteVisibility.set(item.id,!note.hidden);syncNoteToggle();
+        if(!note.hidden)note.focus();
+      };
+      note.oninput=()=>{noteVisibility.set(item.id,true);bridge.setScopeItemNote(item.id,note.value);syncNoteToggle();};
+      syncNoteToggle();
+      name.append(noteToggle,note);
       const assignment=el('label','','scope-assignment');assignment.append(el('span','Estimate page'));
       const select=el('select');select.setAttribute('aria-label','Estimate page for '+item.name);
       select.add(new Option('Unassigned',''));

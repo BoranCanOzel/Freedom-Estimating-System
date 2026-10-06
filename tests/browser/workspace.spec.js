@@ -1665,7 +1665,12 @@ test('Scope fetch keeps per-takeoff review marks and never replaces estimate pag
   await page.locator('#scope-search').fill('A2 - Details');
   await expect(page.locator('[data-scope-item]')).toHaveCount(1);
   await page.locator('#scope-search').fill('');
+  await expect(page.getByRole('textbox',{name:'Notes for Concrete slab',exact:true})).toBeHidden();
+  await page.getByRole('button',{name:'Add note for Concrete slab',exact:true}).click();
   await page.getByRole('textbox',{name:'Notes for Concrete slab',exact:true}).fill('Night shift only');
+  await page.getByRole('button',{name:'Hide note for Concrete slab',exact:true}).click();
+  await expect(page.getByRole('textbox',{name:'Notes for Concrete slab',exact:true})).toBeHidden();
+  await page.getByRole('button',{name:'Show note for Concrete slab',exact:true}).click();
   await page.getByRole('combobox',{name:'Estimate page for Concrete slab',exact:true}).selectOption('sn');
   const allAi=page.getByRole('checkbox',{name:'Show all Scope items to AI',exact:true});
   await expect(allAi).toBeChecked();
@@ -1689,6 +1694,7 @@ test('Scope fetch keeps per-takeoff review marks and never replaces estimate pag
   revision++;
   await page.locator('#scope-fetch').click();
   await expect(page.locator('[data-scope-item="a"]')).toContainText('180 SF');
+  await expect(page.getByRole('textbox',{name:'Notes for Concrete slab revised',exact:true})).toBeVisible();
   await expect(page.getByRole('textbox',{name:'Notes for Concrete slab revised',exact:true})).toHaveValue('Night shift only');
   await expect(page.getByRole('combobox',{name:'Estimate page for Concrete slab revised',exact:true})).toHaveValue('sn');
   await expect(page.getByRole('checkbox',{name:'Show Concrete slab revised to AI',exact:true})).not.toBeChecked();
@@ -1704,6 +1710,7 @@ test('Scope fetch keeps per-takeoff review marks and never replaces estimate pag
   await expect(page.locator('[data-scope-item]')).toHaveCount(3);
   await expect(page.locator('#server-status')).toHaveText('All changes saved');
   await page.reload();
+  await expect(page.getByRole('textbox',{name:'Notes for Concrete slab revised',exact:true})).toBeVisible();
   await expect(page.getByRole('textbox',{name:'Notes for Concrete slab revised',exact:true})).toHaveValue('Night shift only');
   await expect(page.locator('#scopeCard')).toBeVisible();
   await expect(page.locator('[data-scope-item="c"]')).toHaveAttribute('data-status','duplicate');

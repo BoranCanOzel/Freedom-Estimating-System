@@ -51,6 +51,7 @@ body.dark:not(.medieval) #scopeCard .scope-actions .btn[aria-pressed=true]{color
 
 #scopeCard .scope-item-note{display:block;box-sizing:border-box;width:100%;min-height:42px;margin-top:8px;padding:6px 8px;resize:vertical;border:1px solid var(--rule);border-radius:4px;background:transparent;color:var(--ink);font:12px/1.5 var(--f-sans)}
 #scopeCard .scope-item-note::placeholder{color:var(--muted)}
+#scopeCard .scope-note-toggle{display:block;margin-top:8px}
 #scopeCard .scope-item-note:focus{outline:2px solid var(--amber);outline-offset:1px;background:var(--card)}
 
 #scope-page-colours{margin-bottom:20px}
