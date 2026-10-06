@@ -225,6 +225,7 @@
   .option-tab{display:flex;align-items:stretch;position:relative}
   .option-tab>.tab{border-top-right-radius:0;padding-right:8px;min-width:0;max-width:210px}
   .option-tab-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+  .option-tab-colour{width:9px;height:9px;flex:none;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.15)}
   .option-close{border:1px solid var(--rule);border-left:0;border-bottom:0;border-radius:0 5px 0 0;background:var(--card);color:var(--muted);min-width:28px;padding:3px;font:18px var(--f-sans);cursor:pointer}
   .option-close:hover:not(:disabled){background:var(--calc);color:#c65a4f}
   .option-close:disabled{opacity:.3;cursor:default}
@@ -5426,9 +5427,12 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
       const col = tabColor(sh.color);
       if (col){
-        if (!active) t.style.background = col.tint;
-        t.style.boxShadow = 'inset 0 3px 0 ' + col.dot;
-        t.style.color = col.dot;
+        if (!active){ t.style.background = col.tint; t.style.color = col.dot; }
+        const dot = document.createElement('span');
+        dot.className = 'option-tab-colour';
+        dot.style.background = col.dot;
+        dot.setAttribute('aria-hidden','true');
+        t.appendChild(dot);
       }
 
       const lab = document.createElement('span');
