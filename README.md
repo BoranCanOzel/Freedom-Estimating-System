@@ -138,6 +138,14 @@ Edits are acknowledged only after SQLite writes succeed. JSON snapshots are gene
 
 For a full backup, stop the process and copy all of `DATA_DIR`, or use SQLite's supported online backup facilities. Do not copy only `projects.sqlite` while the database is running in WAL mode. The JSON snapshot history is a convenience, not a substitute for an independent backup. Never edit a snapshot to change an open project; import it as a new workbook instead.
 
+## Work timeline
+
+Open **Timeline** at the top right beside Load calc and Wage calc. It creates a draft from named estimate work using **8-hour workdays** by default. Direct labor uses people x hours x days for person-hours; labor within a section overlaps, while sections run sequentially. Subsections own their direct rows, avoiding duplicate parent totals. Choose separate crews by page to run pages in parallel.
+
+The chart uses page/scope colors and shows planned peak people per day. Click a task to open its source work. Set an optional start date, skip weekends, and adjust start days, people, durations, or inclusion in **Adjust tasks**. Clear a field or use Reset to restore the automatic value. These saved, shared settings never change estimate quantities or prices. Unknown durations are flagged and block automatic successors until reviewed; equipment and material quantities do not become invented labor durations.
+
+This is a planning draft: review actual dependencies, shared crews, cure times, holidays and quantity-priced labor. It does not resource-level or calculate critical path. No model call is needed to draw the schedule. AI tools can read it with `read_timeline` / GET `/api/ai/v1/timeline` and adjust `takeoff.timeline` through existing validate/save endpoints; see [AI timeline instructions](docs/ai-takeoff.md#work-timeline-8-hour-days-by-default). Deploy the built client and restart Node for the new API. Settings are stored with the takeoff, including JSON exports and snapshots. **Print current view** prints the selected day window; **Save as PDF** continues to export the estimate report.
+
 ## Nested takeoff sections
 
 Use **+ Subsection** on a section header to add a child. Indentation and branch lines show the hierarchy; each section collapses independently and its subtotal includes all descendants. Moving or duplicating a section carries its entire subtree. Removing a section header keeps its contents at the parent level.

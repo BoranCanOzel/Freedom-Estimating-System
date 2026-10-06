@@ -72,7 +72,7 @@ containing this address does not establish a tool connection.
 ## JSON editing rules
 
 - The root is a takeoff: `{id, name, custom, note, sheets, ...}`. Keep its `id`.
-  Only name, note, custom, sheets, and scopeAssignments can change at the takeoff root. Preserve
+  Only name, note, custom, sheets, scopeAssignments, and timeline can change at the takeoff root. Preserve
   all other root fields exactly, including fields not described here.
 - `sheets` contains the option pages. Keep at least one. Each has an `id`,
   `title`, `rows`, and may have fees, units, rounding, load/wage calculations, etc.
@@ -111,6 +111,38 @@ You may color-code estimating pages and assign imported Scope items to them. Set
 Set `takeoff.scopeAssignments` to an object mapping visible imported Scope item IDs to estimating sheet IDs, for example `{"zz-item-42":"sheet-demo"}`. Each item can be assigned to one existing page and inherits its color. Omit an entry to unassign it. When removing a page, remove or reassign its entries. These assignments organize measured work; they do not create priced rows or alter quantities. The user can change assignments and colors on the Scope page, and edit the same page colors directly from Summary. Summary page rows and their section/subsection rows display the same color; there is no separate Summary color field. To recolor a scope, update only the matching `sheets[].color` in the full takeoff JSON returned by `read_takeoff`, preserving other fields, then validate and save with the returned revision.
 
 Use the usual revision-checked validate/save endpoints or MCP tools. `read_scope` also returns current assignments and estimating pages with colors. Only visible Scope item IDs are assignable; hidden items' assignments are preserved by the server. `scopeData`, measurements, notes, review statuses, source IDs, and visibility controls remain read-only.
+
+### Work timeline (8-hour days by default)
+
+Call `read_timeline` (MCP) or GET `/api/ai/v1/timeline` to read the authorized takeoff's calculated planning draft, source task IDs, person-hours, elapsed working hours, planned peak crew, dates, and assumptions. The Timeline tab uses this same calculation. No external AI call is needed to generate the draft.
+
+Direct labor assumes Count = people, Time = hours per day, Days = working days. Person-hours = Count * Time * Days. Labor lines within the same section overlap, so its default elapsed duration is the longest Time * Days and its planned crew is the sum of those lines' people. Nested sections use their own direct rows; parent totals are never counted twice. Unsectioned items become individual tasks. Blank seed rows are ignored. Material or equipment quantities do not establish labor durations. Incomplete labor and service/assembly tasks need a reviewed manual duration. An unknown duration blocks automatic successors until it is filled, excluded, or a successor gets an explicit start.
+
+The default sequence follows estimate order. `parallel-pages` sequences each page separately from hour zero, assuming separate crews. This is a planning assumption, not a verified dependency or resource constraint. Review actual work order, crew availability, cure times, mobilization and quantity-priced labor before presenting a committed schedule. Planned crew counts assume the listed crew is assigned throughout the task. Changing crew assumes constant productivity.
+
+Edit `takeoff.timeline` in the full JSON from `read_takeoff`, then use the usual revision-checked validate/save workflow. It changes planning only, never estimate quantities or prices. The user can make the same edits in Timeline. For example:
+
+```json
+{
+  "hoursPerDay": 8,
+  "startDate": "2026-10-12",
+  "skipWeekends": true,
+  "mode": "sequential",
+  "tasks": [
+    {"id": "existing-section-id", "startHour": 0, "crew": 3},
+    {"id": "existing-subsection-id", "startHour": 8, "durationHours": 4, "crew": 2}
+  ]
+}
+```
+
+- `hoursPerDay` is 1 to 24; default 8. `startDate` is YYYY-MM-DD or blank for relative days. Weekends are skipped by default; a weekend start moves to Monday. Dates describe workdays, without clock times or holiday rules.
+- Reuse task IDs returned by `read_timeline`, which are source section or unsectioned row IDs. Do not invent IDs or copy calculated task fields into overrides. Remove overrides when deleting their source rows. An override for an existing section with no direct work is dormant until it has work again.
+- `startHour` counts working hours from the beginning, not calendar hours or person-hours. At 8 hours/day, 8 starts on Day 2 and 4 starts halfway through Day 1. Omit it for automatic sequencing. Give tasks equal starts to overlap them.
+- `crew` must be positive. With no duration override, duration becomes estimated person-hours / crew. `durationHours` must be positive and takes priority over inferred duration. It represents elapsed working hours, not person-hours. No duration is invented for missing labor data.
+- `excluded: true` removes a task from the schedule while keeping its estimate. Delete an override field or task entry to restore automatic behavior. Changing workday length preserves explicit start and duration hours.
+- Task bars inherit `sheets[].color`, shared with Summary and Scope. To recolor them, edit the page color. There is no separate timeline color field.
+
+After saving, read the timeline again to check unscheduled tasks, overlapping crews, and finish date. Do not claim that the draft checks dependencies, crew availability, holidays, or critical path; those are not modeled yet.
 
 ### Section and subsection UP quantities and unit labels
 

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { validateBook } from './model.js';
+import {timelineSchema,validateTimeline} from './timeline.js';
 
 const canonical = value => Array.isArray(value) ? value.map(canonical) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])) : value;
 export const revision = value => createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
@@ -32,6 +33,7 @@ const numeric={anyOf:[{type:'number'},{type:'string',pattern:'^$|^-?[0-9]+(\\.[0
 const unitColumnSchema={type:'object',required:['id'],properties:{id:idSchema,label:{type:'string',description:'Unit label, for example EA, LF, SF, CY, or LS.'},qty:{...numeric,description:'Page quantity used as the default denominator for calculated UP.'}}};
 const sectionUnitsSchema={type:'object',description:'Section and subsection UP overrides, keyed by an existing units[].id on this same page. Write on the section start row, not sectionEnd. Quantity and label inherit independently from the page column when omitted or blank, not from a parent section. The displayed dollar UP is calculated as section grand total divided by effective quantity.',additionalProperties:{type:'object',properties:{qty:{...numeric,description:'Section quantity denominator, e.g. 120 for 120 LF or 3 for 3 EA. Not a dollar price.'},label:{type:'string',description:'Section unit label, e.g. EA or LF. Empty text restores the page label.'}}}};
 export const takeoffSchema={type:'object',required:['id','name','sheets'],properties:{
+  timeline:timelineSchema,
   id:idSchema,name:{type:'string'},note:{type:'string'},custom:{type:'object'},
   aiDataWorkTypes:{type:'array',items:{type:'string',enum:['concrete-pour','demo','saw-cutting']},uniqueItems:true,readOnly:true,description:'User-selected work labels. May include any combination of concrete-pour, demo, and saw-cutting. Missing or empty means not specified, not that these activities are absent.'},
   aiDataMethod:{type:'string',enum:['','unit-price','hourly','mixed'],readOnly:true,description:'Reference pricing method: unit-price = SF/LF/EA pricing; hourly = hourly or crew breakdown; mixed = both. Missing or empty means not specified. Section organization does not determine this method.'},
@@ -50,7 +52,7 @@ export function validateTakeoff(next, before) {
   validateBook({sheets:[next]});
   const fail=message=>{throw Object.assign(new Error(message),{status:422});};
   if(!next || typeof next!=='object' || Array.isArray(next) || next.id!==before.id)fail('Keep the takeoff ID unchanged.');
-  const editable=new Set(['name','note','custom','sheets','scopeAssignments']);
+  const editable=new Set(['name','note','custom','sheets','scopeAssignments','timeline']);
   for(const key of new Set([...Object.keys(before),...Object.keys(next)]))if(!editable.has(key)&&JSON.stringify(next[key])!==JSON.stringify(before[key]))fail('Takeoff field is read-only: '+key);
   if(typeof next.name!=='string'||next.name.length>500)fail('Takeoff name must be text, up to 500 characters.');
   if(!Array.isArray(next.sheets)||!next.sheets.length)fail('Keep at least one option page.');
@@ -117,6 +119,7 @@ export function validateTakeoff(next, before) {
     }
     if(stack.length)fail('Every section needs a matching sectionEnd.');
   }
+  validateTimeline(next);
   return next;
 }
 export function differences(before,after,path='',out=[]) {

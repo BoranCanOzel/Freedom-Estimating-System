@@ -2858,6 +2858,7 @@
   </div>
 
   <div class="card" id="scopeCard" hidden></div>
+  <div class="card" id="timelineCard" hidden></div>
 
   <div class="card" id="loadCard" hidden>
     <div class="head">
@@ -5499,10 +5500,10 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     });
     rail.insertBefore(add, railEnd());
 
-    [['load','Load calc'], ['wage','Wage calc']].forEach(([v, label]) => {
+    [['timeline','Timeline'], ['load','Load calc'], ['wage','Wage calc']].forEach(([v, label]) => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'tab tab-calc';
+      b.className = 'tab tab-calc tab-' + v;
       b.textContent = label;
       b.setAttribute('aria-selected', String(book.view === v));
       b.addEventListener('click', () => { book.view = v; showView(); save(); });
@@ -5688,18 +5689,19 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     const pageActions = document.getElementById('workspace-page-actions');
     if (pageActions) pageActions.hidden = !hit;
     if (!hit){
-      ['sheetCard','summaryCard','scopeCard','loadCard','wageCard','libToggle'].forEach(id => document.getElementById(id).hidden = true);
+      ['sheetCard','summaryCard','scopeCard','timelineCard','loadCard','wageCard','libToggle'].forEach(id => document.getElementById(id).hidden = true);
       document.body.classList.remove('lib-open');
       document.dispatchEvent(new CustomEvent('estimator:view', {detail:{view:'empty'}}));
       return;
     }
     if (hit) hit.tk.active = book.active;
     if (book.view === 'scopes') book.view = 'scope';
-    const known = ['summary','scope','load','wage'];
+    const known = ['summary','scope','timeline','load','wage'];
     const v = known.indexOf(book.view) >= 0 ? book.view : 'sheet';
     document.getElementById('sheetCard').hidden = v !== 'sheet';
     document.getElementById('summaryCard').hidden = v !== 'summary';
     document.getElementById('scopeCard').hidden = v !== 'scope';
+    document.getElementById('timelineCard').hidden = v !== 'timeline';
     document.getElementById('loadCard').hidden = v !== 'load';
     document.getElementById('wageCard').hidden = v !== 'wage';
     document.getElementById('libToggle').hidden = v !== 'sheet';
@@ -6760,7 +6762,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       delete tk.loadCalc;
     });
     if (!book.sheets.some(s => s.id === book.active)) book.active = book.sheets[0].id;
-    if (['summary','scope','scopes','sheet','load','wage'].indexOf(book.view) < 0) book.view = 'sheet';
+    if (['summary','scope','scopes','sheet','timeline','load','wage'].indexOf(book.view) < 0) book.view = 'sheet';
     state = book.sheets.find(s => s.id === book.active) || book.sheets[0];
   }
 
@@ -10625,7 +10627,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     document.body.classList.remove('lib-open');
     document.body.classList.remove('proj-open');
     document.getElementById('editor').hidden = true;
-    if (!all && (book.view === 'load' || book.view === 'wage')) { window.print(); return; }
+    if (!all && ['load','wage','timeline'].includes(book.view)) { window.print(); return; }
     const box = document.getElementById('printAll');
     box.innerHTML = all
       ? printSummaryHtml() + book.sheets.map(printSheetHtml).join('')
@@ -11904,7 +11906,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     if (resumeTakeoff) {
       bk.activeList = resumeList.id; bk.activeTakeoff = resumeTakeoff.id;
       if ((resumeTakeoff.sheets || []).some(s => s.id === location.sheet)) resumeTakeoff.active = bk.active = location.sheet;
-      bk.view = ['sheet','summary','scope','scopes','load','wage'].includes(location.view) ? location.view : 'sheet';
+      bk.view = ['sheet','summary','scope','scopes','timeline','load','wage'].includes(location.view) ? location.view : 'sheet';
     }
     if (Array.isArray(bk.rows)) return {view:'sheet', active:null, sheets:[normalize(Object.assign(bk, {num:1}))]};
     const list = (bk.lists || []).find(l => l.id === bk.activeList) || (bk.lists || [])[0];
@@ -12095,6 +12097,17 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       return hit ? String(hit.pr.address || '').trim() || String(hit.co.address || '').trim() : '';
     },
     getZZTakeoffLink(){const hit=findTakeoff(book.activeTakeoff);return projectWebLink(hit?.tk.scopeLink ?? hit?.pr.zztakeoffLink);},
+    getTimelineTakeoff(){
+      const hit=findTakeoff(book.activeTakeoff);return hit?structuredClone({id:hit.tk.id,name:hit.tk.name,sheets:hit.tk.sheets,timeline:hit.tk.timeline}):null;
+    },
+    setTimeline(value){const hit=findTakeoff(book.activeTakeoff);if(hit){hit.tk.timeline=structuredClone(value);save();}},
+    openTimelineTask(sheetId,rowId){
+      const sh=book.sheets.find(sheet=>sheet.id===sheetId),row=sh?.rows.find(row=>row.id===rowId);
+      if(!row)return;
+      if(row.type==='section'){openSummarySection(sheetId,rowId);return;}
+      book.view='sheet';book.active=sh.id;state=sh;showView();
+      const target=refs.get(rowId)?.tr;if(target){revealAround(target);target.scrollIntoView({block:'center'});}save();
+    },
     getScopePages(){return book.sheets.map(sh=>({id:sh.id,title:sh.title,num:sh.num,color:sh.color}));},
     scopeColorControl(id){
       const sh=book.sheets.find(sh=>sh.id===id);return sh ? scopeColorBtn(sh) : null;
@@ -12178,7 +12191,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       openTakeoff(hit.tk.id);
       const sh = book.sheets.find(s => s.id === location.sheet);
       if (sh) { book.active = hit.tk.active = sh.id; state = sh; }
-      book.view = ['sheet','summary','scope','scopes','load','wage'].includes(location.view) ? location.view : 'summary';
+      book.view = ['sheet','summary','scope','scopes','timeline','load','wage'].includes(location.view) ? location.view : 'summary';
       showView(); renderProjects(); save(); return true;
     },
     exportBook(){ return structuredClone(book); },

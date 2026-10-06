@@ -12,6 +12,7 @@ import { setupAiAccess } from './ai-access.js';
 import { setupShareAccess } from './share-access.js';
 import { setupPdfDownload } from './pdf-download.js';
 import { setupScope } from './scope.js';
+import { setupTimeline } from './timeline.js';
 import { setupTransfers } from './transfers.js';
 import { detectTransfer, transferChoices } from '../shared/transfers.js';
 
@@ -569,6 +570,7 @@ setupAiAccess(api,takeoffAccessContext);
 setupShareAccess(api,takeoffAccessContext);
 setupPdfDownload(takeoffAccessContext,message);
 setupScope(api,takeoffAccessContext,bridge);
+setupTimeline(bridge);
 projectPresence = setupProjectPresence(bridge);
 $('workspace-cursor-color').onchange = async event => {
   const control = event.target, previous = document.body.dataset.sharedCursorColor || '';

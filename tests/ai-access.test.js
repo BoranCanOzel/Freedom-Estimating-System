@@ -48,7 +48,9 @@ test('AI grants enforce scope, repeated saves, revisions, validation, live broad
 
     assert.equal((await call('/api/projects','GET',undefined,key)).status,401);
     const instructions=await (await call(api+'/instructions','GET',undefined,key)).json();assert.deepEqual(instructions.aiInformation.items,items);assert.ok(instructions.schema);assert.match(instructions.instructions,/ONE takeoff/);
-    const spec=await (await call(api+'/openapi.json')).json();assert.ok(spec.paths['/save'].post.requestBody);
+    const spec=await (await call(api+'/openapi.json')).json();assert.ok(spec.paths['/save'].post.requestBody);assert.ok(spec.paths['/timeline'].get);
+    assert.equal(instructions.schema.properties.timeline.properties.hoursPerDay.default,8);
+    assert.equal((await fetch(base+api+'/timeline')).status,401);
     const original=await (await call(api+'/takeoff','GET',undefined,key)).json();assert.equal(original.takeoff.id,'one');assert.ok(!JSON.stringify(original).includes('Private customer'));
     const scopeRead=await (await call(api+'/scope','GET',undefined,key)).json();
     assert.deepEqual(scopeRead.scopeData,shownScope);assert.equal(scopeRead.readOnly,true);assert.deepEqual(original.takeoff.scopeData,shownScope);
@@ -59,6 +61,9 @@ test('AI grants enforce scope, repeated saves, revisions, validation, live broad
       assert.equal((await call(api+'/validate','POST',{revision:original.revision,takeoff:modified},key)).status,422);
     }
     const change={revision:original.revision,takeoff:structuredClone(original.takeoff),requestId:'save-1'};change.takeoff.sheets[0].rows[0].cost=25;change.takeoff.sheets[0].color='teal';change.takeoff.scopeAssignments={'scope-0':'sheet-one'};
+    change.takeoff.timeline={hoursPerDay:8,startDate:'2026-10-09',tasks:[{id:'row-one',startHour:8,durationHours:4,crew:2}]};
+    const badTimeline=structuredClone(change);badTimeline.takeoff.timeline.tasks[0].id='row-two';
+    assert.equal((await call(api+'/validate','POST',badTimeline,key)).status,422);
     for(const [item,page] of [['hidden-scope','sheet-one'],['missing','sheet-one'],['scope-0','missing']]){
       const invalid=structuredClone(change);invalid.takeoff.scopeAssignments={[item]:page};
       assert.equal((await call(api+'/validate','POST',invalid,key)).status,422);
@@ -83,6 +88,10 @@ test('AI grants enforce scope, repeated saves, revisions, validation, live broad
     const exported=await (await call('/api/projects/'+created.id+'/export')).json();assert.deepEqual(exported.lists[0].companies[0].projects[0].takeoffs[0].scopeData,scopeData);assert.deepEqual(exported.lists[0].companies[0].projects[0].takeoffs[1],book.lists[0].companies[0].projects[0].takeoffs[1]);
     const assigned=exported.lists[0].companies[0].projects[0].takeoffs[0];
     assert.equal(assigned.sheets[0].color,'teal');
+    assert.deepEqual(assigned.timeline,change.takeoff.timeline);
+    const timeline=await (await call(api+'/timeline','GET',undefined,key)).json();
+    assert.equal(timeline.takeoffId,'one');assert.equal(timeline.tasks.length,1);assert.equal(timeline.tasks[0].startHour,8);assert.equal(timeline.tasks[0].durationHours,4);assert.equal(timeline.peakCrew,2);assert.equal(timeline.finishDate,'2026-10-12');
+    assert.equal(timeline.tasks[0].color,'teal');assert.equal(timeline.laborHours,1);
     assert.deepEqual(assigned.scopeAssignments,{'scope-0':'sheet-one','hidden-scope':'sheet-one'});
     const colored=await (await call(api+'/scope','GET',undefined,key)).json();
     assert.deepEqual(colored.scopeAssignments,{'scope-0':'sheet-one'});assert.equal(colored.pages[0].color,'teal');
@@ -105,10 +114,12 @@ test('AI grants enforce scope, repeated saves, revisions, validation, live broad
     assert.equal((await call(api+'/validate','POST',{revision:original.revision,takeoff:original.takeoff},fresh.key)).status,200);
     const rpc=async(method,params)=>{const response=await call(api+'/mcp','POST',{jsonrpc:'2.0',id:1,method,params},fresh.key);assert.equal(response.status,200);return response.json();};
     assert.equal((await rpc('initialize',{protocolVersion:'2025-11-25'})).result.protocolVersion,'2025-11-25');
-    assert.equal((await rpc('tools/list')).result.tools.length,8);
+    assert.equal((await rpc('tools/list')).result.tools.length,9);
     assert.equal(JSON.parse((await rpc('tools/call',{name:'read_takeoff',arguments:{}})).result.content[0].text).takeoff.id,'one');
+    const restoredTimeline=JSON.parse((await rpc('tools/call',{name:'read_timeline',arguments:{}})).result.content[0].text);
+    assert.equal(restoredTimeline.tasks[0].durationHours,1);assert.equal(restoredTimeline.settings.hoursPerDay,8);
     assert.deepEqual(JSON.parse((await rpc('tools/call',{name:'read_scope',arguments:{}})).result.content[0].text).scopeData,shownScope);
-    await call(admin+'/'+fresh.id,'DELETE');assert.equal((await call(api+'/scope','GET',undefined,fresh.key)).status,403);assert.equal((await call(api+'/takeoff','GET',undefined,fresh.key)).status,403);
+    await call(admin+'/'+fresh.id,'DELETE');assert.equal((await call(api+'/scope','GET',undefined,fresh.key)).status,403);assert.equal((await call(api+'/takeoff','GET',undefined,fresh.key)).status,403);assert.equal((await call(api+'/timeline','GET',undefined,fresh.key)).status,403);
     const permanent=await grant();inspect=new DatabaseSync(join(dataDir,'projects.sqlite'));
     assert.equal(inspect.prepare('SELECT count(*) AS count FROM ai_grants WHERE key_hash=?').get(permanent.key).count,0);
     inspect.prepare('UPDATE ai_grants SET expires_at=1 WHERE id=?').run(permanent.id);
