@@ -29,6 +29,8 @@ export function aiVisibleTakeoff(takeoff){
 export const pageColors=['slate','teal','moss','amber','rust','plum','red','gray'];
 const idSchema={type:'string',minLength:1,maxLength:160};
 const numeric={anyOf:[{type:'number'},{type:'string',pattern:'^$|^-?[0-9]+(\\.[0-9]+)?$'}]};
+const unitColumnSchema={type:'object',required:['id'],properties:{id:idSchema,label:{type:'string',description:'Unit label, for example EA, LF, SF, CY, or LS.'},qty:{...numeric,description:'Page quantity used as the default denominator for calculated UP.'}}};
+const sectionUnitsSchema={type:'object',description:'Section and subsection UP overrides, keyed by an existing units[].id on this same page. Write on the section start row, not sectionEnd. Quantity and label inherit independently from the page column when omitted or blank, not from a parent section. The displayed dollar UP is calculated as section grand total divided by effective quantity.',additionalProperties:{type:'object',properties:{qty:{...numeric,description:'Section quantity denominator, e.g. 120 for 120 LF or 3 for 3 EA. Not a dollar price.'},label:{type:'string',description:'Section unit label, e.g. EA or LF. Empty text restores the page label.'}}}};
 export const takeoffSchema={type:'object',required:['id','name','sheets'],properties:{
   id:idSchema,name:{type:'string'},note:{type:'string'},custom:{type:'object'},
   aiDataWorkTypes:{type:'array',items:{type:'string',enum:['concrete-pour','demo','saw-cutting']},uniqueItems:true,readOnly:true,description:'User-selected work labels. May include any combination of concrete-pour, demo, and saw-cutting. Missing or empty means not specified, not that these activities are absent.'},
@@ -40,7 +42,7 @@ export const takeoffSchema={type:'object',required:['id','name','sheets'],proper
   scopeAssignments:{type:'object',additionalProperties:idSchema,description:'Map visible imported Scope item IDs to estimating sheet IDs. Assign an item to one estimating page; it inherits that page color. Omit an entry to unassign it. Hidden Scope items cannot be changed.'},
   scopeLink:{type:'string',readOnly:true,description:'Saved ZZTakeoff link. Preserve unchanged.'},
   scopeData:{type:['object','null'],readOnly:true,description:'Last fetched measured Scope and review decisions. Preserve unchanged.',properties:{source:{type:'string'},fetchedAt:{type:'string'},items:{type:'array',items:{type:'object',properties:{id:{type:'string'},name:{type:'string'},group:{type:'string'},pages:{type:'array',items:{type:'object',properties:{id:{type:'string'},name:{type:'string'}}}},measurements:{type:'string'},note:{type:'string',maxLength:10000,readOnly:true,description:'User note for this Scope item.'},status:{enum:['included','excluded','ignored','duplicate']},missing:{type:'boolean'},showAi:{type:'boolean',readOnly:true,description:'User-controlled visibility. Missing means true.'}}}}}},
-  sheets:{type:'array',minItems:1,items:{type:'object',required:['id','rows'],properties:{id:idSchema,title:{type:'string'},color:{type:'string',enum:['',...pageColors],description:'Page and assigned Scope item color. Choose a palette key; omit or use empty text for no color.'},flatAddEnabled:{type:'boolean'},rows:{type:'array',items:{type:'object',required:['id'],properties:{id:idSchema,type:{enum:['item','section','sectionEnd']},name:{type:'string'},kind:{type:'string'},count:numeric,time:numeric,days:numeric,cost:numeric,markup:numeric,flatAdd:numeric,note:{type:'string'},sid:idSchema}}}}}}
+  sheets:{type:'array',minItems:1,items:{type:'object',required:['id','rows'],properties:{id:idSchema,title:{type:'string'},color:{type:'string',enum:['',...pageColors],description:'Page and assigned Scope item color. Choose a palette key; omit or use empty text for no color.'},flatAddEnabled:{type:'boolean'},units:{type:'array',description:'UP columns for this page. Create a column before assigning section overrides to its ID.',items:unitColumnSchema},rows:{type:'array',items:{type:'object',required:['id'],properties:{id:idSchema,type:{enum:['item','section','sectionEnd']},name:{type:'string'},kind:{type:'string'},count:numeric,time:numeric,days:numeric,cost:numeric,markup:numeric,flatAdd:numeric,note:{type:'string'},units:sectionUnitsSchema,sid:idSchema}}}}}}
 }};
 export const changeSchema={type:'object',required:['revision','takeoff'],additionalProperties:false,properties:{revision:{type:'string',pattern:'^[a-f0-9]{64}$'},takeoff:takeoffSchema,requestId:{type:'string',minLength:1,maxLength:100}}};
 
@@ -85,6 +87,13 @@ export function validateTakeoff(next, before) {
     if(sheet.title!==undefined&&typeof sheet.title!=='string')fail('Option title must be text.');
     if(!Array.isArray(sheet.rows))fail('Each option needs a rows array.');
     if(sheet.flatAddEnabled!==undefined&&typeof sheet.flatAddEnabled!=='boolean')fail('flatAddEnabled must be true or false.');
+    if(sheet.units!==undefined&&!Array.isArray(sheet.units))fail('Page units must be an array of UP columns.');
+    const unitIds=new Set();
+    for(const unit of sheet.units||[]){
+      if(!unit||typeof unit!=='object'||Array.isArray(unit))fail('Each UP column must be an object.');
+      if(unit.label!==undefined&&typeof unit.label!=='string')fail('UP column label must be text, such as EA or LF.');
+      unitIds.add(unit.id);
+    }
     const stack=[];
     for(const row of sheet.rows){
       if(!row||typeof row!=='object'||Array.isArray(row))fail('Each row must be an object with an ID.');
@@ -92,7 +101,17 @@ export function validateTakeoff(next, before) {
       if(row.note!==undefined&&typeof row.note!=='string')fail('Row note must be text.');
       if(row.kind!==undefined&&!['none','labor','equip','material','part','service','construct','hybrid'].includes(row.kind))fail('Unsupported item kind.');
       if(ids.has(row.id))fail('Row IDs must be unique across option pages.');ids.add(row.id);
-      if(row.type==='section')stack.push(row.id);
+      if(row.type==='section'){
+        if(row.units!==undefined){
+          if(!row.units||typeof row.units!=='object'||Array.isArray(row.units))fail('Section units must be an object keyed by page UP column ID.');
+          for(const [column,override] of Object.entries(row.units)){
+            if(!unitIds.has(column))fail('Section UP override must reference an existing units[].id on the same page: '+column);
+            if(!override||typeof override!=='object'||Array.isArray(override))fail('Section UP override must contain qty and/or label.');
+            if(override.label!==undefined&&typeof override.label!=='string')fail('Section UP label must be text, such as EA or LF.');
+          }
+        }
+        stack.push(row.id);
+      }
       else if(row.type==='sectionEnd'){if(stack.pop()!==row.sid)fail('Section ends must match nested section starts.');}
       else if(row.type && row.type!=='item')fail('Unsupported row type.');
     }

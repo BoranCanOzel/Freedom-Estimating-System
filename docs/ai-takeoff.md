@@ -72,7 +72,7 @@ containing this address does not establish a tool connection.
 ## JSON editing rules
 
 - The root is a takeoff: `{id, name, custom, note, sheets, ...}`. Keep its `id`.
-  Only name, note, custom, and sheets can change at the takeoff root. Preserve
+  Only name, note, custom, sheets, and scopeAssignments can change at the takeoff root. Preserve
   all other root fields exactly, including fields not described here.
 - `sheets` contains the option pages. Keep at least one. Each has an `id`,
   `title`, `rows`, and may have fees, units, rounding, load/wage calculations, etc.
@@ -111,3 +111,33 @@ You may color-code estimating pages and assign imported Scope items to them. Set
 Set `takeoff.scopeAssignments` to an object mapping visible imported Scope item IDs to estimating sheet IDs, for example `{"zz-item-42":"sheet-demo"}`. Each item can be assigned to one existing page and inherits its color. Omit an entry to unassign it. When removing a page, remove or reassign its entries. These assignments organize measured work; they do not create priced rows or alter quantities. The user can change assignments and colors on the Scope page.
 
 Use the usual revision-checked validate/save endpoints or MCP tools. `read_scope` also returns current assignments and estimating pages with colors. Only visible Scope item IDs are assignable; hidden items' assignments are preserved by the server. `scopeData`, measurements, notes, review statuses, source IDs, and visibility controls remain read-only.
+
+### Section and subsection UP quantities and unit labels
+
+AI may create or edit UP columns and set independent UP quantities and labels on any section or nested subsection. A subsection is another `type:"section"` start row inside its parent. Use the same validate/save endpoints or MCP tools; no separate permission or endpoint is needed.
+
+- Page columns live in `sheets[].units`: `[{"id":"up-main","label":"SF","qty":1000}]`. Reuse an existing column ID, or create a new UUID if the page has no suitable UP column.
+- On a section **start row**, set `units` to an object keyed by that page column ID: `"units":{"up-main":{"qty":120,"label":"LF"}}`.
+- A subsection can independently use `"units":{"up-main":{"qty":3,"label":"EA"}}`. This changes only that subsection's UP inputs, not its parent, siblings, or the page defaults.
+- Update `qty` and `label` together when changing measurement units. Changing the label does not convert the number. Use known measured quantities; do not invent conversion factors.
+- Omitted or empty `qty` and `label` inherit independently from the **page column**, not the enclosing section. Delete the override entry to restore both defaults. A quantity of zero is an explicit override and displays no rate; it does not restore inheritance.
+- The dollar UP is computed as the section grand total (including nested descendants and applicable fees) divided by its effective quantity. Do not write a dollar rate into `qty` or invent `unitPrice`, `up`, or calculated-total fields. To target a dollar rate, edit underlying pricing only when authorized; UP inputs themselves do not change the estimate total.
+- Preserve other columns and overrides. When removing a UP column, remove its section overrides too. Put overrides on the opening section row, not its `sectionEnd` row. IDs must reference a UP column on the same page.
+
+Example page fragment (merge these fields into the full takeoff you read, then validate and save with its revision):
+
+```json
+{
+  "id": "existing-page-id",
+  "units": [{"id": "up-main", "label": "SF", "qty": 1000}],
+  "rows": [
+    {"id": "parent", "type": "section", "name": "Saw cutting", "units": {"up-main": {"qty": 120, "label": "LF"}}},
+    {"id": "child", "type": "section", "name": "Openings", "units": {"up-main": {"qty": 3, "label": "EA"}}},
+    {"id": "work", "kind": "labor", "name": "Cut openings", "count": 1, "time": 1, "days": 1, "cost": 300},
+    {"id": "child-end", "type": "sectionEnd", "sid": "child"},
+    {"id": "parent-end", "type": "sectionEnd", "sid": "parent"}
+  ]
+}
+```
+
+With no markup or fees, this example computes $100/EA for Openings and $2.50/LF for Saw cutting, from the same $300 nested total.

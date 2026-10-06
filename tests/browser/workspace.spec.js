@@ -2600,3 +2600,53 @@ test('Scope assigns measured items to colored pages and replaces the old Scopes 
   await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'ts'}));
   await expect(page.locator('#summaryCard')).toBeVisible();
 });
+
+
+test('AI saves section and subsection UP quantities and labels with live calculated rates',async({page})=>{
+  const data=workbook(),sh=data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0];
+  sh.fees=[];sh.units=[{id:'up',label:'SF',qty:1000}];
+  sh.rows=[{id:'parent',type:'section',name:'Cutting'},
+    {id:'child',type:'section',name:'Openings'},
+    {id:'work',kind:'labor',name:'Crew',cost:300,count:1,time:1,days:1},
+    {id:'child-end',type:'sectionEnd',sid:'child'},
+    {id:'parent-end',type:'sectionEnd',sid:'parent'}];
+  await openWorkbook(page,data);
+  await page.locator('#takeoff-ai-access').click();
+  await page.locator('#ai-access-generate').click();
+  await expect(page.locator('#ai-access-connection')).toHaveValue(/Authorization: Bearer/);
+  const connection=await page.locator('#ai-access-connection').inputValue();
+  const headers={Authorization:'Bearer '+/Authorization: Bearer ([a-f0-9]+)/.exec(connection)[1]};
+  await page.locator('#ai-access-close').click();
+  const read=async()=> (await page.request.get('/api/ai/v1/takeoff',{headers})).json();
+  const save=async(snapshot,requestId)=>{
+    const payload={revision:snapshot.revision,takeoff:snapshot.takeoff,requestId};
+    expect((await page.request.post('/api/ai/v1/validate',{headers,data:payload})).ok()).toBe(true);
+    expect((await page.request.post('/api/ai/v1/save',{headers,data:payload})).ok()).toBe(true);
+  };
+  const original=await read();
+  original.takeoff.sheets[0].rows[0].units={up:{qty:120,label:'LF'}};
+  original.takeoff.sheets[0].rows[1].units={up:{qty:3,label:'EA'}};
+  await save(original,'set-section-up');
+  const section=id=>page.locator('#body tr[data-id="'+id+'"]');
+  await expect(section('parent').getByLabel('Section quantity for this unit')).toHaveValue('120');
+  await expect(section('parent').getByLabel('Section unit label')).toHaveValue('LF');
+  await expect(section('parent').locator('.unit-tag')).toHaveText('/120 LF');
+  await expect(section('parent').locator('.sec-unit').locator('..').locator('.v')).toHaveText('2.50');
+  await expect(section('child').getByLabel('Section quantity for this unit')).toHaveValue('3');
+  await expect(section('child').getByLabel('Section unit label')).toHaveValue('EA');
+  await expect(section('child').locator('.sec-unit').locator('..').locator('.v')).toHaveText('100.00');
+  const updated=await read();
+  updated.takeoff.sheets[0].rows[1].units.up={qty:30,label:'LF'};
+  await save(updated,'change-subsection-unit');
+  await expect(section('child').getByLabel('Section unit label')).toHaveValue('LF');
+  await expect(section('child').locator('.sec-unit').locator('..').locator('.v')).toHaveText('10.00');
+  await page.reload();
+  await expect(section('child').getByLabel('Section quantity for this unit')).toHaveValue('30');
+  const reset=await read();reset.takeoff.sheets[0].rows[1].units.up={qty:'',label:''};
+  await save(reset,'inherit-page-up');
+  await expect(section('child').getByLabel('Section quantity for this unit')).toHaveValue('1000');
+  await expect(section('child').getByLabel('Section unit label')).toHaveValue('SF');
+  await expect(section('child').locator('.sec-unit').locator('..').locator('.v')).toHaveText('0.30');
+  await expect(section('parent').getByLabel('Section unit label')).toHaveValue('LF');
+  await expect(page.locator('#tGrand .v')).toHaveText('300.00');
+});
