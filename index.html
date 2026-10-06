@@ -226,6 +226,13 @@
   .option-tab>.tab{border-top-right-radius:0;padding-right:8px;min-width:0;max-width:210px}
   .option-tab-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
   .option-tab-colour{width:9px;height:9px;flex:none;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.15)}
+  .sum-section-link{font:inherit;color:inherit;text-align:left;background:none;border:0;padding:0;cursor:pointer}
+  .sum-section-link:hover{text-decoration:underline}
+  .sum-section-link:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
+  #sumTable .s-sec{cursor:pointer}
+  #sheetCard.section-locate #body>tr:not(.section-target){opacity:.45}
+  #sheetCard #body>tr.section-target>td{box-shadow:inset 0 3px var(--amber),inset 0 -3px var(--amber)}
+  #sheetCard #body>tr.section-target{scroll-margin-block:90px;outline:none}
   .option-close{border:1px solid var(--rule);border-left:0;border-bottom:0;border-radius:0 5px 0 0;background:var(--card);color:var(--muted);min-width:28px;padding:3px;font:18px var(--f-sans);cursor:pointer}
   .option-close:hover:not(:disabled){background:var(--calc);color:#c65a4f}
   .option-close:disabled{opacity:.3;cursor:default}
@@ -5631,7 +5638,34 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     save();
   });
 
+  let sectionLocateTimer;
+  function clearSectionHighlight(){
+    clearTimeout(sectionLocateTimer);
+    document.getElementById('sheetCard').classList.remove('section-locate');
+    document.querySelectorAll('#body .section-target').forEach(row => row.classList.remove('section-target'));
+  }
+
+  function openSummarySection(sheetId, sectionId){
+    const sh = book.sheets.find(sheet => sheet.id === sheetId);
+    const section = sh?.rows.find(row => row.id === sectionId && row.type === 'section');
+    if (!section) return;
+    book.view = 'sheet'; book.active = sh.id; state = sh;
+    section.collapsed = false;
+    showView();
+    const target = refs.get(section.id)?.tr;
+    if (!target) return;
+    revealAround(target);
+    target.tabIndex = -1;
+    target.focus({preventScroll:true});
+    target.scrollIntoView({block:'center',behavior:'instant'});
+    document.getElementById('sheetCard').classList.add('section-locate');
+    target.classList.add('section-target');
+    sectionLocateTimer = setTimeout(clearSectionHighlight, 1800);
+    save();
+  }
+
   function showView(){
+    clearSectionHighlight();
     applyTheme();
     applyZoom();
     renderStickies();
@@ -5970,14 +6004,14 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
             return {label:u.label, qty:q, price: q ? sec.grand / q : 0};
           });
           const feeSum = sec.fees.reduce((a,b) => a + b, 0);
-          return '<tr class="s-sec' + (sec.depth ? ' s-nested' : ' s-root-section') + '" data-section="' + esc(sec.row.id) + '" data-depth="' + sec.depth + '">' +
+          return '<tr class="s-sec' + (sec.depth ? ' s-nested' : ' s-root-section') + '" data-sheet="' + esc(sh.id) + '" data-section="' + esc(sec.row.id) + '" data-depth="' + sec.depth + '">' +
             '<td class="s-num"><div class="num-wrap"><span class="s-subn">' +
               sh.num + '.' + numbering.join('.') + '</span></div></td>' +
             '<td class="s-scope"><div class="s-section-tree" style="padding-left:' + (8 + sec.depth * 20) + 'px">' +
               Array.from({length:sec.depth}, (_, level) => '<span class="s-tree-guide" aria-hidden="true" style="left:' + (18 + level * 20) + 'px"></span>').join('') +
               '<div class="s-section-heading">' +
               (hasChildren ? '<button type="button" class="caret sum-section-caret' + (expanded ? '' : ' shut') + '" data-section-key="' + esc(sectionKey) + '" aria-expanded="' + expanded + '" aria-label="' + esc((expanded ? 'Hide subsections of ' : 'Show subsections of ') + (sec.name || 'unnamed section')) + '">' + caretSvg() + '</button>' : '<span class="caret-gap"></span>') +
-              '<span class="s-secname">' + (sec.name ? esc(sec.name) : '<span class="s-none">unnamed section</span>') + '</span></div>' +
+              '<button type="button" class="s-secname sum-section-link" title="Open this section on its page">' + (sec.name ? esc(sec.name) : '<span class="s-none">unnamed section</span>') + '</button></div>' +
               (detail && sec.note && sec.note.trim()
                 ? '<span class="s-detail">' + esc(sec.note.trim()) + '</span>' : '') +
             '</div></td>' +
@@ -6042,6 +6076,10 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         renderSummary();save();
         [...t.querySelectorAll('.sum-section-caret')].find(button => button.dataset.sectionKey === key)?.focus({preventScroll:true});
       });
+    });
+
+    t.querySelectorAll('tbody tr.s-sec').forEach(tr => {
+      tr.addEventListener('click', () => openSummarySection(tr.dataset.sheet, tr.dataset.section));
     });
 
     t.querySelectorAll('tbody tr.s-row').forEach(tr => {
@@ -10556,6 +10594,11 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     table.removeAttribute('id');
     table.className = 'ptab';
     table.removeAttribute('style');
+    table.querySelectorAll('.sum-section-link').forEach(button => {
+      const label = document.createElement('span');
+      label.className = 's-secname'; label.textContent = button.textContent;
+      button.replaceWith(label);
+    });
     table.querySelectorAll('colgroup, .col-resizer, button').forEach(el => el.remove());
     const blocks = document.getElementById('sumBlocks').cloneNode(true);
     blocks.removeAttribute('id');

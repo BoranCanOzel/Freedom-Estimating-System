@@ -2689,3 +2689,46 @@ test('summary bulk section and subsection controls stay independent across pages
   await page.locator('#workspace-view > summary').click();
   await expect(subsections).toBeDisabled();
 });
+
+
+test('Summary section links reveal the exact nested section and briefly spotlight it',async({page})=>{
+  const data=workbook(),tk=data.lists[0].companies[0].projects[0].takeoffs[0];
+  const item=id=>({id,kind:'labor',name:id,cost:10,count:1,time:1,days:1});
+  tk.sheets.push({...sheet('target-page','Second page'),rows:[
+    ...Array.from({length:35},(_,i)=>item('before-'+i)),
+    {id:'parent-target',type:'section',name:'Target parent'},
+    {id:'child-target',type:'section',name:'Target child'},item('target-item'),
+    {id:'child-end',type:'sectionEnd',sid:'child-target'},
+    {id:'parent-end',type:'sectionEnd',sid:'parent-target'},
+    ...Array.from({length:15},(_,i)=>item('after-'+i))
+  ]});
+  await openWorkbook(page,data);
+  await page.locator('#rail [data-sheet="target-page"]').click();
+  await page.locator('#body [data-id="child-target"] .caret').click();
+  await page.locator('#body [data-id="parent-target"] .caret').click();
+  await page.locator('#rail .tab-summary').click();
+  await page.locator('#sumTable .sum-caret[data-open="target-page"]').click();
+  // Fold buttons retain their behavior without navigating.
+  const summaryParent=page.locator('#sumTable [data-section="parent-target"]');
+  await summaryParent.locator('.sum-section-caret').click();
+  await expect(page.locator('#summaryCard')).toBeVisible();
+  await summaryParent.locator('.sum-section-caret').click();
+  const link=page.locator('#sumTable [data-section="child-target"] .sum-section-link');
+  await link.focus();await page.keyboard.press('Enter');
+  const target=page.locator('#body [data-id="child-target"]');
+  await expect(page.locator('#rail [data-sheet="target-page"]')).toHaveAttribute('aria-selected','true');
+  await expect(target).toBeInViewport();await expect(target).toBeFocused();
+  await expect(target).toHaveClass(/section-target/);
+  await expect(page.locator('#body [data-id="target-item"]')).toBeVisible();
+  await expect(page.locator('#body [data-id="parent-target"] .caret')).toHaveAttribute('aria-expanded','true');
+  expect(await page.locator('#body [data-id="before-0"]').evaluate(el=>getComputedStyle(el).opacity)).toBe('0.45');
+  await page.screenshot({path:'.tools/summary-section-spotlight.png'});
+  await expect(target).not.toHaveClass(/section-target/,{timeout:4000});
+  await expect(page.locator('#sheetCard')).not.toHaveClass(/section-locate/);
+  // Clicking the row's amount also navigates, and switching views clears the effect.
+  await page.locator('#rail .tab-summary').click();
+  await summaryParent.locator('.s-grand').click();
+  await expect(page.locator('#body [data-id="parent-target"]')).toHaveClass(/section-target/);
+  await page.locator('#rail .tab-summary').click();
+  await expect(page.locator('#sheetCard')).not.toHaveClass(/section-locate/);
+});
