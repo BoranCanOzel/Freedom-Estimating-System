@@ -66,9 +66,23 @@ test('generic Labor subsections use the actual work name and retain source IDs a
 test('scope lanes show work chronologically, pack adjacent tasks and separate overlaps without moving work',()=>{
   const source=takeoff();source.timeline={tasks:[{id:'parent',startHour:8,durationHours:8},{id:'child',startHour:0,durationHours:12},{id:'pour',startHour:24}]};
   const draft=deriveTimeline(source),before=structuredClone(draft),groups=scopeLanes(draft.tasks,0,24);
-  assert.equal(groups.length,1);assert.equal(groups[0].id,'a');assert.equal(groups[0].lanes,2);
+  assert.equal(groups.length,1);assert.equal(groups[0].id,'parent');assert.equal(groups[0].lanes,2);
   assert.deepEqual(groups[0].tasks.map(t=>[t.id,t.lane]),[['child',0],['parent',1]]);
   assert.deepEqual(draft,before);
   assert.equal(scopeLanes(draft.tasks,24,32)[0].id,'b');
   const adjacent=deriveTimeline(takeoff());assert.equal(scopeLanes(adjacent.tasks,0,24)[0].lanes,1);
+});
+
+test('left-side scope groups use top-level work sections, combining all their subsections',()=>{
+  const source={sheets:[{id:'page',title:'A001',rows:[
+    {id:'demolition',type:'section',name:'Interior demolition'},
+    {id:'walls',type:'section',name:'Walls'},section('wall-labor'),labor('wall-crew'),end('wall-labor'),end('walls'),
+    {id:'ceilings',type:'section',name:'Ceilings'},labor('ceiling-crew'),end('ceilings'),end('demolition'),
+    {id:'trench',type:'section',name:'Plumbing trench'},section('sawcut'),labor('saw-crew'),end('sawcut'),end('trench')
+  ]}]};
+  const draft=deriveTimeline(source),groups=scopeLanes(draft.tasks,0,100);
+  assert.deepEqual(groups.map(group=>group.name),['Interior demolition','Plumbing trench']);
+  assert.deepEqual(groups[0].tasks.map(task=>task.id),['wall-labor','ceilings']);
+  assert.deepEqual(groups[1].tasks.map(task=>task.id),['sawcut']);
+  assert.equal(draft.laborHours,96);assert.equal(draft.endHour,48);
 });

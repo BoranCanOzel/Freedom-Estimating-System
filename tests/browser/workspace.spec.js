@@ -2887,19 +2887,20 @@ test('Timeline leaves unknown durations for review and makes long schedules navi
 test('Timeline groups repeated Labor subsections into readable scope lanes without changing saved work',async({page})=>{
   const data=workbook(),tk=data.lists[0].companies[0].projects[0].takeoffs[0];
   const names=['Remove existing light fixtures','Remove partition walls','Remove suspended ceiling','Saw cut slab','Remove plumbing fixtures','Remove existing flooring','Load out demolition debris','Clean and prepare work area'];
-  tk.sheets[0].title='A001 - Interior Demolition';tk.sheets[0].color='rust';tk.sheets[0].rows=[];
+  tk.sheets[0].title='A001 - Interior Demolition';tk.sheets[0].color='rust';tk.sheets[0].rows=[{id:'scope-demo',type:'section',name:'Interior demolition'}];
   names.forEach((name,i)=>tk.sheets[0].rows.push(
     {id:'work-'+i,type:'section',name},
     {id:'labor-'+i,type:'section',name:'Labor'},
     {id:'crew-'+i,kind:'labor',name:'Labor',count:i===7?1:3,time:i===7?1:8,days:1,cost:100},
     {id:'labor-end-'+i,type:'sectionEnd',sid:'labor-'+i},{id:'work-end-'+i,type:'sectionEnd',sid:'work-'+i}
   ));
+  tk.sheets[0].rows.push({id:'scope-demo-end',type:'sectionEnd',sid:'scope-demo'});
   const starts=[32,24,56,48,28,16,40,24];
   tk.timeline={hoursPerDay:8,tasks:starts.map((startHour,i)=>({id:'labor-'+i,startHour}))};
   await openWorkbook(page,data);await page.locator('#rail .tab-timeline').click();
   const before=await page.evaluate(()=>JSON.stringify(window.estimator.getTimelineTakeoff()));
   await expect(page.locator('[data-timeline-scope]')).toHaveCount(1);
-  await expect(page.locator('.timeline-scope-row>.timeline-label strong')).toHaveText('A001 - Interior Demolition');
+  await expect(page.locator('.timeline-scope-row>.timeline-label strong')).toHaveText('Interior demolition');
   await expect(page.locator('.timeline-work-key strong')).toHaveText([names[5],names[7],names[1],names[4],names[0],names[6],names[3]]);
   await expect(page.locator('[data-timeline-key="labor-7"]')).toContainText('1 person');
   await expect(page.locator('[data-timeline-task="labor-7"] .timeline-bar')).toHaveText('2');
@@ -2918,4 +2919,26 @@ test('Timeline groups repeated Labor subsections into readable scope lanes witho
   expect(await page.evaluate(()=>JSON.stringify(window.estimator.getTimelineTakeoff()))).toBe(before);
   await page.locator('[data-timeline-key="labor-5"]').click();
   await expect(page.locator('#body tr[data-id="labor-5"]')).toBeInViewport();
+});
+
+test('Timeline left column contains main scopes of work, with their subsections inside each row',async({page})=>{
+  const data=workbook(),tk=data.lists[0].companies[0].projects[0].takeoffs[0];
+  tk.sheets[0].title='A001 - Work breakdown';tk.sheets[0].color='rust';tk.sheets[0].rows=[];
+  for(const [id,name,children] of [['demo','Interior demolition',['Remove walls','Remove ceilings']],['trench','Plumbing trench',['Saw cut','Excavate']]]){
+    tk.sheets[0].rows.push({id,type:'section',name});
+    children.forEach((name,i)=>tk.sheets[0].rows.push(
+      {id:id+'-'+i,type:'section',name},{id:id+'-labor-'+i,type:'section',name:'Labor'},
+      {id:id+'-crew-'+i,kind:'labor',name:'Crew',count:2,time:4,days:1,cost:100},
+      {id:id+'-labor-end-'+i,type:'sectionEnd',sid:id+'-labor-'+i},{id:id+'-end-'+i,type:'sectionEnd',sid:id+'-'+i}
+    ));
+    tk.sheets[0].rows.push({id:id+'-end',type:'sectionEnd',sid:id});
+  }
+  await openWorkbook(page,data);await page.locator('#rail .tab-timeline').click();
+  await expect(page.locator('.timeline-scope-row>.timeline-label strong')).toHaveText(['Interior demolition','Plumbing trench']);
+  await expect(page.locator('[data-timeline-scope="demo"] .timeline-work-key strong')).toHaveText(['Remove walls','Remove ceilings']);
+  await expect(page.locator('[data-timeline-scope="trench"] .timeline-work-key strong')).toHaveText(['Saw cut','Excavate']);
+  await expect(page.locator('.timeline-bar')).toHaveCount(4);
+  await page.evaluate(()=>window.estimator.setTheme('medieval'));
+  await page.locator('#timelineCard>.scroll').evaluate(el=>{el.scrollTop=240;});
+  await page.screenshot({path:'.tools/timeline-main-scopes.png'});
 });

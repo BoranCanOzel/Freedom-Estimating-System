@@ -33,7 +33,8 @@ export function timelineSources(takeoff){
       if(row.kind==='none'||(!String(row.name||'').trim()&&!positive(row.cost)))continue;
       const source=stack.at(-1)||row;
       if(!groups.has(source.id)){
-        const task={id:source.id,sheetId:sheet.id,section:!!stack.length,name:workName(source,stack,sheet),sourceName:source.name||'Unnamed work',path:stack.map(s=>s.name||'Unnamed section').join(' / '),page:sheet.title||'Untitled page',color:sheet.color||'',laborHours:0,baseDuration:0,baseCrew:0,sourceRowIds:[],issues:[]};
+        const scope=stack[0];
+        const task={id:source.id,sheetId:sheet.id,scopeId:scope?.id||sheet.id,scopeName:scope?.name||sheet.title||'Untitled scope',section:!!stack.length,name:workName(source,stack,sheet),sourceName:source.name||'Unnamed work',path:stack.map(s=>s.name||'Unnamed section').join(' / '),page:sheet.title||'Untitled page',color:sheet.color||'',laborHours:0,baseDuration:0,baseCrew:0,sourceRowIds:[],issues:[]};
         groups.set(source.id,task);tasks.push(task);
       }
       const task=groups.get(source.id);task.sourceRowIds.push(row.id);

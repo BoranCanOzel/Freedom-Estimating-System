@@ -7,8 +7,9 @@ export function scopeLanes(tasks,from,to){
   const groups=new Map();
   for(const task of tasks){
     if(!task.scheduled||task.endHour<=from||task.startHour>=to)continue;
-    if(!groups.has(task.sheetId))groups.set(task.sheetId,{id:task.sheetId,name:task.page,color:task.color,tasks:[]});
-    groups.get(task.sheetId).tasks.push(task);
+    const scopeId=task.scopeId||task.sheetId,key=JSON.stringify([task.sheetId,scopeId]);
+    if(!groups.has(key))groups.set(key,{id:scopeId,name:task.scopeName||task.page,page:task.page,color:task.color,tasks:[]});
+    groups.get(key).tasks.push(task);
   }
   return [...groups.values()].map(group=>{
     const ends=[];
@@ -30,7 +31,9 @@ export function renderScopeLanes(grid,draft,firstDay,windowDays,bridge){
     const wrap=el('section','','timeline-scope');wrap.dataset.timelineScope=group.id;
     wrap.style.setProperty('--scope-color',bridge.scopeColorValue(group.color)||'var(--slate)');
     const row=el('div','','timeline-grid-row timeline-scope-row');
-    const label=el('div','','timeline-label');label.append(el('strong',group.name),el('small',group.tasks.length+' scheduled '+(group.tasks.length===1?'activity':'activities')));
+    const label=el('div','','timeline-label');label.append(el('strong',group.name));
+    if(group.page!==group.name)label.append(el('small',group.page));
+    label.append(el('small',group.tasks.length+' scheduled '+(group.tasks.length===1?'activity':'activities')));
     const track=el('div','','timeline-track');track.style.height=group.lanes*64+16+'px';
     const legend=el('div','','timeline-work-list');
     group.tasks.forEach((task,index)=>{
