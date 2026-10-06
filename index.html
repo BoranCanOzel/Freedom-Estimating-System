@@ -276,6 +276,12 @@
   }
 
   .s-dot{width:8px;height:8px;border-radius:50%;flex:none;display:inline-block}
+  .sow-col{flex-shrink:0;width:24px;height:24px;border-radius:50%;border:1px solid var(--rule);cursor:pointer;padding:0}
+  .sow-col.none{background:var(--card)!important;position:relative}
+  .sow-col.none::after{content:"";position:absolute;left:4px;right:4px;top:10px;height:2px;background:#B23A2E;transform:rotate(-45deg)}
+  .sow-col:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+  .summary-page-title{display:flex;align-items:center;gap:9px}
+  #sumTable .summary-coloured>.s-scope{box-shadow:inset 4px 0 var(--summary-color);background:color-mix(in srgb,var(--summary-color) 12%,var(--card))!important}
 
   .sum-title{
     font-family:var(--f-cond);font-weight:700;
@@ -4598,7 +4604,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       none.className = 'sw none' + (sh.color ? '' : ' on');
       none.addEventListener('click', ev => {
         ev.stopPropagation(); delete sh.color; pal.hidden = true;
-        renderTabs(); save(); document.dispatchEvent(new Event('estimator:projects'));
+        renderTabs(); if(book.view==='summary')renderSummary(); save(); document.dispatchEvent(new Event('estimator:projects'));
       });
       grid.appendChild(none);
       TAB_COLORS.forEach(c => {
@@ -4609,7 +4615,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         sw.style.background = c.dot;
         sw.addEventListener('click', ev => {
           ev.stopPropagation(); sh.color = c.k; pal.hidden = true;
-          renderTabs(); save(); document.dispatchEvent(new Event('estimator:projects'));
+          renderTabs(); if(book.view==='summary')renderSummary(); save(); document.dispatchEvent(new Event('estimator:projects'));
         });
         grid.appendChild(sw);
       });
@@ -5975,7 +5981,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
           (tabColor(sh.color) ? '<span class="s-dot" style="background:' + tabColor(sh.color).dot + '"></span>' : '') +
           '<span class="s-n">' + sh.num + '</span>' +
         '</div></td>' +
-        '<td class="s-scope"><span class="s-head">' + head + '</span>' +
+        '<td class="s-scope"><div class="summary-page-title"><span class="s-head">' + head + '</span></div>' +
           (restLines ? '<span class="s-sub">' + esc(restLines) + '</span>' : '') +
           (detail && sh.note && sh.note.trim()
             ? '<span class="s-detail">' + esc(sh.note.trim()) + '</span>' : '') +
@@ -6041,6 +6047,13 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         '<td class="grand">' + moneyHTML(tot.grand) + (hasRounding ? roundedTotalHTML(tot.rounded) : '') + '</td>' +
         '<td></td>' +
       '</tr></tfoot>';
+
+    t.querySelectorAll('tbody tr[data-sheet]').forEach(row => {
+      const sh = book.sheets.find(sheet => sheet.id === row.dataset.sheet);
+      const color = tabColor(sh?.color);
+      if(color){ row.classList.add('summary-coloured'); row.style.setProperty('--summary-color',color.dot); }
+      if(row.classList.contains('s-row') && sh)row.querySelector('.summary-page-title').prepend(scopeColorBtn(sh));
+    });
 
     SUM_COLS.forEach((c, i) => {
       const th = t.querySelector('thead th[data-sw="' + c.k + '"]');

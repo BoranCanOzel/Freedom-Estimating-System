@@ -2739,3 +2739,40 @@ test('Summary section links reveal the exact nested section and briefly spotligh
   await page.locator('#rail .tab-summary').click();
   await expect(page.locator('#sheetCard')).not.toHaveClass(/section-locate/);
 });
+
+
+test('Summary colors are editable and stay shared with Scope, tabs and AI saves',async({page})=>{
+  const data=workbook(),tk=data.lists[0].companies[0].projects[0].takeoffs[0],sh=tk.sheets[0];
+  sh.color='plum';sh.rows=[{id:'sec',type:'section',name:'Section'},{id:'sub',type:'section',name:'Subsection'},...sh.rows,{id:'sub-end',type:'sectionEnd',sid:'sub'},{id:'sec-end',type:'sectionEnd',sid:'sec'}];
+  tk.scopeData={source:'zz',items:[{id:'source',name:'Measured work',status:'included'}]};tk.scopeAssignments={source:'sn'};
+  await openWorkbook(page,data);
+  await page.locator('#rail .tab-summary').click();
+  await page.locator('#sumTable .sum-caret').click();
+  const summary=page.locator('#sumTable tr.s-row[data-sheet="sn"]');
+  const color=()=>summary.evaluate(el=>el.style.getPropertyValue('--summary-color'));
+  expect(await color()).toBe('#7A4A70');
+  await summary.getByRole('button',{name:'Change colour for North scope',exact:true}).click();
+  await page.locator('#tabPalette').getByRole('button',{name:'teal',exact:true}).click();
+  await expect(page.locator('#summaryCard')).toBeVisible();
+  await expect(page.locator('#sumTable .summary-coloured')).toHaveCount(3);
+  expect(await color()).toBe('#2E7D74');
+  await expect(page.locator('#sumTable [data-section="sub"]')).toHaveCSS('--summary-color','#2E7D74');
+  await page.locator('#rail .tab-scope').click();
+  await expect(page.locator('[data-scope-item="source"]')).toHaveCSS('--scope-item-colour','#2E7D74');
+  await page.locator('#rail .tab-summary').click();
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();expect(await color()).toBe('#2E7D74');
+  await page.locator('#takeoff-ai-access').click();await page.locator('#ai-access-generate').click();
+  await expect(page.locator('#ai-access-connection')).toHaveValue(/Authorization: Bearer/);
+  const connection=await page.locator('#ai-access-connection').inputValue();
+  const headers={Authorization:'Bearer '+/Authorization: Bearer ([a-f0-9]+)/.exec(connection)[1]};
+  await page.locator('#ai-access-close').click();
+  const read=await (await page.request.get('/api/ai/v1/takeoff',{headers})).json();
+  read.takeoff.sheets[0].color='rust';
+  expect((await page.request.post('/api/ai/v1/save',{headers,data:{revision:read.revision,takeoff:read.takeoff,requestId:'summary-color'}})).ok()).toBe(true);
+  await expect.poll(color).toBe('#A8552F');
+  await summary.getByRole('button',{name:'Change colour for North scope',exact:true}).click();
+  await page.locator('#tabPalette').getByRole('button',{name:'No colour',exact:true}).click();
+  await expect(page.locator('#sumTable .summary-coloured')).toHaveCount(0);
+  await expect(page.locator('#summaryCard')).toBeVisible();
+});
