@@ -172,6 +172,8 @@ The **Access keys** tab shows active AI key counts by creator. Signed-in users c
 
 On Summary, the takeoff **Description** starts collapsed. Click its heading to expand or collapse it; the choice survives summary refreshes for the current takeoff and resets on a fresh load.
 
+Summary notes belong to each takeoff (`takeoff.summaryNotes`) and follow it in PDF, print, Excel, and JSON exports. They are not shared between jobs or alternate takeoffs. Old workbook-wide notes remain available in a collapsed **Previous shared notes** panel for manual recovery; they are not assigned to a takeoff or included in its reports automatically.
+
 Its **AI Data** tab lists every estimate with the AI Data checkbox enabled across all workbooks. Search by job, customer, estimate, or workbook, refresh the list, and open an estimate directly. The list uses live workbook state when available and preserves unsaved text-library drafts when switching tabs. This signed-in directory does not expand an AI token's takeoff permissions.
 
 The library is stored in the `ai_information` table in `projects.sqlite`, so include it in the full database backup. It is separate from workbook JSON exports and project snapshots. AI access keys receive read-only access to this library, including updates made after the key was created. Instructions and takeoff responses include the library first; `read_ai_information` (MCP) or `/api/ai/v1/information` (REST) retrieves it again. The connection instructions direct models to analyze relevant references before working; the server cannot verify a model's reasoning.

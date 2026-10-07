@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {transferChoices,exportTransfer,importTransfer,detectTransfer} from '../shared/transfers.js';
-const takeoff={id:'t',name:'Estimate',sheets:[{id:'s',rows:[{id:'section',type:'section',name:'Labor'},{id:'r',kind:'labor',cost:'75',count:2,time:8,days:1},{id:'end',type:'sectionEnd',sid:'section'}]}]};
+const takeoff={id:'t',name:'Estimate',summaryNotes:'Estimate-specific notes',sheets:[{id:'s',rows:[{id:'section',type:'section',name:'Labor'},{id:'r',kind:'labor',cost:'75',count:2,time:8,days:1},{id:'end',type:'sectionEnd',sid:'section'}]}]};
 const project={id:'p',name:'Vons',takeoffs:[takeoff]};
 const customer={id:'c',name:'Centennial',projects:[project]};
 const book={lists:[{id:'l',name:'Projects',companies:[customer]}]};
@@ -26,6 +26,7 @@ test('scoped round trips append copies with fresh IDs and matching section refer
   assert.notEqual(added.id,record.id);
   const t=kind==='customer'?added.projects[0].takeoffs[0]:kind==='project'?added.takeoffs[0]:added;
   assert.equal(t.sheets[0].rows[1].cost,'75');
+  assert.equal(t.summaryNotes,'Estimate-specific notes');
   assert.equal(t.sheets[0].rows[2].sid,t.sheets[0].rows[0].id);
  }
 });

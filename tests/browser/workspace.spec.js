@@ -34,7 +34,7 @@ test('Save as PDF downloads every takeoff option with readable pagination and co
   const {readFile}=await import('node:fs/promises');
   const {getDocument,OPS}=await import('pdfjs-dist/legacy/build/pdf.mjs');
   const data=workbook(),takeoff=data.lists[0].companies[0].projects[0].takeoffs[0];
-  takeoff.name='Complete takeoff';takeoff.note='Takeoff description';data.summaryNotes='Scope exclusions and clarifications.';
+  takeoff.name='Complete takeoff';takeoff.note='Takeoff description';takeoff.summaryNotes='Scope exclusions and clarifications.';
   data.lists[0].companies[0].projects[0].notes='Private project planning note';
   const first=takeoff.sheets[0];first.note='Option-specific scope note';first.flatAddEnabled=true;first.roundTotal=100;
   first.fees=Array.from({length:8},(_,i)=>({id:'fee'+i,label:'Custom fee '+i,pct:1}));
@@ -306,6 +306,25 @@ test('AI Data marks only the selected estimate and persists when toggled',async(
   await page.reload();
   await expect(checkbox).not.toBeChecked();
   expect(await page.evaluate(()=>window.estimator.getShared().lists[0].companies[0].projects[0].takeoffs[0].aiData)).toBe(false);
+});
+
+test('summary notes stay with their takeoff across projects, exports, clearing and reloads',async({page})=>{
+  const data=workbook();data.summaryNotes='Old workbook-wide note';
+  data.lists[0].companies[0].projects[0].takeoffs.push({id:'alternate',name:'Alternate takeoff',sheets:[sheet('alternate-sheet','Alternate scope')]});
+  await openWorkbook(page,data);await page.locator('#rail .tab-summary').click();
+  const notes=page.locator('#sumNotes');await expect(notes).toHaveValue('');await expect(page.locator('#legacySummaryNotes pre')).not.toBeVisible();
+  await page.locator('#legacySummaryNotes summary').click();await expect(page.locator('#legacySummaryNotes pre')).toHaveText('Old workbook-wide note');
+  await notes.fill('North project only');await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  const open=async(takeoff,sheet)=>{expect(await page.evaluate(location=>window.estimator.openLocation(location),{list:'list',takeoff,sheet,view:'summary'})).toBe(true);};
+  await open('ts','ss');await expect(notes).toHaveValue('');expect(await page.evaluate(()=>window.estimator.getPdfReport().summaryNotes)).toBe('');
+  await notes.fill('South project only');await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await open('alternate','alternate-sheet');await expect(notes).toHaveValue('');await notes.fill('Alternate only');
+  await open('tn','sn');await expect(notes).toHaveValue('North project only');expect(await page.evaluate(()=>window.estimator.getPdfReport().summaryNotes)).toBe('North project only');
+  await notes.fill('');await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();await expect(page.locator('#summaryCard')).toBeVisible();await expect(page.locator('#server-status')).toHaveText('All changes saved');await expect(notes).toHaveValue('');
+  await open('ts','ss');await expect(notes).toHaveValue('South project only');await open('alternate','alternate-sheet');await expect(notes).toHaveValue('Alternate only');
+  const saved=await page.evaluate(()=>window.estimator.getShared());expect(saved.summaryNotes).toBe('Old workbook-wide note');
+  expect(saved.lists[0].companies[0].projects[0].takeoffs[0].summaryNotes).toBe('');
 });
 
 test('summary takeoff description starts collapsed and can be expanded without changing the takeoff',async({page})=>{
@@ -2333,7 +2352,7 @@ test('summary sections collapse descendants independently and preserve totals an
 
 test('summary and printing include rounding and summary details', async ({page}) => {
   const data=workbook(), tk=data.lists[0].companies[0].projects[0].takeoffs[0];
-  data.summaryNotes='Summary note';
+  tk.summaryNotes='Summary note';
   const sh=tk.sheets[0]; sh.roundTotal=100; sh.roundStep=10;
   sh.note='Option detail'; sh.title='North scope\nSecond scope line';
   sh.rows.unshift({id:'sec',type:'section',name:'Site preparation'});

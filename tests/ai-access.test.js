@@ -90,6 +90,8 @@ test('AI grants enforce scope, repeated saves, revisions, validation, live broad
       assert.equal((await call(api+'/validate','POST',{revision:original.revision,takeoff:modified},key)).status,422);
     }
     const change={revision:original.revision,takeoff:structuredClone(original.takeoff),requestId:'save-1'};change.takeoff.sheets[0].rows[0].cost=25;change.takeoff.sheets[0].color='teal';change.takeoff.scopeAssignments={'scope-0':'sheet-one'};
+    change.takeoff.summaryNotes='Only this takeoff has these summary notes.';
+    const badNotes=structuredClone(change);badNotes.takeoff.summaryNotes={text:'invalid'};assert.equal((await call(api+'/validate','POST',badNotes,key)).status,422);
     change.takeoff.timeline={hoursPerDay:8,startDate:'2026-10-09',tasks:[{id:'row-one',startHour:8,durationHours:4,crew:2,notes:'Use the assigned crew.',resources:[{id:'row-one',quantity:2}]}],costs:[{id:'travel',day:2,kind:'travel',amount:80,taskId:'row-one',sourceRowId:'row-one'}]};
     const badTimeline=structuredClone(change);badTimeline.takeoff.timeline.tasks[0].id='row-two';
     assert.equal((await call(api+'/validate','POST',badTimeline,key)).status,422);
@@ -108,6 +110,7 @@ test('AI grants enforce scope, repeated saves, revisions, validation, live broad
     const update=new Promise(resolve=>ws.on('message',bytes=>{const value=JSON.parse(bytes);if(value.type==='update')resolve(value);}));
     const saved=await call(api+'/save','POST',change,key);assert.equal(saved.status,200);const receipt=await saved.json();assert.ok(receipt.saved);await update;
     assert.equal((await call(api+'/takeoff','GET',undefined,key)).status,200);
+    assert.equal((await (await call(api+'/takeoff','GET',undefined,key)).json()).takeoff.summaryNotes,change.takeoff.summaryNotes);
     assert.equal(receipt.accessConsumed,false);
     assert.equal((await call(api+'/instructions','GET',undefined,key)).status,200);
     assert.deepEqual(await (await call(api+'/save','POST',change,key)).json(),receipt);

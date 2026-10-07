@@ -148,6 +148,8 @@ Example fragment to merge into the full takeoff read before validating/saving:
 
 Opening Timeline, editing estimate rows, or changing display zoom never creates a plan or adds activities. The user can adjust or remove saved tasks in Timeline. AI access uses the existing external AI connection; the page itself does not invoke a model.
 
+Summary notes are stored in the authorized takeoff's `summaryNotes` text field. This is separate from its description (`note`) and from other takeoffs' notes. Preserve existing summary notes unless asked to edit them. Legacy workbook-wide notes are unassigned and must not be copied across projects automatically.
+
 #### Equipment, work details, and daily costs
 
 `read_timeline` includes `availableResources`: named takeoff item rows and nested part/service rows, with their existing `id`, `kind`, page, section path, estimate note, input quantity, and input rate. These are references only. Equipment appearing in the estimate is **not assigned automatically**. Read the full estimate for pricing context; an input rate is not a total cost or necessarily a daily rate.

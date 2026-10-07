@@ -2899,6 +2899,7 @@
       <div class="sum-notes">
         <div class="eyebrow">Notes</div>
         <textarea id="sumNotes" rows="3" placeholder="Notes for this set of options"></textarea>
+        <details id="legacySummaryNotes" hidden><summary>Previous shared notes</summary><p>These notes were previously shared across the workbook. Copy any relevant text into this takeoff's notes above.</p><pre></pre></details>
       </div>
       <section id="sumCostBreakdown" aria-label="Cost breakdown"></section>
     </div>
@@ -5966,7 +5967,8 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     renderCostBreakdown();
     const t = document.getElementById('sumTable');
     renderSummaryBlocks();
-    document.getElementById('sumNotes').value = book.summaryNotes || '';
+    document.getElementById('sumNotes').value = findTakeoff(book.activeTakeoff)?.tk.summaryNotes || '';
+    const previousNotes=document.getElementById('legacySummaryNotes');previousNotes.hidden=!String(book.summaryNotes||'').trim();previousNotes.querySelector('pre').textContent=book.summaryNotes||'';
     const detail = !!book.sumDetail;
     book.sumOpen = book.sumOpen || {};
     book.sumSectionClosed = book.sumSectionClosed || {};
@@ -7047,7 +7049,8 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   });
 
   document.getElementById('sumNotes').addEventListener('input', e => {
-    book.summaryNotes = e.target.value;
+    const hit=findTakeoff(book.activeTakeoff);if(!hit)return;
+    hit.tk.summaryNotes = e.target.value;
     save();
   });
 
@@ -10426,9 +10429,10 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     const sumCol = (col, v) => cF('SUM(' + col + f0 + ':' + col + fN + ')', v, 7);
     rows.push(rowXml([cS('', 8), cS('ALL OPTIONS', 8),
       sumCol('C', sub), sumCol('D', fee), sumCol('E', g), cS('', 8)], r++));
-    if (book.summaryNotes){
+    const summaryNotes=findTakeoff(book.activeTakeoff)?.tk.summaryNotes;
+    if (summaryNotes){
       r++;
-      rows.push(rowXml([cS('Notes', 8), cS(book.summaryNotes, 2)], r++));
+      rows.push(rowXml([cS('Notes', 8), cS(summaryNotes, 2)], r++));
     }
     return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
       '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
@@ -10628,7 +10632,8 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     blocks.removeAttribute('id');
     blocks.querySelectorAll('a').forEach(el => el.remove());
     let html = '<section class="psheet"><h2>Summary</h2>' + blocks.outerHTML + table.outerHTML;
-    if (book.summaryNotes) html += '<p class="pnote"><b>Notes:</b> ' + esc(book.summaryNotes) + '</p>';
+    const summaryNotes=findTakeoff(book.activeTakeoff)?.tk.summaryNotes;
+    if (summaryNotes) html += '<p class="pnote"><b>Notes:</b> ' + esc(summaryNotes) + '</p>';
     return html + '</section>';
   }
 
@@ -12086,7 +12091,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       if (!hit) throw new Error('Open a takeoff before saving a PDF.');
       const {co,pr,tk} = hit;
       const fields = (kind,record,base) => base.concat(customFields(kind).map(key=>[key,record.custom?.[key]])).filter(([,value])=>value!=null&&String(value).trim());
-      return structuredClone({name:tk.name || 'Takeoff',project:pr.name || '',customer:co.name || '',summaryNotes:book.summaryNotes || '',
+      return structuredClone({name:tk.name || 'Takeoff',project:pr.name || '',customer:co.name || '',summaryNotes:tk.summaryNotes || '',
         metadata:[
           {title:'Customer',fields:fields('company',co,[['Customer',co.name],['Address',co.address],['Phone',co.phone],['Email',co.email]])},
           {title:'Project',fields:fields('project',pr,[['Project',pr.name],['Status',pr.status],['Job address',pr.address || co.address],['Contacts',pr.contacts],['Email',pr.email],...(includeDetails?[['Notes',pr.notes]]:[])])},

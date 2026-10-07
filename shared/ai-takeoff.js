@@ -34,7 +34,7 @@ const unitColumnSchema={type:'object',required:['id'],properties:{id:idSchema,la
 const sectionUnitsSchema={type:'object',description:'Section and subsection UP overrides, keyed by an existing units[].id on this same page. Write on the section start row, not sectionEnd. Quantity and label inherit independently from the page column when omitted or blank, not from a parent section. The displayed dollar UP is calculated as section grand total divided by effective quantity.',additionalProperties:{type:'object',properties:{qty:{...numeric,description:'Section quantity denominator, e.g. 120 for 120 LF or 3 for 3 EA. Not a dollar price.'},label:{type:'string',description:'Section unit label, e.g. EA or LF. Empty text restores the page label.'}}}};
 export const takeoffSchema={type:'object',required:['id','name','sheets'],properties:{
   timeline:timelineSchema,
-  id:idSchema,name:{type:'string'},note:{type:'string'},custom:{type:'object'},
+  id:idSchema,name:{type:'string'},note:{type:'string'},summaryNotes:{type:'string',description:'Summary notes for this takeoff only; shown in its summary and exports.'},custom:{type:'object'},
   aiDataWorkTypes:{type:'array',items:{type:'string',enum:['concrete-pour','demo','saw-cutting']},uniqueItems:true,readOnly:true,description:'User-selected work labels. May include any combination of concrete-pour, demo, and saw-cutting. Missing or empty means not specified, not that these activities are absent.'},
   aiDataMethod:{type:'string',enum:['','unit-price','hourly','mixed'],readOnly:true,description:'Reference pricing method: unit-price = SF/LF/EA pricing; hourly = hourly or crew breakdown; mixed = both. Missing or empty means not specified. Section organization does not determine this method.'},
   aiData:{type:'boolean',readOnly:true,description:'Whether this estimate is selected as reference data for AI models. Missing means false.'},
@@ -52,7 +52,8 @@ export function validateTakeoff(next, before) {
   validateBook({sheets:[next]});
   const fail=message=>{throw Object.assign(new Error(message),{status:422});};
   if(!next || typeof next!=='object' || Array.isArray(next) || next.id!==before.id)fail('Keep the takeoff ID unchanged.');
-  const editable=new Set(['name','note','custom','sheets','scopeAssignments','timeline']);
+  const editable=new Set(['name','note','summaryNotes','custom','sheets','scopeAssignments','timeline']);
+  if(next.summaryNotes!==undefined&&typeof next.summaryNotes!=='string')fail('Summary notes must be text.');
   for(const key of new Set([...Object.keys(before),...Object.keys(next)]))if(!editable.has(key)&&JSON.stringify(next[key])!==JSON.stringify(before[key]))fail('Takeoff field is read-only: '+key);
   if(typeof next.name!=='string'||next.name.length>500)fail('Takeoff name must be text, up to 500 characters.');
   if(!Array.isArray(next.sheets)||!next.sheets.length)fail('Keep at least one option page.');
