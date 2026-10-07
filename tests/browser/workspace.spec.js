@@ -2834,7 +2834,7 @@ test('Summary colors are editable and stay shared with Scope, tabs and AI saves'
 });
 
 
-test('Summary column headings stick flush to the scroll area without a gap',async({page})=>{
+test('Summary headings and totals stick flush to the scroll area without gaps',async({page})=>{
   const data=workbook();
   data.lists[0].companies[0].projects[0].takeoffs[0].sheets=Array.from({length:35},(_,i)=>sheet('page-'+i,'Scope '+i));
   await openWorkbook(page,data);
@@ -2849,6 +2849,10 @@ test('Summary column headings stick flush to the scroll area without a gap',asyn
       return Math.abs(th.getBoundingClientRect().top-(bounds.top+scroll.clientTop*scale));
     })).toBeLessThanOrEqual(2);
     await expect(page.locator('#sumTable thead th').first()).toBeInViewport();
+    await expect.poll(()=>page.locator('#sumTable tfoot td').first().evaluate(td=>{
+      const scroll=document.querySelector('#summaryCard>.scroll'),bounds=scroll.getBoundingClientRect(),scale=bounds.width/scroll.offsetWidth;
+      return Math.abs(td.getBoundingClientRect().bottom-(bounds.top+(scroll.clientTop+scroll.clientHeight)*scale));
+    })).toBeLessThanOrEqual(2);
   }
   await page.screenshot({path:'.tools/summary-sticky-header.png'});
 });
