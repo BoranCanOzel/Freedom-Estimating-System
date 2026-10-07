@@ -160,7 +160,7 @@ Drag library sections onto the lower half of a section header to place them insi
 
 ## Takeoff PDF export
 
-**Save as PDF**, next to **Share**, downloads the current takeoff directly. The landscape report includes customer/project context, an option summary, every scope's line items and named total, fees, unit pricing, rounded amounts, saved notes, component breakdowns, and embedded pictures. Collapsed rows, hidden details, theme, and screen zoom do not omit report content. Save an open editor before exporting.
+**Save as PDF**, next to **Share**, opens a menu with **Save without details** and **Save with details**. Without details omits saved project/takeoff descriptions and summary, page, section, item, and component notes. Both versions keep customer/project context, the scope summary, every scope's line items and named total, fees, unit pricing, rounded amounts, component breakdowns, and embedded pictures. Collapsed rows, theme, and screen zoom do not omit report content. Save an open editor before exporting.
 
 Each option has one item list with dedicated pricing columns, including unit prices and quantities. Standard estimates fit US Letter landscape; unusually wide tables use wider pages to keep the text readable. Per-line rounding is omitted. Headers and page numbers repeat. Notes print directly beneath their items or section headers, once. Section subtotal rows are omitted; each scope has one total labeled with its name. The browser generates selectable PDF text using bundled Noto Sans fonts (license: `client/fonts/OFL.txt`). The PDF engine loads on demand and no estimate data is sent to an external conversion service. Run `npm ci --include=dev` and `npm run build` when deploying; the build also produces `dist/pdf-renderer.js`.
 

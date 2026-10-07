@@ -7,7 +7,7 @@ const ink=[31,51,65],muted=[92,105,115],rule=[216,222,227];
 const text=value=>String(value??'').replace(/\r\n?/g,'\n');
 
 // Vector text and tables: pagination never relies on screenshots or screen zoom.
-export function buildTakeoffPdf(report,{fonts,date=new Date()}={}) {
+export function buildTakeoffPdf(report,{fonts,date=new Date(),includeDetails=true}={}) {
   const doc=new jsPDF({orientation:'landscape',unit:'pt',format:'letter',compress:true,putOnlyUsedFonts:true});
   let font='helvetica';
   if(fonts){
@@ -50,7 +50,7 @@ export function buildTakeoffPdf(report,{fonts,date=new Date()}={}) {
     body:report.sheets.map((sh,i)=>[`${i+1}. ${sh.title||'Untitled scope'}`,money(sh.totals.sub),money(sh.totals.feeSum),money(sh.totals.grand),Number(sh.roundTotal)?money(sh.totals.grandRounded):'—']),
     foot:[[report.name+' total',money(sum('sub')),money(sum('feeSum')),money(sum('grand')),'']],
     columnStyles:{0:{cellWidth:320},1:{halign:'right'},2:{halign:'right'},3:{halign:'right'},4:{halign:'right'}}});
-  if(report.summaryNotes)table({head:[['Summary notes']],body:[[report.summaryNotes]]});
+  if(includeDetails&&report.summaryNotes)table({head:[['Summary notes']],body:[[report.summaryNotes]]});
 
   for(const sh of report.sheets){
     const scopeName=text(sh.title).trim()||'Untitled scope';
@@ -84,13 +84,13 @@ export function buildTakeoffPdf(report,{fonts,date=new Date()}={}) {
     const widths=columns.map(([key])=>Math.max(['count','time','days'].includes(key)?44:62,
       ...[...rows.map(row=>row.values?.[key]||''),total[key]||''].flatMap(value=>text(value).split('\n').map(line=>doc.getTextWidth(line)+12))));
     newPage(scopeName,Math.max(792,190+widths.reduce((sum,w)=>sum+w,0)+margin*2));
-    paragraph(scopeName,{size:17,bold:true});paragraph(sh.note);
+    paragraph(scopeName,{size:17,bold:true});if(includeDetails)paragraph(sh.note);
     const descriptionWidth=usable-widths.reduce((sum,w)=>sum+w,0);
     const detailCells=value=>[{content:value,colSpan:columns.length+1,styles:{fontSize:9,textColor:muted,fillColor:[250,251,252],cellPadding:{top:4,bottom:6,left:12,right:6}}}];
     const body=rows.length?rows.flatMap(row=>{
       const cells=row.kind==='section'?[{content:row.label,colSpan:columns.length+1,styles:{fontStyle:'bold',fillColor:[225,232,237]}}]
         :[row.label,...columns.map(([key])=>row.values[key]||'')];
-      const detail=text(row.note).trim();
+      const detail=includeDetails?text(row.note).trim():'';
       return detail?[cells,detailCells(detail)]:[cells];
     }):[[{content:'No line items in this scope.',colSpan:columns.length+1}]];
     const foot=[[scopeName+' total',...columns.map(([key])=>total[key]||'')]];
@@ -100,7 +100,7 @@ export function buildTakeoffPdf(report,{fonts,date=new Date()}={}) {
       if(y>height-190)newPage(scopeName+' · Components');
       paragraph(`${row.name||'Item'} — component breakdown`,{size:15,bold:true});
       paragraph('Component amounts build the item unit cost; they are already included in the scope totals.');
-      table({head:[['Component / description','Count','Time','Days','Cost','Markup %','Amount']],body:row.components.map(p=>[[p.name,p.note].filter(Boolean).join('\n'),number(p.count),number(p.time),number(p.days),money(p.cost),number(p.markup)+'%',money(p.total)]),columnStyles:{0:{cellWidth:280},...Object.fromEntries([1,2,3,4,5,6].map(i=>[i,{halign:'right'}]))}});
+      table({head:[['Component / description','Count','Time','Days','Cost','Markup %','Amount']],body:row.components.map(p=>[[p.name,includeDetails?p.note:''].filter(Boolean).join('\n'),number(p.count),number(p.time),number(p.days),money(p.cost),number(p.markup)+'%',money(p.total)]),columnStyles:{0:{cellWidth:280},...Object.fromEntries([1,2,3,4,5,6].map(i=>[i,{halign:'right'}]))}});
     }
     const pictures=[{name:sh.title,pics:sh.pics,img:sh.img},...sh.rows];
     for(const row of pictures){

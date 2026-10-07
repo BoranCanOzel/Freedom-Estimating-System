@@ -35,6 +35,7 @@ test('Save as PDF downloads every takeoff option with readable pagination and co
   const {getDocument,OPS}=await import('pdfjs-dist/legacy/build/pdf.mjs');
   const data=workbook(),takeoff=data.lists[0].companies[0].projects[0].takeoffs[0];
   takeoff.name='Complete takeoff';takeoff.note='Takeoff description';data.summaryNotes='Scope exclusions and clarifications.';
+  data.lists[0].companies[0].projects[0].notes='Private project planning note';
   const first=takeoff.sheets[0];first.note='Option-specific scope note';first.flatAddEnabled=true;first.roundTotal=100;
   first.fees=Array.from({length:8},(_,i)=>({id:'fee'+i,label:'Custom fee '+i,pct:1}));
   first.units=Array.from({length:9},(_,i)=>({id:'unit'+i,label:'Measured unit '+i,qty:i+1}));
@@ -44,13 +45,20 @@ test('Save as PDF downloads every takeoff option with readable pagination and co
     {id:'section-end',type:'sectionEnd'},
     {id:'long',kind:'labor',name:'Long note item',cost:100,count:1,time:1,days:1,note:Array.from({length:130},(_,i)=>`Detailed scope line ${i}: Include cutting and cleanup.`).join('\n')+'\nEND OF LONG NOTE'}];
   takeoff.sheets.push({...sheet('second','Second option'),rows:[{id:'svc',kind:'service',name:'Service with add-ons',count:1,time:1,days:1,cost:100,parts:[{id:'p',name:'Included component',count:'2',time:'1',days:'1',cost:'5',markup:'0'}]}]});
+  takeoff.sheets[1].rows[0].parts[0].note='Component installation note';
   const picture=await page.evaluate(()=>{const canvas=document.createElement('canvas');canvas.width=320;canvas.height=180;const ctx=canvas.getContext('2d');ctx.fillStyle='#d8e5ed';ctx.fillRect(0,0,320,180);ctx.fillStyle='#203440';ctx.font='20px sans-serif';ctx.fillText('Site reference',20,60);return canvas.toDataURL('image/png');});
   takeoff.sheets[1].rows[0].pics=[{id:'photo',name:'Site reference photo',url:picture}];
   takeoff.sheets.push({...sheet('empty','Empty alternative'),rows:[]});
   await openWorkbook(page,data);
   await expect(page.locator('#takeoff-share + #takeoff-pdf')).toBeVisible();
   const before=await page.evaluate(()=>JSON.stringify(window.estimator.getShared()));
-  const downloadPromise=page.waitForEvent('download');await page.locator('#takeoff-pdf').click();const download=await downloadPromise;
+  await page.locator('#takeoff-pdf').click();await expect(page.getByRole('menuitem',{name:'Save without details',exact:true})).toBeVisible();
+  await page.locator('#takeoff-pdf').click();await expect(page.locator('#takeoff-pdf-menu')).not.toBeVisible();
+  await page.locator('#takeoff-pdf').focus();await page.keyboard.press('ArrowDown');await expect(page.getByRole('menuitem',{name:'Save without details',exact:true})).toBeFocused();
+  await page.keyboard.press('ArrowDown');await expect(page.getByRole('menuitem',{name:'Save with details',exact:true})).toBeFocused();
+  await page.keyboard.press('Escape');await expect(page.locator('#takeoff-pdf-menu')).not.toBeVisible();await expect(page.locator('#takeoff-pdf')).toBeFocused();
+  await page.locator('#takeoff-pdf').click();await page.screenshot({path:'.tools/pdf-download-menu.png'});
+  const downloadPromise=page.waitForEvent('download');await page.getByRole('menuitem',{name:'Save with details',exact:true}).click();const download=await downloadPromise;
   expect(download.suggestedFilename()).toBe('Complete takeoff - Takeoff.pdf');
   await download.saveAs('.tools/takeoff-export-review.pdf');
   expect(await page.evaluate(()=>JSON.stringify(window.estimator.getShared()))).toBe(before);
@@ -108,9 +116,23 @@ test('Save as PDF downloads every takeoff option with readable pagination and co
   expect(all.indexOf('Detail visible even when collapsed.')).toBeLessThan(all.indexOf('Export item 001'));
   expect(all.match(/Detail visible even when collapsed\./g)).toHaveLength(65);
   expect(all).toContain('Site reference photo');expect(all).toContain('No line items in this scope.');expect(hasImage).toBe(true);
+  expect(all).toContain('Private project planning note');expect(all).toContain('Component installation note');
+  const detailedPages=pdf.numPages;
   await loading.destroy();
   await page.locator('#rail .tab-summary').click();
   await expect(page.locator('#takeoff-share + #takeoff-pdf')).toBeVisible();
+  await page.locator('#takeoff-pdf').click();
+  const plainDownloadPromise=page.waitForEvent('download');await page.getByRole('menuitem',{name:'Save without details',exact:true}).click();const plainDownload=await plainDownloadPromise;
+  const plainLoading=getDocument({data:new Uint8Array(await readFile(await plainDownload.path())),useSystemFonts:false}),plain=await plainLoading.promise;
+  let plainText='';for(let i=1;i<=plain.numPages;i++)plainText+=(await (await plain.getPage(i)).getTextContent()).items.map(item=>item.str||'').join(' ')+'\n';
+  for(const omitted of ['Takeoff description','Scope exclusions and clarifications.','Option-specific scope note','Section scope included','Detail visible even when collapsed.','END OF LONG NOTE','Private project planning note','Component installation note'])expect(plainText).not.toContain(omitted);
+  for(const retained of ['Site preparation','Long note item','Included component','$110.00','$113.30','Custom fee 7','Measured unit 8','North scope total','SF price','Qty 160','Site reference photo'])expect(plainText).toContain(retained);
+  for(let i=0;i<65;i++)expect(plainText.split(`Export item ${String(i).padStart(3,'0')}`)).toHaveLength(2);
+  expect(plain.numPages).toBeLessThan(detailedPages);expect(await page.evaluate(()=>JSON.stringify(window.estimator.getShared()))).toBe(before);await plainLoading.destroy();
+  await page.setViewportSize({width:390,height:844});await page.locator('#takeoff-pdf').click();await expect(page.locator('#takeoff-pdf-menu')).toBeVisible();
+  const bounds=await page.locator('#takeoff-pdf-menu').boundingBox();expect(bounds.x).toBeGreaterThanOrEqual(0);expect(bounds.x+bounds.width).toBeLessThanOrEqual(390);
+  await page.screenshot({path:'.tools/pdf-download-menu-mobile.png'});
+  await page.mouse.click(2,2);await expect(page.locator('#takeoff-pdf-menu')).not.toBeVisible();
 });
 
 test.describe('phone layouts',()=>{

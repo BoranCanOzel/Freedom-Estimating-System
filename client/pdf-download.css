@@ -1,0 +1,4 @@
+#takeoff-pdf-menu{position:fixed;inset:auto;margin:0;padding:5px;width:240px;max-width:calc(100vw - 16px);box-sizing:border-box;border:1px solid var(--rule);border-radius:6px;background:var(--card);color:var(--ink);box-shadow:0 8px 28px #0004}
+#takeoff-pdf-menu button{display:block;width:100%;padding:11px 12px;border:0;border-radius:3px;text-align:left;background:transparent;color:inherit;font:13px var(--f-sans);cursor:pointer}
+#takeoff-pdf-menu button:hover,#takeoff-pdf-menu button:focus-visible{background:color-mix(in srgb,var(--amber) 12%,var(--card));outline:1px solid var(--amber);outline-offset:-1px}
+#takeoff-pdf-menu strong,#takeoff-pdf-menu small{display:block}#takeoff-pdf-menu small{margin-top:4px;color:var(--muted);font-size:11px}

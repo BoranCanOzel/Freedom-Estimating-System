@@ -12072,7 +12072,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       if(book.view==='summary')renderSummary();
       renderProjects();save();
     },
-    getPdfReport(){
+    getPdfReport({includeDetails=true}={}){
       const hit = findTakeoff(book.activeTakeoff);
       if (!hit) throw new Error('Open a takeoff before saving a PDF.');
       const {co,pr,tk} = hit;
@@ -12080,8 +12080,8 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       return structuredClone({name:tk.name || 'Takeoff',project:pr.name || '',customer:co.name || '',summaryNotes:book.summaryNotes || '',
         metadata:[
           {title:'Customer',fields:fields('company',co,[['Customer',co.name],['Address',co.address],['Phone',co.phone],['Email',co.email]])},
-          {title:'Project',fields:fields('project',pr,[['Project',pr.name],['Status',pr.status],['Job address',pr.address || co.address],['Contacts',pr.contacts],['Email',pr.email],['Notes',pr.notes]])},
-          {title:'Takeoff',fields:fields('takeoff',tk,[['Takeoff',tk.name],['Description',tk.note]])}
+          {title:'Project',fields:fields('project',pr,[['Project',pr.name],['Status',pr.status],['Job address',pr.address || co.address],['Contacts',pr.contacts],['Email',pr.email],...(includeDetails?[['Notes',pr.notes]]:[])])},
+          {title:'Takeoff',fields:fields('takeoff',tk,[['Takeoff',tk.name],...(includeDetails?[['Description',tk.note]]:[])])}
         ],
         sheets:book.sheets.map(sh=>({...sh,totals:sheetTotals(sh),rows:sh.rows.map(row=>{
           if(row.type==='section')return {...row,sectionQuantities:sh.units.map(u=>num(secUnit(row,u).qty))};
