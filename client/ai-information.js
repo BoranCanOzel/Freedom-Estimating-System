@@ -22,6 +22,30 @@ export function setupAiInformation(api,openEstimate) {
     <div class="ai-data-filters"><label class="ai-data-search">Find an estimate<input id="ai-info-data-search" type="search" placeholder="Search estimates, jobs, customers..."></label><label>Pricing method<select id="ai-info-data-method"><option value="all">All methods</option><option value="">Not specified</option></select></label><label>Work type<select id="ai-info-data-work-type"><option value="all">All work types</option><option value="concrete-pour">Concrete pour</option><option value="demo">Demo</option><option value="saw-cutting">Saw cutting</option><option value="both">Concrete pour + Demo</option><option value="">Not specified</option></select></label></div>
     <div class="ai-data-results-bar"><p id="ai-info-data-count" role="status"></p><button type="button" id="ai-info-data-reset">Clear filters</button></div><div id="ai-info-data-results"></div>`;
   libraryPanel.after(dataPanel);
+  const keysTab=document.createElement('button');keysTab.type='button';keysTab.id='ai-info-keys-tab';keysTab.textContent='Access keys';keysTab.setAttribute('role','tab');keysTab.setAttribute('aria-controls','ai-info-keys-panel');keysTab.setAttribute('aria-selected','false');keysTab.tabIndex=-1;tabs.append(keysTab);
+  const keysPanel=document.createElement('section');keysPanel.id='ai-info-keys-panel';keysPanel.hidden=true;keysPanel.setAttribute('role','tabpanel');keysPanel.setAttribute('aria-labelledby',keysTab.id);
+  keysPanel.innerHTML='<div class="ai-keys-heading"><div><h2>AI access keys</h2><p>Manage active AI keys across all workbooks. Users are grouped by who generated each key.</p><p id="ai-info-keys-count"></p></div><button type="button" id="ai-info-keys-revoke-all">Revoke all server keys</button></div><div id="ai-info-keys-users"></div><p class="ai-keys-hint">Revocation takes effect immediately. Existing estimates and AI change history are kept. Generate a new key from a takeoff to restore AI access.</p>';
+  dataPanel.after(keysPanel);
+  async function loadKeys(){
+    message('Loading AI access keys...');const data=await request('/ai-access');
+    $('keys-count').textContent=data.active+' active AI '+(data.active===1?'key':'keys');
+    $('keys-revoke-all').dataset.unavailable=String(!data.active);$('keys-revoke-all').disabled=busy||!data.active;
+    $('keys-users').replaceChildren();
+    for(const user of data.users){
+      const row=document.createElement('article'),info=document.createElement('div'),name=document.createElement('strong'),count=document.createElement('span'),revoke=document.createElement('button');row.className='ai-keys-user';
+      name.textContent=user.name;count.textContent=user.active+' active '+(user.active===1?'key':'keys');info.append(name,count);
+      revoke.type='button';revoke.textContent='Revoke all for user';revoke.setAttribute('aria-label','Revoke all AI keys for '+user.name);revoke.dataset.unavailable=String(!user.active);revoke.disabled=busy||!user.active;
+      revoke.onclick=()=>revokeKeys('user',user.name);row.append(info,revoke);$('keys-users').append(row);
+    }
+    if(!data.users.length)$('keys-users').textContent='No AI access keys have been created.';
+    message('');
+  }
+  function revokeKeys(scope,user){
+    const question=scope==='server'?'Revoke every active AI access key on this server for all users and workbooks?':'Revoke all AI access keys created by '+user+' across every workbook?';
+    if(!confirm(question+' Connected AI tools will lose access until new keys are generated.'))return;
+    run(async()=>{const result=await request('/ai-access/revoke',{method:'POST',body:JSON.stringify({scope,...(scope==='user'?{user}:{})})});await loadKeys();message('Revoked '+result.revoked+' AI access '+(result.revoked===1?'key.':'keys.'));});
+  }
+  $('keys-revoke-all').onclick=()=>revokeKeys('server');
   for(const [value,label] of aiDataMethods)$('data-method').add(new Option(label,value));
   let activeTab='library',estimates=[];
   function renderEstimates(){
@@ -70,12 +94,12 @@ export function setupAiInformation(api,openEstimate) {
   }
   async function loadEstimates(){message('Loading AI Data estimates...');const data=await request('/ai-information/estimates');estimates=data.estimates;renderEstimates();message('');}
   function setTab(tab){
-    activeTab=tab;libraryPanel.hidden=tab!=='library';dataPanel.hidden=tab!=='data';
-    for(const name of ['library','data']){$(name+'-tab').setAttribute('aria-selected',String(tab===name));$(name+'-tab').tabIndex=tab===name?0:-1;}
-    page.querySelector('[data-action="reload"]').textContent=tab==='data'?'Refresh estimates':'Reload library';
+    activeTab=tab;libraryPanel.hidden=tab!=='library';dataPanel.hidden=tab!=='data';keysPanel.hidden=tab!=='keys';
+    for(const name of ['library','data','keys']){$(name+'-tab').setAttribute('aria-selected',String(tab===name));$(name+'-tab').tabIndex=tab===name?0:-1;}
+    page.querySelector('[data-action="reload"]').textContent=tab==='keys'?'Refresh keys':tab==='data'?'Refresh estimates':'Reload library';
   }
-  for(const tab of ['library','data'])$(tab+'-tab').onclick=()=>run(async()=>{setTab(tab);if(tab==='data')await loadEstimates();else message(dirty?'Unsaved changes.':'');});
-  tabs.onkeydown=event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)&&!busy){event.preventDefault();const tab=event.key==='Home'?'library':event.key==='End'?'data':activeTab==='library'?'data':'library';$(tab+'-tab').click();setTimeout(()=>$(tab+'-tab').focus(),0);}};
+  for(const tab of ['library','data','keys'])$(tab+'-tab').onclick=()=>run(async()=>{setTab(tab);if(tab==='data')await loadEstimates();else if(tab==='keys')await loadKeys();else message(dirty?'Unsaved changes.':'');});
+  tabs.onkeydown=event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)&&!busy){event.preventDefault();const names=['library','data','keys'],tab=event.key==='Home'?names[0]:event.key==='End'?names.at(-1):names[(names.indexOf(activeTab)+(event.key==='ArrowRight'?1:-1)+names.length)%names.length];$(tab+'-tab').click();setTimeout(()=>$(tab+'-tab').focus(),0);}};
   $('data-reset').onclick=()=>{$('data-search').value='';$('data-method').value='all';$('data-work-type').value='all';renderEstimates();};
   $('data-search').oninput=renderEstimates;
   $('data-method').onchange=renderEstimates;
@@ -159,7 +183,7 @@ export function setupAiInformation(api,openEstimate) {
   function setBusy(value){
     busy=value;
     if(value)page.setAttribute('aria-busy','true');else page.removeAttribute('aria-busy');
-    page.querySelectorAll('button,input,select,textarea').forEach(e=>e.disabled=value&&e.dataset.action!=='close');
+    page.querySelectorAll('button,input,select,textarea').forEach(e=>e.disabled=(value&&e.dataset.action!=='close')||e.dataset.unavailable==='true');
   }
   async function request(path,options={}){
     const signal=operation?.signal;
@@ -178,7 +202,7 @@ export function setupAiInformation(api,openEstimate) {
   }
   async function reload(){library=await request('/ai-information');savedLibrary=structuredClone(library);dirty=false;if(!item())selected='';render();message('Library loaded.');}
   async function persist(items){library=await request('/ai-information',{method:'PUT',body:JSON.stringify({revision:library.revision,items})});savedLibrary=structuredClone(library);dirty=false;render();message('Saved. AI access now includes the latest information.');}
-  button.onclick=()=>run(async()=>{if(!page.hidden)return;page.hidden=false;background(true);button.setAttribute('aria-pressed','true');document.body.classList.add('ai-information-open');message('Loading library...');await reload();if(activeTab==='data')await loadEstimates();setTimeout(()=>page.querySelector('[data-action="close"]').focus(),0);});
+  button.onclick=()=>run(async()=>{if(!page.hidden)return;page.hidden=false;background(true);button.setAttribute('aria-pressed','true');document.body.classList.add('ai-information-open');message('Loading library...');await reload();if(activeTab==='data')await loadEstimates();else if(activeTab==='keys')await loadKeys();setTimeout(()=>page.querySelector('[data-action="close"]').focus(),0);});
   function closePage(){if(!discard())return;operation?.abort();operation=null;setBusy(false);endDrag();page.hidden=true;dirty=false;background(false);document.body.classList.remove('ai-information-open');button.setAttribute('aria-pressed','false');button.focus();}
   page.querySelector('[data-action="close"]').onclick=closePage;
   document.getElementById('server-bar').addEventListener('click',event=>{
@@ -205,7 +229,7 @@ export function setupAiInformation(api,openEstimate) {
     if(!confirm(`Delete “${current.title}”${removed.size>1?' and everything inside it':''}? This cannot be undone.`))return;
     await persist(library.items.filter(i=>!removed.has(i.id)));selected='';render();
   });
-  page.querySelector('[data-action="reload"]').onclick=()=>run(async()=>{if(activeTab==='data')await loadEstimates();else if(discard())await reload();});
+  page.querySelector('[data-action="reload"]').onclick=()=>run(async()=>{if(activeTab==='data')await loadEstimates();else if(activeTab==='keys')await loadKeys();else if(discard())await reload();});
   $('search').oninput=tree;
   window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue='';}});
 }

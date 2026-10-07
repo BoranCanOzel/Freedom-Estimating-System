@@ -308,6 +308,40 @@ test('AI Data marks only the selected estimate and persists when toggled',async(
   expect(await page.evaluate(()=>window.estimator.getShared().lists[0].companies[0].projects[0].takeoffs[0].aiData)).toBe(false);
 });
 
+test('summary takeoff description starts collapsed and can be expanded without changing the takeoff',async({page})=>{
+  const data=workbook();data.lists[0].companies[0].projects[0].takeoffs[0].note='Detailed takeoff scope\nKeep these instructions.';
+  await openWorkbook(page,data);await page.locator('#rail .tab-summary').click();
+  const detail=page.locator('#summary-takeoff-description');await expect(detail).toBeVisible();await expect(detail.locator('p')).not.toBeVisible();
+  await detail.locator('summary').click();await expect(detail.locator('p')).toBeVisible();await expect(detail).toContainText('Keep these instructions.');
+  await page.evaluate(()=>window.estimator.setCurrentJobStatus('Completed'));await expect(detail.locator('p')).toBeVisible();
+  await detail.locator('summary').click();await expect(detail.locator('p')).not.toBeVisible();
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');await page.reload();await expect(detail).toBeVisible();await expect(page.locator('#server-status')).toHaveText('All changes saved');await expect(detail.locator('p')).not.toBeVisible();
+  expect(await page.evaluate(()=>window.estimator.getShared().lists[0].companies[0].projects[0].takeoffs[0].note)).toBe('Detailed takeoff scope\nKeep these instructions.');
+});
+
+test('AI Information revokes keys by creator and server-wide with cancellation and refreshed counts',async({page,browser,baseURL})=>{
+  const name='Key owner '+Date.now(),otherName='Other key owner '+Date.now();await openWorkbook(page,workbook(),name);
+  const title=await page.locator('#server-title').textContent(),projects=await (await page.request.get('/api/projects')).json(),project=projects.find(p=>p.name===title);
+  const other=await browser.newContext({baseURL});
+  try{
+    await other.request.post('/api/login',{data:{name:otherName,password:'1313'}});
+    const path='/api/projects/'+project.id+'/ai-access',generate=async(request,takeoff)=>(await request.post(path,{data:{list:'list',takeoff}})).json();
+    const first=await generate(page.request,'tn'),second=await generate(page.request,'ts'),third=await generate(other.request,'tn');
+    const read=key=>page.request.get('/api/ai/v1/takeoff',{headers:{Authorization:'Bearer '+key}});
+    await page.locator('#ai-information-open').click();await page.getByRole('tab',{name:'Access keys',exact:true}).click();
+    const revoke=page.getByRole('button',{name:'Revoke all AI keys for '+name,exact:true});await expect(revoke).toBeEnabled();await expect(revoke.locator('..')).toContainText('2 active keys');
+    page.once('dialog',dialog=>dialog.dismiss());await revoke.click();expect((await read(first.key)).status()).toBe(200);
+    page.once('dialog',dialog=>dialog.accept());await revoke.click();await expect(page.locator('#ai-info-status')).toHaveText('Revoked 2 AI access keys.');await expect(revoke).toBeDisabled();
+    expect((await read(first.key)).status()).toBe(403);expect((await read(second.key)).status()).toBe(403);expect((await read(third.key)).status()).toBe(200);
+    await page.screenshot({path:'.tools/ai-key-management.png'});
+    page.once('dialog',dialog=>dialog.dismiss());await page.getByRole('button',{name:'Revoke all server keys',exact:true}).click();expect((await read(third.key)).status()).toBe(200);
+    page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'Revoke all server keys',exact:true}).click();await expect(page.locator('#ai-info-keys-count')).toHaveText('0 active AI keys');
+    await expect(page.getByRole('button',{name:'Revoke all server keys',exact:true})).toBeDisabled();expect((await read(third.key)).status()).toBe(403);
+    await page.getByRole('button',{name:'Back to estimating',exact:true}).click();await page.locator('#ai-information-open').click();await expect(revoke).toBeDisabled();
+    await page.setViewportSize({width:390,height:844});await page.screenshot({path:'.tools/ai-key-management-mobile.png'});
+  }finally{await other.close();}
+});
+
 test('AI Information lists checked estimates across workbooks and opens their exact location',async({page})=>{
   await openWorkbook(page);
   const suffix=Date.now().toString(),job='AI reference job '+suffix,estimate='AI reference estimate '+suffix;

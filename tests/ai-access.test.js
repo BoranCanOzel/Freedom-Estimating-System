@@ -12,6 +12,35 @@ import { WebSocket } from 'ws';
 import { createApp } from '../server.js';
 
 const takeoff=id=>({id,name:id,custom:{},sheets:[{id:'sheet-'+id,title:'Scope',fees:[],units:[],rows:[{id:'row-'+id,kind:'labor',name:'Cutting',cost:10,count:1,time:1,days:1}]}]});
+test('bulk AI key revocation is authenticated, creator-scoped across workbooks, and server-wide',async()=>{
+  const app=createApp({dataDir:await mkdtemp(join(tmpdir(),'freedom-ai-revoke-')),production:false});app.server.listen(0,'127.0.0.1');await once(app.server,'listening');
+  const base='http://127.0.0.1:'+app.server.address().port;
+  try{
+    const login=async name=>{const response=await fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,password:'1313'})});return response.headers.get('set-cookie').split(';')[0];};
+    const alice=await login('Alice'),bob=await login('Bob');
+    const call=(cookie,path,method='GET',body)=>fetch(base+path,{method,headers:{'Content-Type':'application/json',...(cookie?{cookie}:{})},body:body===undefined?undefined:JSON.stringify(body)});
+    const book={lists:[{id:'list',companies:[{id:'co',projects:[{id:'job',takeoffs:[takeoff('one'),takeoff('two')]}]}]}]};
+    const workbooks=await Promise.all(['A','B'].map(async name=>(await call(alice,'/api/projects','POST',{name,book})).json()));
+    const grant=async(cookie,workbook,takeoff)=>(await call(cookie,'/api/projects/'+workbook.id+'/ai-access','POST',{list:'list',takeoff})).json();
+    const a1=await grant(alice,workbooks[0],'one'),a2=await grant(alice,workbooks[0],'two'),a3=await grant(alice,workbooks[1],'one'),b1=await grant(bob,workbooks[1],'two');
+    const read=key=>fetch(base+'/api/ai/v1/takeoff',{headers:{Authorization:'Bearer '+key}});
+    const before=await (await read(b1.key)).json();
+    assert.equal((await call(null,'/api/ai-access')).status,401);
+    assert.equal((await call(null,'/api/ai-access/revoke','POST',{scope:'server'})).status,401);
+    assert.equal((await fetch(base+'/api/ai-access/revoke',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+a1.key},body:JSON.stringify({scope:'server'})})).status,401);
+    for(const body of [{},{scope:'all'},{scope:'user'},{scope:'user',user:''},{scope:'server',user:'Alice'},{scope:'server',extra:true}])assert.equal((await call(alice,'/api/ai-access/revoke','POST',body)).status,422);
+    assert.deepEqual(await (await call(alice,'/api/ai-access')).json(),{users:[{name:'Alice',active:3},{name:'Bob',active:1}],active:4});
+    assert.deepEqual(await (await call(alice,'/api/ai-access/revoke','POST',{scope:'user',user:'Alice'})).json(),{revoked:3});
+    for(const grant of [a1,a2,a3])assert.equal((await read(grant.key)).status,403);
+    assert.equal((await read(b1.key)).status,200);assert.deepEqual(await (await read(b1.key)).json(),before);
+    assert.deepEqual(await (await call(alice,'/api/ai-access/revoke','POST',{scope:'user',user:'Alice'})).json(),{revoked:0});
+    const fresh=await grant(alice,workbooks[0],'one');assert.equal((await read(fresh.key)).status,200);
+    assert.deepEqual(await (await call(alice,'/api/ai-access/revoke','POST',{scope:'server'})).json(),{revoked:2});
+    for(const grant of [fresh,b1])assert.equal((await read(grant.key)).status,403);
+    const listing=await (await call(alice,'/api/ai-access')).json();assert.equal(listing.active,0);assert(listing.users.every(user=>user.active===0));
+    const history=await (await call(alice,'/api/projects/'+workbooks[0].id+'/ai-access?list=list&takeoff=one')).json();assert.equal(history.grants.length,2);assert(history.grants.every(grant=>grant.revoked));
+  }finally{await app.close();}
+});
 test('AI grants enforce scope, repeated saves, revisions, validation, live broadcast, audit, undo and manual revocation',async()=>{
   const dataDir=await mkdtemp(join(tmpdir(),'freedom-ai-')),app=createApp({dataDir,production:false});
   app.server.listen(0,'127.0.0.1');await once(app.server,'listening');

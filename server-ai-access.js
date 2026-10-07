@@ -153,6 +153,19 @@ export function mountAiAccess({app,db,session,project,rooms,snapshot,readAiInfor
     res.json({openapi:'3.1.0',info:{title:'Freedom one-takeoff editing',version:'1.0.0'},servers:[{url:req.protocol+'://'+req.get('host')+base}],security:[{takeoffKey:[]}],components:{securitySchemes:{takeoffKey:{type:'http',scheme:'bearer'}}},paths});
   });
   const admin='/api/projects/:id/ai-access';
+  app.get('/api/ai-access',route((req,res)=>{
+    signed(req);
+    const users=db.prepare('SELECT created_by AS name, SUM(CASE WHEN revoked=0 THEN 1 ELSE 0 END) AS active FROM ai_grants GROUP BY created_by ORDER BY created_by COLLATE NOCASE').all();
+    res.json({users,active:users.reduce((sum,user)=>sum+user.active,0)});
+  }));
+  app.post('/api/ai-access/revoke',route((req,res)=>{
+    signed(req);const body=req.body;
+    if(!body||!['user','server'].includes(body.scope)||Object.keys(body).some(key=>!['scope','user'].includes(key)))fail(422,'Choose a user or server-wide revocation.');
+    if(body.scope==='user'&&(typeof body.user!=='string'||!body.user.trim()))fail(422,'Choose the user whose AI keys should be revoked.');
+    if(body.scope==='server'&&body.user!==undefined)fail(422,'Server-wide revocation cannot specify a user.');
+    const result=body.scope==='user'?db.prepare('UPDATE ai_grants SET revoked=1 WHERE revoked=0 AND created_by=?').run(body.user):db.prepare('UPDATE ai_grants SET revoked=1 WHERE revoked=0').run();
+    res.json({revoked:result.changes});
+  }));
   app.post(admin,route((req,res)=>{
     const user=signed(req),data=source(req.params.id),scope=locateTakeoff(data.book,req.body?.list,req.body?.takeoff);
     if(!scope)fail(404,'Takeoff not found.');
