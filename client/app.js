@@ -149,6 +149,9 @@ class LiveProject {
       if (this.closed) return;
       try {
         const msg = JSON.parse(event.data);
+        // Identify this connection before applying/rendering shared state.
+        // A later state refresh may omit peerId; it must not erase our identity.
+        if(msg.type==='sync'&&msg.peerId)this.peerId=msg.peerId;
         if (msg.type === 'sync' || msg.type === 'update') {
           if (this.ready) this.changed();
           const before = this.ready ? JSON.stringify(readBook(this.doc)) : null;
@@ -162,7 +165,7 @@ class LiveProject {
           finally { this.applying = false; }
           this.historyLocation = clone(bridge.getLocation());
           if (msg.type === 'sync') {
-            this.peerId = msg.peerId; this.synced = true; this.ready = true; this.retry = 0;
+            this.synced = true; this.ready = true; this.retry = 0;
             document.body.classList.add('server-active');
             workspace.sync(); syncProjectPanel();
             document.dispatchEvent(new Event('estimator:history'));
@@ -172,7 +175,7 @@ class LiveProject {
           this.sendPresence(); this.paintPeers();
         } else if (msg.type === 'ack') {
           this.acked = Math.max(this.acked, msg.seq); this.paintStatus();
-        } else if (msg.type === 'presence') { this.peers = msg.peers; this.paintPeers(); projectPresence.update(this.peers,this.peerId); }
+        } else if (msg.type === 'presence') { if(msg.selfId)this.peerId=msg.selfId;this.peers = msg.peers; this.paintPeers(); projectPresence.update(this.peers,this.peerId); }
         else if (msg.type === 'duel') tankDuel.receive(msg);
         else if (msg.type === 'error') { this.failed = true; status(msg.error, true); message('Your changes are still in this browser. Export JSON before closing if the error persists.', true); }
       } catch (e) { status('Could not apply a shared update. Export your work before reloading.', true); console.error(e); }
@@ -272,7 +275,7 @@ class LiveProject {
     });
   }
   updatePeers() {
-    const peers = this.peers.filter(peer => peer.id !== this.peerId);
+    const peers = this.peerId ? this.peers.filter(peer => peer.id !== this.peerId) : [];
     this.peerNodes ||= new Map();
     if (!peers.length && !this.peerNodes.size) return;
     const here = bridge.getLocation();
@@ -295,7 +298,9 @@ class LiveProject {
       return geometry.get(selector);
     };
     const positions = peers.map(peer => {
-      const same = peer.view === here.view && peer.takeoff === here.takeoff && (here.view !== 'sheet' || peer.sheet === here.sheet);
+      // Other tabs signed in as us can remain in the people list, but must
+      // never draw our own pointer or focused-field outline back at us.
+      const same = peer.name !== user && peer.view === here.view && peer.takeoff === here.takeoff && (here.view !== 'sheet' || peer.sheet === here.sheet);
       return { peer, same, cursor: same && peer.visible ? measure(peer.anchor) : null, field: same ? measure(peer.field) : null };
     });
     const active = new Set(peers.map(peer => peer.id));

@@ -265,7 +265,7 @@ export function createApp(options = {}) {
       ws.name = user.name; ws.token = user.token; ws.peerId = randomUUID(); ws.alive = true;
       const room = getRoom(id); room.clients.add(ws);
       const send = (client, value) => { if (client.readyState === WebSocket.OPEN) client.send(JSON.stringify(value)); };
-      const presence = () => { const peers = [...room.clients].map(c => ({ id: c.peerId, name: c.name, ...(c.presence || {}) })).concat(sharePresence.peers(id)); for (const c of room.clients) send(c, { type: 'presence', peers }); };
+      const presence = () => { const peers = [...room.clients].map(c => ({ id: c.peerId, name: c.name, ...(c.presence || {}) })).concat(sharePresence.peers(id)); for (const c of room.clients) send(c, { type: 'presence', selfId:c.peerId, peers }); };
       send(ws, { type: 'sync', state: encode(room.doc), peerId: ws.peerId }); presence();
       ws.on('pong', () => { ws.alive = true; });
       ws.on('error', () => {});

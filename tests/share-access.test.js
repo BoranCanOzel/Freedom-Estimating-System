@@ -54,6 +54,8 @@ test('shared presence is scoped, connects guests with estimators, and honors rev
   const guest=await socket('/share-live');guest.send(JSON.stringify({type:'auth',key:grant.path.split('#')[1]}));await wait(()=>guest.messages.some(m=>m.type==='presence'&&m.peers.some(p=>p.name==='Owner')));
   guest.send(JSON.stringify({type:'presence',presence:{list:'fake',takeoff:'two',sheet:'sone',view:'sheet',anchor:'#title',x:.5,y:.5,visible:true}}));
   await wait(()=>owner.messages.some(m=>m.type==='presence'&&m.peers.some(p=>p.name.startsWith('Guest')&&p.visible&&p.takeoff==='one')));
+  const selfId=owner.messages.find(m=>m.type==='sync').peerId;
+  assert(owner.messages.filter(m=>m.type==='presence').every(m=>m.selfId===selfId));
   assert(!guest.messages.some(m=>m.state||m.update||m.takeoff));
   await new Promise(r=>setTimeout(r,50));owner.send(JSON.stringify({type:'presence',presence:{list:'l',takeoff:'two',sheet:'stwo',view:'sheet'}}));
   await wait(()=>guest.messages.at(-1)?.type==='presence'&&!guest.messages.at(-1).peers.some(p=>p.name==='Owner'));

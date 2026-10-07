@@ -1,5 +1,34 @@
 import { test, expect } from '@playwright/test';
 
+test('own cursors stay hidden across tabs and reconnects while collaborators remain visible',async({browser,baseURL})=>{
+  const own=await browser.newContext({baseURL}),other=await browser.newContext({baseURL});
+  await own.addInitScript(()=>{const Native=window.WebSocket;window.WebSocket=class extends Native{constructor(...args){super(...args);if(String(args[0]).includes('/live/'))window.cursorTestSocket=this;}};});
+  const first=await own.newPage(),second=await own.newPage(),bob=await other.newPage();
+  const aliceName='Self cursor '+Date.now(),bobName='Other cursor '+Date.now();
+  async function login(page,name){await page.goto('/');await page.locator('#server-login-name').fill(name);await page.locator('#server-login-password').fill('1313');await page.locator('#server-login-form button').click();await expect(page.locator('#server-login')).not.toBeVisible();}
+  const ownCursors=page=>page.locator('.server-cursor:visible').filter({hasText:aliceName});
+  try{
+    await login(first,aliceName);
+    const name='Self cursor regression '+Date.now();await first.locator('#server-new').click();await first.locator('#server-name-input').fill(name);await first.locator('#server-name-form button[type=submit]').click();
+    await expect(first.locator('#server-status')).toHaveText('All changes saved');
+    await first.locator('#workspace-view').evaluate(el=>{el.open=true;});await first.locator('#workspace-cursor').selectOption('ring');await first.locator('#workspace-view').evaluate(el=>{el.open=false;});
+    await second.goto('/');await expect(second.locator('#server-title')).toHaveText(name);await expect(second.locator('#server-status')).toHaveText('All changes saved');
+    await expect(first.locator('.server-person').filter({hasText:aliceName})).toBeVisible();
+    await second.locator('#rail .tab[data-sheet]').first().click();await first.locator('#rail .tab[data-sheet]').first().click();
+    await first.locator('#title').focus();await first.locator('#title').hover();
+    await expect(second.locator('.server-cursor').filter({hasText:aliceName})).toHaveAttribute('data-style','ring');
+    await expect(ownCursors(second)).toHaveCount(0);await expect(ownCursors(first)).toHaveCount(0);await expect(second.locator('.server-field:visible')).toHaveCount(0);
+    await login(bob,bobName);await bob.locator('#server-open').click();await bob.getByRole('button').filter({has:bob.getByText(name,{exact:true})}).click();await expect(bob.locator('#server-status')).toHaveText('All changes saved');
+    await bob.locator('#rail .tab[data-sheet]').first().click();await bob.locator('#title').focus();await bob.locator('#title').hover();
+    await expect(second.locator('.server-cursor:visible').filter({hasText:bobName})).toHaveCount(1);await expect(ownCursors(second)).toHaveCount(0);
+    const reconnected=second.waitForEvent('websocket');await second.evaluate(()=>window.cursorTestSocket.close());await reconnected;
+    await expect(second.locator('#server-status')).toHaveText('All changes saved',{timeout:20000});await expect(first.locator('#server-status')).toHaveText('All changes saved',{timeout:20000});
+    await first.locator('#title').hover();await expect(second.locator('.server-person').filter({hasText:aliceName})).toBeVisible();
+    await expect(ownCursors(second)).toHaveCount(0);await expect(ownCursors(first)).toHaveCount(0);
+    await bob.locator('#title').hover();await expect(second.locator('.server-cursor:visible').filter({hasText:bobName})).toHaveCount(1);
+  }finally{await own.close();await other.close();}
+});
+
 test('two estimators share edits, cursors, reconnects and projects', async ({ browser, baseURL }) => {
   const a = await browser.newContext({baseURL}), b = await browser.newContext({baseURL});
   const alice = await a.newPage(), bob = await b.newPage(), errors=[];
@@ -75,14 +104,12 @@ test('two estimators share edits, cursors, reconnects and projects', async ({ br
     await expect(alice.locator('#server-status')).toHaveText('All changes saved',{timeout:20000});
     await expect(bob.locator('#body input[aria-label="Item name"]').first()).toHaveValue('Offline saw');
     await expect(alice.locator('#title')).toHaveValue('Online scope');
-    // A detail-editor draft must not overwrite an unrelated incoming field.
-    await alice.locator('#body .card-btn').first().click();
-    await alice.locator('#editor .ed-name, #editor .gc-name').first().fill('Draft name');
-    await expect(bob.locator('#body input[aria-label="Item name"]').first()).toHaveValue('Offline saw');
+    // Inline editing must preserve an unrelated incoming field and local focus.
+    await field.fill('Draft name');await field.focus();
+    await expect(bob.locator('#body input[aria-label="Item name"]').first()).toHaveValue('Draft name');
     await bob.locator('#body input[aria-label="cost"]').first().fill('88');
     await expect(alice.locator('#body input[aria-label="cost"]').first()).toHaveValue('88.00');
-    await expect(alice.locator('#editor .ed-name, #editor .gc-name').first()).toHaveValue('Draft name');
-    await alice.locator('#edSave').click();
+    await expect(field).toHaveValue('Draft name');await expect(field).toBeFocused();
     await expect(bob.locator('#body input[aria-label="Item name"]').first()).toHaveValue('Draft name');
     await expect(bob.locator('#body input[aria-label="cost"]').first()).toHaveValue(/^88(?:\.00)?$/);
     await alice.locator('#server-projects').click();

@@ -17,7 +17,7 @@ export function createSharePresence({access,source,findTakeoff,readBook,rooms,se
       const peers=[...owners(ws.link.workbook),...guests(ws.link.workbook)].filter(p=>p.takeoff===scope.takeoff&&p.list===scope.list);
       send(ws,{type:'presence',selfId:ws.peerId,peers});
     }
-    for(const id of affected){const room=rooms.get(id);if(!room)continue;const peers=[...owners(id),...guests(id)];for(const ws of room.clients)send(ws,{type:'presence',peers});}
+    for(const id of affected){const room=rooms.get(id);if(!room)continue;const peers=[...owners(id),...guests(id)];for(const ws of room.clients)send(ws,{type:'presence',selfId:ws.peerId,peers});}
   }
   wss.on('connection',(ws,req)=>{
     ws.peerId=randomUUID();clients.add(ws);
