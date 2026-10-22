@@ -12,6 +12,67 @@ import { WebSocket } from 'ws';
 import { createApp } from '../server.js';
 
 const takeoff=id=>({id,name:id,custom:{},sheets:[{id:'sheet-'+id,title:'Scope',fees:[],units:[],rows:[{id:'row-'+id,kind:'labor',name:'Cutting',cost:10,count:1,time:1,days:1}]}]});
+test('universal keys target current and future workbooks while preserving project scope, privacy, receipts and revocation',async()=>{
+  const dataDir=await mkdtemp(join(tmpdir(),'freedom-ai-universal-'));
+  let app,base;
+  const start=async()=>{app=createApp({dataDir,production:false});app.server.listen(0,'127.0.0.1');await once(app.server,'listening');base='http://127.0.0.1:'+app.server.address().port;};
+  await start();
+  try{
+    const login=await fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Universal tester',password:'1313'})});
+    const cookie=login.headers.get('set-cookie').split(';')[0];
+    const call=(path,method='GET',body,key)=>fetch(base+path,{method,headers:{'Content-Type':'application/json',...(key?{Authorization:'Bearer '+key}:{cookie})},body:body===undefined?undefined:JSON.stringify(body)});
+    const admin='/api/ai-access/universal',api='/api/ai/v1';
+    for(const method of ['GET','POST','DELETE'])assert.equal((await fetch(base+admin+(method==='DELETE'?'/missing':''),{method})).status,401);
+    const create=async name=>(await (await call('/api/projects','POST',{name,book:{lists:[{id:'list',companies:[{id:'co',projects:[{id:'job',takeoffs:[{...takeoff('one'),scopeAiAccess:false,scopeData:{items:[{id:'secret',name:'Hidden',status:'included'}]}}]}]}]}]}})).json()).id;
+    const first=await create('First');
+    const generated=await call(admin,'POST');assert.equal(generated.status,201);const universal=await generated.json();
+    const second=await create('Created after universal key');
+    const project=await (await call('/api/projects/'+first+'/ai-access','POST',{list:'list',takeoff:'one'})).json();
+    for(const method of ['GET','POST','DELETE'])assert.equal((await call(admin+(method==='DELETE'?'/'+universal.id:''),method,undefined,universal.key)).status,401);
+    const key=universal.key,targetA={workbook:first,list:'list',takeoff:'one'},targetB={workbook:second,list:'list',takeoff:'one'};
+    const query=target=>'?'+new URLSearchParams(target),rpc=async(name,args={})=>(await (await call(api+'/mcp','POST',{jsonrpc:'2.0',id:1,method:'tools/call',params:{name,arguments:args}},key)).json()).result;
+    const index=await (await call(api+'/takeoffs','GET',undefined,key)).json();assert.equal(index.takeoffs.length,2);
+    const scoped=await (await call(api+'/takeoffs','GET',undefined,project.key)).json();assert.equal(scoped.takeoffs.length,1);assert.equal(scoped.takeoffs[0].workbook,first);
+    assert.equal((await call(api+'/takeoff'+query(targetB),'GET',undefined,project.key)).status,403);
+    assert.equal((await call(api+'/takeoff','GET',undefined,key)).status,422);
+    assert.equal((await call(api+'/takeoff'+query({...targetA,takeoff:'missing'}),'GET',undefined,key)).status,404);
+    assert.equal((await rpc('read_takeoff')).isError,true);
+    const instructions=await (await call(api+'/instructions','GET',undefined,key)).json();assert.equal(instructions.access,'universal');assert(instructions.changeSchema.required.includes('target'));
+    const listedTools=await (await call(api+'/mcp','POST',{jsonrpc:'2.0',id:2,method:'tools/list'},key)).json();assert(listedTools.result.tools.find(tool=>tool.name==='save_takeoff').inputSchema.required.includes('target'));
+    const schema=await (await call(api+'/openapi.json')).json();assert(schema.paths['/takeoffs']);assert(schema.paths['/save'].post.requestBody.content['application/json'].schema.properties.target);
+    const original=await (await call(api+'/takeoff'+query(targetA),'GET',undefined,key)).json();assert.equal(original.takeoff.scopeData,undefined);
+    assert.equal((await call(api+'/scope'+query(targetA),'GET',undefined,key)).status,403);
+    assert.equal((await call(api+'/timeline'+query(targetB),'GET',undefined,key)).status,200);
+    const payload={target:targetA,revision:original.revision,takeoff:{...original.takeoff,name:'Universal edit'},requestId:'universal-save'};
+    assert.equal((await call(api+'/validate','POST',payload,key)).status,200);
+    assert.equal((await call(api+'/save','POST',payload,project.key)).status,403);
+    const saved=await call(api+'/save','POST',payload,key);assert.equal(saved.status,200);const receipt=await saved.json();
+    assert.deepEqual(await (await call(api+'/save','POST',payload,key)).json(),receipt);
+    assert.equal((await call(api+'/save','POST',{...payload,target:targetB},key)).status,409);
+    assert.equal((await call(api+'/save','POST',{...payload,requestId:'stale'},key)).status,409);
+    const other=JSON.parse((await rpc('read_takeoff',{target:targetB})).content[0].text);assert.equal(other.takeoff.name,'one');
+    const otherSave=await rpc('save_takeoff',{target:targetB,revision:other.revision,takeoff:{...other.takeoff,name:'MCP edit'},requestId:'mcp-save'});assert.equal(JSON.parse(otherSave.content[0].text).saved,true);
+    const historyPath='/api/projects/'+first+'/ai-access';
+    const history=await (await call(historyPath+'?list=list&takeoff=one')).json();assert.equal(history.changes[0].id,receipt.changeId);assert.equal(history.changes[0].canUndo,true);
+    assert.equal((await call(historyPath+'/changes/'+receipt.changeId+'/undo','POST')).status,200);
+    const inspect=new DatabaseSync(join(dataDir,'projects.sqlite'));
+    try{assert.equal(inspect.prepare('SELECT key_hash FROM ai_grants WHERE id=?').get(universal.id).key_hash,createHash('sha256').update(key).digest('hex'));assert.deepEqual(inspect.prepare('PRAGMA foreign_key_check').all(),[]);}finally{inspect.close();}
+    await app.close();await start();
+    assert.equal((await call(api+'/takeoff'+query(targetA),'GET',undefined,key)).status,200);
+    assert.equal((await call(api+'/takeoff','GET',undefined,project.key)).status,200);
+    assert.equal((await call('/api/projects/'+first,'DELETE',{confirmation:'DELETE'})).status,200);
+    assert.equal((await call(api+'/takeoff'+query(targetA),'GET',undefined,key)).status,404);
+    assert.equal((await call(api+'/takeoff'+query(targetB),'GET',undefined,key)).status,200);
+    assert.equal((await call(admin+'/'+universal.id,'DELETE')).status,200);
+    assert.equal((await call(api+'/takeoffs','GET',undefined,key)).status,403);
+    for(const scope of ['user','server']){
+      const fresh=await (await call(admin,'POST')).json();
+      assert.equal((await call('/api/ai-access/revoke','POST',{scope,...(scope==='user'?{user:'Universal tester'}:{})})).status,200);
+      assert.equal((await call(api+'/takeoffs','GET',undefined,fresh.key)).status,403);
+    }
+    const listing=await (await call(admin)).json();assert(listing.grants.every(grant=>grant.revoked&&!grant.key&&!grant.key_hash));
+  }finally{await app.close();}
+});
 test('bulk AI key revocation is authenticated, creator-scoped across workbooks, and server-wide',async()=>{
   const app=createApp({dataDir:await mkdtemp(join(tmpdir(),'freedom-ai-revoke-')),production:false});app.server.listen(0,'127.0.0.1');await once(app.server,'listening');
   const base='http://127.0.0.1:'+app.server.address().port;
@@ -147,7 +208,7 @@ test('AI grants enforce scope, repeated saves, revisions, validation, live broad
     assert.equal((await call(api+'/validate','POST',{revision:original.revision,takeoff:original.takeoff},fresh.key)).status,200);
     const rpc=async(method,params)=>{const response=await call(api+'/mcp','POST',{jsonrpc:'2.0',id:1,method,params},fresh.key);assert.equal(response.status,200);return response.json();};
     assert.equal((await rpc('initialize',{protocolVersion:'2025-11-25'})).result.protocolVersion,'2025-11-25');
-    assert.equal((await rpc('tools/list')).result.tools.length,9);
+    assert.equal((await rpc('tools/list')).result.tools.length,10);
     assert.equal(JSON.parse((await rpc('tools/call',{name:'read_takeoff',arguments:{}})).result.content[0].text).takeoff.id,'one');
     const restoredTimeline=JSON.parse((await rpc('tools/call',{name:'read_timeline',arguments:{}})).result.content[0].text);
     assert.deepEqual(restoredTimeline.tasks,[]);assert.equal(restoredTimeline.hasPlan,false);assert.equal(restoredTimeline.availableWork[0].id,'row-one');assert.equal(restoredTimeline.settings.hoursPerDay,8);
@@ -195,6 +256,9 @@ test('permanent AI keys migrate legacy receipts, survive restarts and serialize 
       inspect.prepare('DELETE FROM ai_save_requests WHERE grant_id=?').run(access.id);
       inspect.prepare('UPDATE ai_grants SET expires_at=1,request_id=?,request_hash=?,receipt=? WHERE id=?').run(changes[winner].requestId,createHash('sha256').update(JSON.stringify(changes[winner])).digest('hex'),JSON.stringify({...receipt,accessConsumed:true}),access.id);
       inspect.exec("UPDATE auth_configuration SET fingerprint='old-password'");
+      // Restore the pre-universal schema to exercise the production upgrade.
+      const legacySchema=inspect.prepare("SELECT sql FROM sqlite_master WHERE name='ai_grants'").get().sql.replace('CREATE TABLE ai_grants','CREATE TABLE ai_grants_legacy').replace('workbook TEXT REFERENCES','workbook TEXT NOT NULL REFERENCES');
+      inspect.exec('PRAGMA foreign_keys=OFF; BEGIN; '+legacySchema+'; INSERT INTO ai_grants_legacy SELECT * FROM ai_grants; DROP TABLE ai_grants; ALTER TABLE ai_grants_legacy RENAME TO ai_grants; COMMIT;');
     }finally{inspect.close();}
     await start();
     assert.equal((await fetch(base+'/api/ai/v1/takeoff',{headers:{Authorization:'Bearer '+revoked.key}})).status,403);

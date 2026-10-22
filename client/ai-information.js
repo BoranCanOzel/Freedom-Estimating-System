@@ -1,5 +1,6 @@
 import { aiDataMethods, aiDataMethodLabel, aiDataWorkTypes, normalizeAiDataWorkTypes } from '../shared/ai-data.js';
 import './ai-information.css';
+import {publicUrl} from './public-url.js';
 
 export function setupAiInformation(api,openEstimate) {
   const button=document.createElement('button');button.id='ai-information-open';button.type='button';button.textContent='AI Information';
@@ -26,8 +27,48 @@ export function setupAiInformation(api,openEstimate) {
   const keysPanel=document.createElement('section');keysPanel.id='ai-info-keys-panel';keysPanel.hidden=true;keysPanel.setAttribute('role','tabpanel');keysPanel.setAttribute('aria-labelledby',keysTab.id);
   keysPanel.innerHTML='<div class="ai-keys-heading"><div><h2>AI access keys</h2><p>Manage active AI keys across all workbooks. Users are grouped by who generated each key.</p><p id="ai-info-keys-count"></p></div><button type="button" id="ai-info-keys-revoke-all">Revoke all server keys</button></div><div id="ai-info-keys-users"></div><p class="ai-keys-hint">Revocation takes effect immediately. Existing estimates and AI change history are kept. Generate a new key from a takeoff to restore AI access.</p>';
   dataPanel.after(keysPanel);
+  const universal=document.createElement('section');universal.className='ai-universal-access';
+  universal.innerHTML=`<h3>Universal AI access</h3><p>Connect once to read and edit any takeoff across all current and future workbooks. Access never expires and stays active until revoked. Project keys remain limited to their original takeoff.</p><button type="button" id="ai-info-universal-generate">Generate universal key</button><div id="ai-info-universal-package" hidden><label for="ai-info-universal-connection">Connection package — keep this key private</label><textarea id="ai-info-universal-connection" readonly rows="12" spellcheck="false"></textarea><button type="button" id="ai-info-universal-copy">Copy connection package</button><p>The key is shown only when generated. Save it in your AI tool connection.</p></div><div id="ai-info-universal-grants"></div>`;
+  keysPanel.prepend(universal);
+  $('universal-generate').onclick=()=>run(async()=>{
+    const grant=await request('/ai-access/universal',{method:'POST'}),url=path=>publicUrl(path,location.origin);
+    $('universal-connection').value=`Freedom Estimating — universal AI access
+Read and edit takeoffs in all current and future workbooks. Never expires; unlimited saves until revoked.
+
+REST endpoint: ${url(grant.endpoint)}
+MCP endpoint: ${url(grant.mcp)}
+Authorization: Bearer ${grant.key}
+OpenAPI schema: ${url(grant.openapi)}
+
+First call get_instructions (MCP) or GET ${url(grant.instructions)}. Read AI Information and use relevant AI Data examples as the primary estimating reference before creating, repricing, or restructuring an estimate. Revisit read_ai_information for current guidance.
+Call list_takeoffs (MCP) or GET ${url(grant.endpoint+'/takeoffs')} to find the takeoff requested by the user. Ask if the intended estimate is ambiguous. Each result has workbook, list, and takeoff IDs.
+MCP: include target: {workbook, list, takeoff} with read_takeoff, read_scope, read_timeline, validate_changes, and save_takeoff. No shared current-project selection is stored.
+REST reads: GET ${url(grant.endpoint+'/takeoff')}?workbook=...&list=...&takeoff=... (URL-encode IDs). Use the same query parameters for /scope and /timeline.
+REST validation: POST ${url(grant.endpoint+'/validate')} with {target:{workbook,list,takeoff},revision,takeoff}.
+REST save: POST ${url(grant.endpoint+'/save')} with {target:{workbook,list,takeoff},revision,takeoff,requestId}.
+Read the current revision before editing, validate, then save with a unique requestId. Retry only the exact same request body after a connection failure. A 409 means reread and reapply the intended changes. Report success only after a save receipt.
+Scope privacy and read-only fields still apply. Use included, non-missing Scope items; do not invent measurements or rates. Only edit estimates requested by the user.
+Include the Authorization header on every API request. Configure the Bearer key in your tool client; never put it in a URL.`;
+    $('universal-package').hidden=false;await loadKeys();message('Universal key generated. Copy the connection package to connect your AI tool.');
+  });
+  $('universal-copy').onclick=()=>run(async()=>{
+    const field=$('universal-connection');let copied=false;
+    try{if(typeof navigator.clipboard?.writeText==='function'){await navigator.clipboard.writeText(field.value);copied=true;}}catch{}
+    if(!copied){field.disabled=false;field.focus();field.select();field.setSelectionRange(0,field.value.length);try{copied=document.execCommand('copy');}catch{}}
+    message(copied?'Connection package copied.':'Connection text selected — press Ctrl+C (Command+C on Mac) to copy it.');
+  });
   async function loadKeys(){
     message('Loading AI access keys...');const data=await request('/ai-access');
+    const universalData=await request('/ai-access/universal');
+    $('universal-grants').replaceChildren();
+    for(const grant of universalData.grants){
+      const row=document.createElement('article'),info=document.createElement('span');row.className='ai-keys-user';
+      info.textContent=`${grant.revoked?'Revoked':'Active'} · ${grant.created_by} · ${new Date(grant.created_at).toLocaleString()} · never expires`;row.append(info);
+      if(!grant.revoked){const revoke=document.createElement('button');revoke.type='button';revoke.textContent='Revoke universal key';revoke.disabled=busy;
+        revoke.onclick=()=>run(async()=>{await request('/ai-access/universal/'+grant.id,{method:'DELETE'});$('universal-package').hidden=true;$('universal-connection').value='';await loadKeys();message('Universal key revoked.');});row.append(revoke);}
+      $('universal-grants').append(row);
+    }
+    if(!universalData.grants.length)$('universal-grants').textContent='No universal keys have been created.';
     $('keys-count').textContent=data.active+' active AI '+(data.active===1?'key':'keys');
     $('keys-revoke-all').dataset.unavailable=String(!data.active);$('keys-revoke-all').disabled=busy||!data.active;
     $('keys-users').replaceChildren();
@@ -203,7 +244,7 @@ export function setupAiInformation(api,openEstimate) {
   async function reload(){library=await request('/ai-information');savedLibrary=structuredClone(library);dirty=false;if(!item())selected='';render();message('Library loaded.');}
   async function persist(items){library=await request('/ai-information',{method:'PUT',body:JSON.stringify({revision:library.revision,items})});savedLibrary=structuredClone(library);dirty=false;render();message('Saved. AI access now includes the latest information.');}
   button.onclick=()=>run(async()=>{if(!page.hidden)return;page.hidden=false;background(true);button.setAttribute('aria-pressed','true');document.body.classList.add('ai-information-open');message('Loading library...');await reload();if(activeTab==='data')await loadEstimates();else if(activeTab==='keys')await loadKeys();setTimeout(()=>page.querySelector('[data-action="close"]').focus(),0);});
-  function closePage(){if(!discard())return;operation?.abort();operation=null;setBusy(false);endDrag();page.hidden=true;dirty=false;background(false);document.body.classList.remove('ai-information-open');button.setAttribute('aria-pressed','false');button.focus();}
+  function closePage(){if(!discard())return;operation?.abort();operation=null;setBusy(false);endDrag();page.hidden=true;dirty=false;$('universal-connection').value='';$('universal-package').hidden=true;background(false);document.body.classList.remove('ai-information-open');button.setAttribute('aria-pressed','false');button.focus();}
   page.querySelector('[data-action="close"]').onclick=closePage;
   document.getElementById('server-bar').addEventListener('click',event=>{
     if(page.hidden||button.contains(event.target))return;

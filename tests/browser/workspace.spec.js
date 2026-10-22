@@ -338,6 +338,32 @@ test('summary takeoff description starts collapsed and can be expanded without c
   expect(await page.evaluate(()=>window.estimator.getShared().lists[0].companies[0].projects[0].takeoffs[0].note)).toBe('Detailed takeoff scope\nKeep these instructions.');
 });
 
+test('universal AI connection can be generated, copied and revoked while project keys keep working',async({page})=>{
+  await openWorkbook(page);
+  await page.locator('#takeoff-ai-access').click();await page.locator('#ai-access-generate').click();
+  await expect(page.locator('#ai-access-connection')).toHaveValue(/Authorization: Bearer/);
+  const projectKey=/Authorization: Bearer ([a-f0-9]+)/.exec(await page.locator('#ai-access-connection').inputValue())[1];
+  await page.locator('#ai-access-close').click();
+  await page.locator('#ai-information-open').click();await page.getByRole('tab',{name:'Access keys',exact:true}).click();
+  await page.getByRole('button',{name:'Generate universal key',exact:true}).click();
+  const connection=page.locator('#ai-info-universal-connection');await expect(connection).toHaveValue(/Authorization: Bearer/);
+  const value=await connection.inputValue(),key=/Authorization: Bearer ([a-f0-9]+)/.exec(value)[1],headers={Authorization:'Bearer '+key};
+  expect(value).toContain('target: {workbook, list, takeoff}');expect(value).toContain(new URL('/api/ai/v1/mcp',page.url()).href);
+  const index=await (await page.request.get('/api/ai/v1/takeoffs',{headers})).json();expect(index.takeoffs.length).toBeGreaterThanOrEqual(2);
+  await page.evaluate(()=>{Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw Error('Unavailable');}}});document.execCommand=()=>false;});
+  await page.locator('#ai-info-universal-copy').click();await expect(page.locator('#ai-info-status')).toContainText('press Ctrl+C');
+  expect(await connection.evaluate(el=>el.value.slice(el.selectionStart,el.selectionEnd))).toBe(value);
+  await page.setViewportSize({width:390,height:844});
+  expect(await page.locator('#ai-info-keys-panel').evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
+  await page.screenshot({path:'test-results/universal-ai-access-mobile.png',fullPage:true});
+  const record=page.locator('#ai-info-universal-grants .ai-keys-user').first();await expect(record).toContainText('Active');
+  await record.getByRole('button',{name:'Revoke universal key',exact:true}).click();await expect(record).toContainText('Revoked');
+  expect((await page.request.get('/api/ai/v1/takeoffs',{headers})).status()).toBe(403);
+  expect((await page.request.get('/api/ai/v1/takeoff',{headers:{Authorization:'Bearer '+projectKey}})).status()).toBe(200);
+  await page.getByRole('button',{name:'Generate universal key',exact:true}).click();await expect(connection).toHaveValue(/Authorization: Bearer/);
+  await page.getByRole('button',{name:'Back to estimating',exact:true}).click();await expect(connection).toHaveValue('');
+});
+
 test('AI Information revokes keys by creator and server-wide with cancellation and refreshed counts',async({page,browser,baseURL})=>{
   const name='Key owner '+Date.now(),otherName='Other key owner '+Date.now();await openWorkbook(page,workbook(),name);
   const title=await page.locator('#server-title').textContent(),projects=await (await page.request.get('/api/projects')).json(),project=projects.find(p=>p.name===title);
@@ -451,6 +477,41 @@ test('AI Information drag and drop moves folders with descendants, reorders and 
   await page.reload();
   await page.locator('#ai-information-open').click();
   await expect(page.locator('#ai-info-tree button')).toHaveText(['▸  Rates','▸  Concrete','—  Cutting','—  Crew','▸  Standards']);
+});
+
+test('Human Information saves team notes, protects drafts when switching pages and keeps AI information separate',async({page})=>{
+  await openWorkbook(page);
+  const existing=await (await page.request.get('/api/human-information')).json();
+  await page.request.put('/api/human-information',{data:{revision:existing.revision,items:[]}});
+  const aiBefore=await (await page.request.get('/api/ai-information')).json();
+  expect(await page.locator('#ai-information-open').evaluate(el=>el.nextElementSibling.id)).toBe('human-information-open');
+  await page.locator('#human-information-open').click();
+  const panel=page.locator('#human-information-page');await expect(panel).toBeVisible();
+  await panel.getByRole('button',{name:'+ Folder',exact:true}).click();await page.locator('#human-info-title').fill('Office notes');await page.locator('#human-info-save').click();
+  await expect(page.locator('#human-info-status')).toHaveText('Saved.');
+  await panel.getByRole('button',{name:'+ Note',exact:true}).click();await page.locator('#human-info-title').fill('Supplier reminder');await page.locator('#human-info-text').fill('Call the supplier on Friday.');
+  await page.locator('#human-info-text').press('End');await page.locator('#human-info-text').pressSequentially('x');await page.locator('#human-info-text').press('Control+z');
+  await expect(page.locator('#human-info-text')).toHaveValue('Call the supplier on Friday.');
+  await page.locator('#human-info-save').click();await expect(page.locator('#human-info-status')).toHaveText('Saved.');
+  await expect(page.locator('#human-info-parent option:checked')).toHaveText('Office notes');
+  await page.locator('#human-info-text').fill('Unsaved reminder');
+  page.once('dialog',dialog=>dialog.dismiss());await page.locator('#ai-information-open').click();
+  await expect(panel).toBeVisible();await expect(page.locator('#human-info-text')).toHaveValue('Unsaved reminder');await expect(page.locator('#ai-information-page')).not.toBeVisible();
+  page.once('dialog',dialog=>dialog.accept());await page.locator('#ai-information-open').click();
+  await expect(panel).not.toBeVisible();await expect(page.locator('#ai-information-page')).toBeVisible();
+  await page.locator('#human-information-open').click();await expect(panel).toBeVisible();await expect(page.locator('#ai-information-page')).not.toBeVisible();
+  await expect(page.locator('#human-info-text')).toHaveValue('Call the supplier on Friday.');
+  await panel.getByRole('button',{name:'Back to estimating',exact:true}).click();await page.reload();await page.locator('#human-information-open').click();
+  await page.locator('#human-info-search').fill('Friday');await page.locator('#human-info-tree button').click();await expect(page.locator('#human-info-text')).toHaveValue('Call the supplier on Friday.');
+  const current=await (await page.request.get('/api/human-information')).json();
+  await page.request.put('/api/human-information',{data:{revision:current.revision,items:current.items.map(item=>item.kind==='entry'?{...item,text:'Updated by another teammate.'}:item)}});
+  await page.locator('#human-info-text').fill('My draft');await page.locator('#human-info-save').click();await expect(page.locator('#human-info-status')).toContainText('Someone changed Human Information');await expect(page.locator('#human-info-text')).toHaveValue('My draft');
+  page.once('dialog',dialog=>dialog.accept());await panel.getByRole('button',{name:'Reload notes',exact:true}).click();await expect(page.locator('#human-info-text')).toHaveValue('Updated by another teammate.');
+  await page.locator('#human-info-search').fill('');await page.setViewportSize({width:390,height:844});
+  expect(await panel.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);await page.screenshot({path:'test-results/human-information-mobile.png'});
+  page.once('dialog',dialog=>dialog.dismiss());await panel.getByRole('button',{name:'Delete',exact:true}).click();await expect(page.locator('#human-info-editor')).toBeVisible();
+  page.once('dialog',dialog=>dialog.accept());await panel.getByRole('button',{name:'Delete',exact:true}).click();await expect(page.locator('#human-info-status')).toHaveText('Saved.');await expect(page.locator('#human-info-tree button')).toHaveCount(1);
+  expect(await (await page.request.get('/api/ai-information')).json()).toEqual(aiBefore);
 });
 
 test('AI Information organizes text, protects drafts and persists folder changes',async({page})=>{

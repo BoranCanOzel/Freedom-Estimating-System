@@ -5,14 +5,9 @@ import * as Y from 'yjs';
 import { readBook } from './shared/model.js';
 
 export function mountAiInformation({app,db,session,rooms}) {
-  db.exec(`CREATE TABLE IF NOT EXISTS ai_information (id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL);
-    INSERT OR IGNORE INTO ai_information VALUES (1,'{"items":[]}');`);
-  const read=()=>{
-    const raw=db.prepare('SELECT data FROM ai_information WHERE id=1').get().data;
-    return {...JSON.parse(raw),revision:createHash('sha256').update(raw).digest('hex')};
-  };
+  const read=mountInformationLibrary({app,db,session},'ai');
+  mountInformationLibrary({app,db,session},'human');
   const authenticated=(req,res,next)=>session(req)?next():res.status(401).json({error:'Please sign in.'});
-  app.get('/api/ai-information',authenticated,(req,res)=>res.json(read()));
   function readAiEstimates(selector){
     const estimates=[];
     for(const workbook of db.prepare('SELECT id,name,state FROM projects ORDER BY name,id').iterate()){
@@ -38,10 +33,25 @@ export function mountAiInformation({app,db,session,rooms}) {
     return selector?null:{estimates};
   }
   app.get('/api/ai-information/estimates',authenticated,(_req,res)=>res.json(readAiEstimates()));
-  app.put('/api/ai-information',authenticated,(req,res)=>{
+  return {readAiInformation:read,readAiEstimates};
+}
+
+// Human notes use separate storage and session-only routes; never return their reader to AI access.
+function mountInformationLibrary({app,db,session},kind){
+  const table=kind==='human'?'human_information':'ai_information',label=kind==='human'?'Human Information':'AI Information';
+  const endpoint='/api/'+kind+'-information';
+  db.exec(`CREATE TABLE IF NOT EXISTS ${table} (id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL);
+    INSERT OR IGNORE INTO ${table} VALUES (1,'{"items":[]}');`);
+  const read=()=>{
+    const raw=db.prepare(`SELECT data FROM ${table} WHERE id=1`).get().data;
+    return {...JSON.parse(raw),revision:createHash('sha256').update(raw).digest('hex')};
+  };
+  const authenticated=(req,res,next)=>session(req)?next():res.status(401).json({error:'Please sign in.'});
+  app.get(endpoint,authenticated,(_req,res)=>res.json(read()));
+  app.put(endpoint,authenticated,(req,res)=>{
     try {
       const {items,revision}=req.body||{};
-      if(revision!==read().revision)return res.status(409).json({error:'Someone changed AI Information. Copy your unsaved text, then reload the library before saving.'});
+      if(revision!==read().revision)return res.status(409).json({error:`Someone changed ${label}. Copy your unsaved text, then reload the library before saving.`});
       if(!Array.isArray(items)||items.length>1000)throw Error('Use at most 1,000 folders and entries.');
       const ids=new Map();
       for(const item of items){
@@ -56,10 +66,10 @@ export function mountAiInformation({app,db,session,rooms}) {
         while(parent){if(seen.has(parent)||ids.get(parent)?.kind!=='folder')throw Error('Folders must form a valid hierarchy.');seen.add(parent);parent=ids.get(parent).parent;}
       }
       const raw=JSON.stringify({items});
-      if(Buffer.byteLength(raw)>2*1024*1024)return res.status(413).json({error:'AI Information is limited to 2 MB of text.'});
-      db.prepare('UPDATE ai_information SET data=? WHERE id=1').run(raw);
+      if(Buffer.byteLength(raw)>2*1024*1024)return res.status(413).json({error:label+' is limited to 2 MB of text.'});
+      db.prepare(`UPDATE ${table} SET data=? WHERE id=1`).run(raw);
       res.json(read());
     }catch(error){res.status(422).json({error:error.message});}
   });
-  return {readAiInformation:read,readAiEstimates};
+  return read;
 }
