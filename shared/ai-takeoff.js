@@ -34,6 +34,7 @@ const unitColumnSchema={type:'object',required:['id'],properties:{id:idSchema,la
 const sectionUnitsSchema={type:'object',description:'Section and subsection UP overrides, keyed by an existing units[].id on this same page. Write on the section start row, not sectionEnd. Quantity and label inherit independently from the page column when omitted or blank, not from a parent section. The displayed dollar UP is calculated as section grand total divided by effective quantity.',additionalProperties:{type:'object',properties:{qty:{...numeric,description:'Section quantity denominator, e.g. 120 for 120 LF or 3 for 3 EA. Not a dollar price.'},label:{type:'string',description:'Section unit label, e.g. EA or LF. Empty text restores the page label.'}}}};
 export const takeoffSchema={type:'object',required:['id','name','sheets'],properties:{
   timeline:timelineSchema,
+  folders:{type:'array',description:'Folders within this takeoff. Scope and Summary are shared; sheets use folderId to belong to a folder. Unassigned pages appear in Unfiled.',items:{type:'object',required:['id','name'],properties:{id:idSchema,name:{type:'string',minLength:1,maxLength:200}}}},
   id:idSchema,name:{type:'string'},note:{type:'string'},summaryNotes:{type:'string',description:'Summary notes for this takeoff only; shown in its summary and exports.'},custom:{type:'object'},
   aiDataWorkTypes:{type:'array',items:{type:'string',enum:['concrete-pour','demo','saw-cutting']},uniqueItems:true,readOnly:true,description:'User-selected work labels. May include any combination of concrete-pour, demo, and saw-cutting. Missing or empty means not specified, not that these activities are absent.'},
   aiDataMethod:{type:'string',enum:['','unit-price','hourly','mixed'],readOnly:true,description:'Reference pricing method: unit-price = SF/LF/EA pricing; hourly = hourly or crew breakdown; mixed = both. Missing or empty means not specified. Section organization does not determine this method.'},
@@ -46,13 +47,14 @@ export const takeoffSchema={type:'object',required:['id','name','sheets'],proper
   scopeData:{type:['object','null'],readOnly:true,description:'Last fetched measured Scope and review decisions. Preserve unchanged.',properties:{source:{type:'string'},fetchedAt:{type:'string'},items:{type:'array',items:{type:'object',properties:{id:{type:'string'},name:{type:'string'},group:{type:'string'},pages:{type:'array',items:{type:'object',properties:{id:{type:'string'},name:{type:'string'}}}},measurements:{type:'string'},note:{type:'string',maxLength:10000,readOnly:true,description:'User note for this Scope item.'},status:{enum:['included','excluded','ignored','duplicate']},missing:{type:'boolean'},showAi:{type:'boolean',readOnly:true,description:'User-controlled visibility. Missing means true.'}}}}}},
   sheets:{type:'array',minItems:1,items:{type:'object',required:['id','rows'],properties:{id:idSchema,title:{type:'string'},color:{type:'string',enum:['',...pageColors],description:'Shared color for the page tab, Summary page/section rows, and assigned Scope items. Editable in Summary and Scope. Choose a palette key; omit or use empty text for no color.'},flatAddEnabled:{type:'boolean'},units:{type:'array',description:'UP columns for this page. Create a column before assigning section overrides to its ID.',items:unitColumnSchema},rows:{type:'array',items:{type:'object',required:['id'],properties:{id:idSchema,type:{enum:['item','section','sectionEnd']},name:{type:'string'},kind:{type:'string'},count:numeric,time:numeric,days:numeric,cost:numeric,markup:numeric,flatAdd:numeric,note:{type:'string'},units:sectionUnitsSchema,sid:idSchema}}}}}}
 }};
+takeoffSchema.properties.sheets.items.properties.folderId={type:'string',maxLength:160,description:'ID from this takeoff\'s folders array. Omit or use empty text for Unfiled. Moving a page preserves its ID, prices and Scope assignments.'};
 export const changeSchema={type:'object',required:['revision','takeoff'],additionalProperties:false,properties:{revision:{type:'string',pattern:'^[a-f0-9]{64}$'},takeoff:takeoffSchema,requestId:{type:'string',minLength:1,maxLength:100}}};
 
 export function validateTakeoff(next, before) {
   validateBook({sheets:[next]});
   const fail=message=>{throw Object.assign(new Error(message),{status:422});};
   if(!next || typeof next!=='object' || Array.isArray(next) || next.id!==before.id)fail('Keep the takeoff ID unchanged.');
-  const editable=new Set(['name','note','summaryNotes','custom','sheets','scopeAssignments','timeline']);
+  const editable=new Set(['name','note','summaryNotes','custom','sheets','folders','scopeAssignments','timeline']);
   if(next.summaryNotes!==undefined&&typeof next.summaryNotes!=='string')fail('Summary notes must be text.');
   for(const key of new Set([...Object.keys(before),...Object.keys(next)]))if(!editable.has(key)&&JSON.stringify(next[key])!==JSON.stringify(before[key]))fail('Takeoff field is read-only: '+key);
   if(typeof next.name!=='string'||next.name.length>500)fail('Takeoff name must be text, up to 500 characters.');
@@ -72,6 +74,14 @@ export function validateTakeoff(next, before) {
     }
   }
   visit(next);
+  if(next.folders!==undefined&&!Array.isArray(next.folders))fail('Folders must be an array.');
+  const folderIds=new Set();
+  for(const folder of next.folders||[]){
+    if(!folder||typeof folder!=='object'||Array.isArray(folder)||typeof folder.id!=='string'||!folder.id||folder.id.length>160)fail('Each folder needs an ID.');
+    if(folderIds.has(folder.id))fail('Folder IDs must be unique.');
+    if(typeof folder.name!=='string'||!folder.name.trim()||folder.name.length>200)fail('Folder name must be text, from 1 to 200 characters.');
+    folderIds.add(folder.id);
+  }
   if(next.note!==undefined&&typeof next.note!=='string')fail('Takeoff note must be text.');
   if(next.custom!==undefined&&(!next.custom||typeof next.custom!=='object'||Array.isArray(next.custom)))fail('Takeoff custom fields must be an object.');
   if(next.scopeAssignments!==undefined){
@@ -86,6 +96,7 @@ export function validateTakeoff(next, before) {
   const ids=new Set();
   for(const sheet of next.sheets){
     if(!sheet||typeof sheet!=='object'||Array.isArray(sheet))fail('Each option must be an object.');
+    if(sheet.folderId!==undefined&&(typeof sheet.folderId!=='string'||sheet.folderId!==''&&!folderIds.has(sheet.folderId)))fail('Page folderId must reference a folder in this takeoff, or be empty for Unfiled.');
     if(sheet.color!==undefined&&sheet.color!==''&&!pageColors.includes(sheet.color))fail('Unsupported page color.');
     if(sheet.title!==undefined&&typeof sheet.title!=='string')fail('Option title must be text.');
     if(!Array.isArray(sheet.rows))fail('Each option needs a rows array.');

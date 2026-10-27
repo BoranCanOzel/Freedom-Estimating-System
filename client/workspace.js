@@ -306,7 +306,7 @@ export function setupWorkspace() {
     $('workspace-flat-add').checked = ready && bridge.flatAddEnabled();
     $('workspace-flat-add').disabled = !ready;
     for (const part of document.querySelectorAll('[data-for-view]')) {
-      part.hidden = !ready || part.dataset.forView !== view;
+      part.hidden = !ready || part.dataset.forView !== view || part.dataset.forView==='sheet'&&!bridge.getLocation().sheet;
       if (part.hidden && part.tagName === 'DETAILS') part.open = false;
     }
     for (const button of document.querySelectorAll('[data-ready]')) button.disabled = !ready;

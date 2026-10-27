@@ -22,7 +22,7 @@ export function setupScope(api, context, bridge) {
     const estimatePages=bridge.getScopePages();
     for(const page of estimatePages){
       const entry=el('div','','scope-page-colour');
-      entry.append(bridge.scopeColorControl(page.id),el('span',page.num+' - '+(page.title||'Untitled page')));
+      entry.append(bridge.scopeColorControl(page.id),el('span',(page.folderName?page.folderName+' / ':'')+page.num+' - '+(page.title||'Untitled page')));
       pageList.append(entry);
     }
     pageColours.append(el('p','Click a colour to change it. Assign scope items to an estimate page below to use that colour.','scope-description'),pageList);
@@ -98,7 +98,7 @@ export function setupScope(api, context, bridge) {
       const assignment=el('label','','scope-assignment');assignment.append(el('span','Estimate page'));
       const select=el('select');select.setAttribute('aria-label','Estimate page for '+item.name);
       select.add(new Option('Unassigned',''));
-      for(const page of estimatePages)select.add(new Option(page.num+' - '+(page.title||'Untitled page'),page.id));
+      for(const page of estimatePages)select.add(new Option((page.folderName?page.folderName+' / ':'')+page.num+' - '+(page.title||'Untitled page'),page.id));
       select.value=assigned?.id || '';
       select.onchange=()=>{bridge.setScopePage(item.id,select.value);render();};
       assignment.append(select);name.append(assignment);

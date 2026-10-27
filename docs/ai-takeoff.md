@@ -24,6 +24,12 @@ Each example can also be labeled **Prevailing wage** with its own checkbox. The 
 
 The independent **Night time work** checkbox exposes `aiDataNightWork` in the reference index and takeoff JSON. True means labeled; false or absent means not labeled. It does not change rates or calculations and is read-only to AI.
 
+## Takeoff folders
+
+Each takeoff can have a `folders` array of `{id, name}` records. Pages stay in the takeoff's `sheets` array and use `folderId` to reference a folder in that same takeoff. Missing or empty `folderId` means Unfiled. Scope and Summary are shared across all folders; Summary groups pages and totals by folder.
+
+Move a page by changing only its `folderId`, preserving its ID, rows, pricing, Scope assignments and timeline references. When deleting a folder, remove its pages' `folderId` to move them to Unfiled, or assign another existing folder. Folder names must contain 1–200 characters. Folder organization does not change estimate amounts.
+
 ## Fetched Scope items
 
 **Scope sharing is on by default for each estimate.** A missing scopeAiAccess field means enabled. The user can uncheck **Allow AI to read Scope** on that estimate's Scope page to disable it; an explicit false remains disabled. When disabled, scopeData and scopeLink are omitted from all AI takeoff reads, including AI Data references, and read_scope returns 403. The AI cannot change scopeAiAccess. Saving other edits preserves hidden Scope data automatically. A Scope-only 403 does not revoke the takeoff key.

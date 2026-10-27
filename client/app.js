@@ -13,6 +13,8 @@ import { setupAiAccess } from './ai-access.js';
 import { setupShareAccess } from './share-access.js';
 import { setupPdfDownload } from './pdf-download.js';
 import { setupScope } from './scope.js';
+import { createDetailPreferences } from './detail-preferences.js';
+import { setupTakeoffFolders } from './takeoff-folders.js';
 import { setupTimeline } from './timeline.js';
 import { setupTransfers } from './transfers.js';
 import { detectTransfer, transferChoices } from '../shared/transfers.js';
@@ -106,6 +108,7 @@ class LiveProject {
     this.ready = false; this.closed = false; this.peers = []; this.persisting = Promise.resolve();
     this.cacheKey = user + ':' + project.id; this.baseline = {}; this.retry = 0;
     this.locationKey = 'freedom:location:' + this.cacheKey;
+    this.detailPreferences=createDetailPreferences({api,user,workbook:project.id,onError:text=>message(text,true)});
     this.history = new Y.UndoManager(this.doc, {trackedOrigins:new Set(['local']), captureTimeout:500});
     this.history.on('stack-item-added', ({stackItem}) => {
       if (!this.history.undoing && !this.history.redoing) stackItem.meta.set('before', this.historyLocation || bridge.getLocation());
@@ -115,7 +118,7 @@ class LiveProject {
     try { this.resumeLocation = JSON.parse(localStorage.getItem(this.locationKey)) || this.resumeLocation; } catch {}
   }
   async start() {
-    const previous = await cache(this.cacheKey).catch(() => null);
+    const [previous] = await Promise.all([cache(this.cacheKey).catch(() => null),this.detailPreferences.load()]);
     if (previous) Y.applyUpdate(this.doc, previous, 'cache');
     this.doc.on('update', (_update, origin) => {
       const state = Y.encodeStateAsUpdate(this.doc);
@@ -542,6 +545,7 @@ document.body.insertAdjacentHTML('afterbegin', `
   </form></dialog>`);
 document.body.classList.add('server-mode');
 workspace = setupWorkspace();
+setupTakeoffFolders(bridge);
 setupAiInformation(api,item=>openProject({id:item.workbook},{list:item.list,takeoff:item.takeoff,sheet:item.sheet,view:'summary'}));
 setupHumanInformation(api);
 const transfers=setupTransfers(bridge,()=>connection,message);
@@ -639,7 +643,11 @@ for (const id of ['saveFile', 'saveFile2']) {
   $(id).addEventListener('click', event => { event.stopImmediatePropagation(); $('server-export').click(); }, true);
 }
 $('server-signout').onclick = () => run(async () => { await closeProject(); await api('/logout', { method: 'POST' }); location.reload(); });
-window.freedomSession = { changed: defer => defer ? connection?.scheduleChanges() : connection?.changed(), notify: text => message(text) };
+window.freedomSession = {
+  changed: defer => defer ? connection?.scheduleChanges() : connection?.changed(), notify: text => message(text),
+  detailsCollapsed:(list,takeoff)=>connection?.detailPreferences.collapsed(list,takeoff)??true,
+  setDetailsCollapsed:(list,takeoff,value)=>connection?.detailPreferences.set(list,takeoff,value)
+};
 setupHistory(bridge, () => connection);
 window.addEventListener('beforeunload', event => { connection?.flushChanges(); if (connection && connection.seq > connection.acked) { event.preventDefault(); event.returnValue = ''; } });
 window.addEventListener('pagehide', () => connection?.flushChanges());

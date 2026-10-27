@@ -46,14 +46,26 @@ export function buildTakeoffPdf(report,{fonts,date=new Date(),includeDetails=tru
   if(groups.length)table({head:[groups.map(group=>group.title)],body:[groups.map(group=>group.fields.map(([label,value])=>`${text(label)}: ${text(value)}`).join('\n\n'))],columnStyles:Object.fromEntries(groups.map((_,i)=>[i,{cellWidth:usable/groups.length}]))});
   paragraph('Summary',{size:13,bold:true});
   const sum=key=>report.sheets.reduce((total,sh)=>total+(Number(sh.totals[key])||0),0);
+  const folders=report.folders||[];
+  const folderIds=new Set(folders.map(f=>f.id));
+  const folderGroups=[{id:'',name:'Unfiled'},...folders].map(folder=>({...folder,sheets:report.sheets.filter(sh=>(folderIds.has(sh.folderId)?sh.folderId:'')===folder.id)}));
+  const summaryRows=folderGroups.flatMap(folder=>{
+    const rows=folder.sheets.map(sh=>[`${report.sheets.indexOf(sh)+1}. ${sh.title||'Untitled scope'}`,money(sh.totals.sub),money(sh.totals.feeSum),money(sh.totals.grand),Number(sh.roundTotal)?money(sh.totals.grandRounded):'—']);
+    if(folders.length&&(folder.id||rows.length)){
+      const total=key=>money(folder.sheets.reduce((value,sh)=>value+(Number(sh.totals[key])||0),0));
+      rows.unshift([folder.name,total('sub'),total('feeSum'),total('grand'),''].map(content=>({content,styles:{fontStyle:'bold',fillColor:[225,232,237]}})));
+    }
+    return rows;
+  });
   table({head:[['Scope','Subtotal','Fees','Grand total','Rounded total']],
-    body:report.sheets.map((sh,i)=>[`${i+1}. ${sh.title||'Untitled scope'}`,money(sh.totals.sub),money(sh.totals.feeSum),money(sh.totals.grand),Number(sh.roundTotal)?money(sh.totals.grandRounded):'—']),
+    body:summaryRows,
     foot:[[report.name+' total',money(sum('sub')),money(sum('feeSum')),money(sum('grand')),'']],
     columnStyles:{0:{cellWidth:320},1:{halign:'right'},2:{halign:'right'},3:{halign:'right'},4:{halign:'right'}}});
   if(includeDetails&&report.summaryNotes)table({head:[['Summary notes']],body:[[report.summaryNotes]]});
 
-  for(const sh of report.sheets){
-    const scopeName=text(sh.title).trim()||'Untitled scope';
+  for(const sh of folderGroups.flatMap(folder=>folder.sheets)){
+    const folderName=folders.find(folder=>folder.id===sh.folderId)?.name;
+    const scopeName=(folderName?folderName+' / ':'')+(text(sh.title).trim()||'Untitled scope');
     const base=[['count','Count'],['time','Time'],['days','Days'],['cost','Unit cost'],['markup','Markup %'],['sub','Subtotal'],['grand','Grand total']];
     const extra=[...(sh.flatAddEnabled?[['flat','Flat add']]:[]),
       ...sh.fees.map((fee,i)=>['fee'+i,`${fee.label||'Fee'} (${number(fee.pct)}%)`]),

@@ -30,6 +30,101 @@ async function openWorkbook(page, data = workbook(), name = 'Workspace tester') 
   await expect(page.locator('#server-status')).toHaveText('All changes saved', {timeout:20000});
 }
 
+test('takeoff folders organize pages, persist and roll up prices without changing shared Scope',async({page})=>{
+  const data=workbook(),tk=data.lists[0].companies[0].projects[0].takeoffs[0];
+  tk.scopeData={items:[{id:'measured',name:'Measured work',status:'included',measurements:'10 SF'}]};tk.scopeAssignments={measured:'sn'};
+  await openWorkbook(page,data);
+  const folderTabs=page.locator('#takeoff-folders');
+  await expect(folderTabs).toBeVisible();
+  await page.getByRole('button',{name:'New takeoff folder',exact:true}).click();
+  await page.getByRole('textbox',{name:'Folder name',exact:true}).fill('Building A');
+  await page.getByRole('button',{name:'Save folder',exact:true}).click();
+  await expect(page.locator('#emptyTakeoffFolder')).toBeVisible();
+  await expect(page.locator('#duplicateSheet')).not.toBeVisible();
+  await expect(page.locator('#rail .tab-load')).toBeDisabled();
+  await expect(page.locator('#rail [data-sheet]')).toHaveCount(0);
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();await expect(page.locator('#emptyTakeoffFolder')).toBeVisible();
+  await page.locator('#emptyTakeoffFolder button').click();
+  await expect(page.locator('#rail [data-sheet]')).toHaveCount(1);
+  await page.locator('#title').fill('Building A work');await page.locator('#title').blur();
+  const folderId=await page.locator('.takeoff-folder-tab[aria-pressed=true]').getAttribute('data-takeoff-folder');
+  await folderTabs.getByRole('button',{name:/^Unfiled/}).click();
+  await expect(page.locator('#title')).toHaveValue('North scope');
+  await page.getByRole('combobox',{name:'Move page to folder'}).selectOption(folderId);
+  await expect(page.locator('#rail [data-sheet]')).toHaveCount(2);
+  await expect(page.locator('#title')).toHaveValue('North scope');
+  await page.locator('#duplicateSheet').click();
+  await expect(page.locator('#rail [data-sheet]')).toHaveCount(3);
+  await page.locator('#rail .tab-summary').click();
+  await expect(page.locator('#sumTable .s-folder')).toContainText('Building A');
+  await expect(page.locator('#sumTable .s-folder')).toContainText('257.50');
+  await expect(page.locator('#sumTable tfoot')).toContainText('257.50');
+  await page.locator('#rail .tab-scope').click();
+  await expect(page.locator('[data-scope-item="measured"]')).toContainText('Measured work');
+  expect(await page.evaluate(()=>window.estimator.getScope().assignments.measured)).toBe('sn');
+  await page.getByRole('button',{name:'Rename folder',exact:true}).click();
+  await page.getByRole('textbox',{name:'Folder name',exact:true}).fill('East building');await page.getByRole('button',{name:'Save folder',exact:true}).click();
+  await expect(folderTabs).toContainText('East building');
+  await page.locator('#rail .tab-summary').click();
+  await expect(page.locator('#sumTable .s-folder')).toContainText('East building');
+  await page.locator('#sumTable [data-sheet="sn"].s-row').click();
+  await expect(page.locator('.takeoff-folder-tab[aria-pressed=true]')).toContainText('East building');
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();await expect(page.locator('#title')).toHaveValue('North scope');
+  await expect(page.locator('#rail [data-sheet]')).toHaveCount(3);
+  await page.setViewportSize({width:390,height:844});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await page.screenshot({path:'.tools/takeoff-folders-mobile.png'});
+  await page.setViewportSize({width:1440,height:1000});
+  await page.locator('#rail .tab-summary').click();
+  await page.screenshot({path:'.tools/takeoff-folders-summary.png'});
+  const {readFile}=await import('node:fs/promises'),{getDocument}=await import('pdfjs-dist/legacy/build/pdf.mjs');
+  await page.locator('#takeoff-pdf').click();const downloaded=page.waitForEvent('download');
+  await page.getByRole('menuitem',{name:'Save without details',exact:true}).click();
+  const pdfLoad=getDocument({data:new Uint8Array(await readFile(await (await downloaded).path())),useSystemFonts:false});
+  const pdf=await pdfLoad.promise;
+  const summary=(await (await pdf.getPage(1)).getTextContent()).items.map(item=>item.str||'').join(' ');
+  expect(summary).toContain('East building');expect(summary).toContain('$257.50');
+  const detail=(await (await pdf.getPage(2)).getTextContent()).items.map(item=>item.str||'').join(' ');
+  expect(detail).toContain('East building / North scope');await pdfLoad.destroy();
+  await page.getByRole('button',{name:'Delete folder',exact:true}).click();
+  await expect(page.locator('.confirm-pop')).toContainText('pages will move to Unfiled');
+  await page.locator('.confirm-pop').getByRole('button',{name:'Delete folder',exact:true}).click();
+  await expect(page.locator('#rail [data-sheet]')).toHaveCount(3);
+  await expect(folderTabs).not.toContainText('East building');
+  await page.locator('#rail .tab-summary').click();await expect(page.locator('#sumTable tfoot')).toContainText('257.50');
+  expect(await page.evaluate(()=>window.estimator.getScope().assignments.measured)).toBe('sn');
+});
+
+test('takeoff folders isolate page ordering, deletion and takeoff selection',async({page})=>{
+  const data=workbook(),tk=data.lists[0].companies[0].projects[0].takeoffs[0];
+  tk.folders=[{id:'a',name:'Building A'},{id:'b',name:'Building B'}];
+  tk.sheets=[{...sheet('sn','First A'),folderId:'a'},{...sheet('b1','First B'),folderId:'b'},{...sheet('a2','Second A'),folderId:'a'}];
+  await openWorkbook(page,data);
+  await page.locator('[data-takeoff-folder="a"]').click();
+  const source=await page.locator('#rail [data-sheet="a2"]').boundingBox(),target=await page.locator('#rail [data-sheet="sn"]').boundingBox();
+  await page.mouse.move(source.x+source.width/2,source.y+source.height/2);await page.mouse.down();
+  await page.mouse.move(target.x+2,target.y+target.height/2,{steps:8});await page.mouse.up();
+  expect(await page.evaluate(()=>window.estimator.getTimelineTakeoff().sheets.map(s=>s.id))).toEqual(['a2','b1','sn']);
+  await page.locator('[data-takeoff-folder="b"]').click();
+  await expect(page.locator('#rail [data-sheet]')).toHaveCount(1);
+  await page.locator('#rail .option-close').click();await page.getByRole('alertdialog').getByRole('button',{name:'Delete',exact:true}).click();
+  await expect(page.locator('#emptyTakeoffFolder')).toBeVisible();
+  await expect(page.locator('#duplicateSheet')).not.toBeVisible();
+  await expect(page.locator('#rail [data-sheet]')).toHaveCount(0);
+  await page.locator('#rail .tab-summary').click();
+  await expect(page.locator('#sumTable .s-row')).toHaveCount(2);
+  await expect(page.locator('#sumTable .s-folder')).toHaveCount(2);
+  await expect(page.locator('#sumTable tfoot')).toContainText('257.50');
+  await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'ts',sheet:'ss',view:'summary'}));
+  await expect(page.locator('.takeoff-folder-tab')).toHaveCount(1);
+  await expect(page.locator('#sumTable .s-folder')).toHaveCount(0);
+  await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'tn',sheet:'sn',view:'sheet'}));
+  await expect(page.locator('.takeoff-folder-tab[aria-pressed=true]')).toContainText('Building A');
+  await expect(page.locator('#title')).toHaveValue('First A');
+});
+
 test('Save as PDF downloads every takeoff option with readable pagination and complete pricing',async({page})=>{
   const {readFile}=await import('node:fs/promises');
   const {getDocument,OPS}=await import('pdfjs-dist/legacy/build/pdf.mjs');
@@ -1947,7 +2042,7 @@ test('collapse and expand all detail applies across every page of the current ta
   const visit=async(sheetId)=>{
     await page.locator(`#rail .tab[data-sheet="${sheetId}"]`).click();
   };
-  await page.locator('#workspace-toggle-notes').click();
+  await expect(page.locator('#workspace-toggle-notes')).toHaveText('Expand all detail');
   for(const id of ['sn','second']){
     await visit(id);
     await expect(page.locator('#sheetCard .item-note:visible')).toHaveCount(0);
@@ -1967,10 +2062,56 @@ test('collapse and expand all detail applies across every page of the current ta
   }
   await page.locator('#workspace-toggle-notes').click();
   await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'ts',sheet:'ss',view:'sheet'}));
+  await expect(page.locator('#body .item-note').first()).not.toBeVisible();
+  await page.locator('#workspace-toggle-notes').click();
   await expect(page.locator('#body .item-note').first()).toBeVisible();
   await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'tn',sheet:'second',view:'sheet'}));
   await expect(page.locator('#sheetCard .item-note:visible')).toHaveCount(0);
   expect(await page.evaluate(()=>window.estimator.getShared().lists)).toEqual(shared);
+});
+
+test('detail preference persists per person and takeoff across reloads and AI page additions',async({page,browser,baseURL})=>{
+  await openWorkbook(page);
+  const name=await page.locator('#server-title').textContent();
+  const project=(await (await page.request.get('/api/projects')).json()).find(p=>p.name===name);
+  const preferencePath='/api/projects/'+project.id+'/takeoff-preferences';
+  const reload=async()=>{await page.reload();await expect(page.locator('#server-status')).toHaveText('All changes saved');};
+  await expect(page.locator('#workspace-toggle-notes')).toHaveText('Expand all detail');
+  await expect(page.locator('#sheetCard .item-note:visible')).toHaveCount(0);
+  const toggle=async()=>{const saved=page.waitForResponse(r=>r.url().endsWith('/takeoff-preferences')&&r.request().method()==='PUT');await page.locator('#workspace-toggle-notes').click();expect((await saved).ok()).toBe(true);};
+  await toggle();await reload();await expect(page.locator('#body .item-note').first()).toBeVisible();
+  await toggle();await reload();await expect(page.locator('#sheetCard .item-note:visible')).toHaveCount(0);
+  const grant=await (await page.request.post('/api/projects/'+project.id+'/ai-access',{data:{list:'list',takeoff:'tn'}})).json();
+  const headers={Authorization:'Bearer '+grant.key};
+  const read=await (await page.request.get('/api/ai/v1/takeoff',{headers})).json();
+  read.takeoff.sheets.push({...sheet('ai-detail','AI page'),note:'AI page detail',noteOpen:true});
+  read.takeoff.sheets.at(-1).rows[0].noteOpen=true;
+  expect((await page.request.post('/api/ai/v1/save',{headers,data:{revision:read.revision,takeoff:read.takeoff,requestId:'detail-preference-page'}})).ok()).toBe(true);
+  await page.locator('#rail [data-sheet="ai-detail"]').click();
+  await expect(page.locator('#sheetCard .item-note:visible')).toHaveCount(0);
+  await reload();await expect(page.locator('#sheetCard .item-note:visible')).toHaveCount(0);
+  await expect(page.locator('#workspace-toggle-notes')).toHaveText('Expand all detail');
+  await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'ts',sheet:'ss',view:'sheet'}));
+  await toggle();
+  await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'tn',sheet:'sn',view:'sheet'}));
+  await expect(page.locator('#sheetCard .item-note:visible')).toHaveCount(0);
+  const ctx=await browser.newContext({baseURL});
+  try{
+    // Same person in a fresh browser gets the server preference for each takeoff.
+    await ctx.addCookies(await page.context().cookies());const fresh=await ctx.newPage();await fresh.goto('/');
+    await expect(fresh.locator('#server-title')).toHaveText(name);
+    await expect(fresh.locator('#server-status')).toHaveText('All changes saved');
+    await fresh.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'ts',sheet:'ss',view:'sheet'}));
+    await expect(fresh.locator('#body .item-note').first()).toBeVisible();
+    await ctx.clearCookies();await fresh.goto('/');
+    await fresh.locator('#server-login-name').fill('Detail peer '+Date.now());await fresh.locator('#server-login-password').fill('1313');await fresh.locator('#server-login-form button').click();
+    await expect(fresh.locator('#server-login')).not.toBeVisible();
+    await fresh.locator('#server-list .server-project').filter({hasText:name}).click();
+    await expect(fresh.locator('#server-status')).toHaveText('All changes saved');
+    await fresh.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'ts',sheet:'ss',view:'sheet'}));
+    await expect(fresh.locator('#sheetCard .item-note:visible')).toHaveCount(0);
+    expect(await (await fresh.request.get(preferencePath)).json()).toEqual([]);
+  }finally{await ctx.close();}
 });
 
 test('menus preserve rounding, display, downloads, printing and keyboard access', async ({page}) => {

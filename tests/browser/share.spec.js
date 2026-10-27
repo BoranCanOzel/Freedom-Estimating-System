@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 test('guests view all pages, save edits, and see conflicts without a login',async({browser,request})=>{
  await request.post('/api/login',{data:{name:'Share browser',password:'1313'}});
  const sheet=id=>({id,title:'Scope '+id,fees:[{id:'f'+id,label:'Sales',pct:3}],units:[],rows:[{id:'r'+id,kind:'labor',name:'Crew',count:1,time:8,days:1,cost:50,markup:0}]});
- const takeoff={id:'t',name:'Shared estimate',sheets:[sheet('a'),sheet('b')]};
+ const takeoff={id:'t',name:'Shared estimate',folders:[{id:'building',name:'Building A'}],sheets:[{...sheet('a'),folderId:'building'},sheet('b')]};
  const created=await(await request.post('/api/projects',{data:{name:'Share test',book:{lists:[{id:'l',companies:[{id:'c',projects:[{id:'p',takeoffs:[takeoff]}]}]}]}}})).json();
  const admin='/api/projects/'+created.id+'/share-links';
  const grant=async permission=>(await(await request.post(admin,{data:{list:'l',takeoff:'t',permission}})).json());
@@ -11,6 +11,7 @@ test('guests view all pages, save edits, and see conflicts without a login',asyn
  try{
   await page.goto('http://127.0.0.1:3100'+read.path);await expect(page.locator('#shared-status')).toHaveText('Latest version loaded.');
   await expect(page.locator('#summaryCard')).toBeVisible();
+  await expect(page.locator('.summary-folder-link').filter({hasText:'Building A'})).toBeVisible();
   await expect(page.locator('#shared-summary')).toHaveAttribute('aria-pressed','true');
   await expect(page.locator('#shared-page')).toHaveValue('');
   await expect(page.locator('#shared-prev')).toBeDisabled();

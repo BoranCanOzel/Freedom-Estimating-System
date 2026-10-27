@@ -31,6 +31,7 @@ body.shared-view{padding:16px;background:var(--paper);--share-accent:#6e94ad;}
 .shared-view #summaryCard .sum-block.tk{display:none}
 .shared-view #summaryCard .sum-blocks:not(:has(.sum-block:not(.tk) .ro-line)){display:none}
 .shared-readonly .sheet button,.shared-readonly .col-resizer,.shared-readonly .grip{visibility:hidden!important}
+.shared-readonly .sheet .summary-folder-link{visibility:visible!important}
 .shared-readonly .sheet input,.shared-readonly .sheet textarea{cursor:text}
 .shared-readonly #sheetTable tbody td.c-item{position:static;z-index:auto}
 .shared-readonly #sheetTable thead th.c-item{left:auto;z-index:30}

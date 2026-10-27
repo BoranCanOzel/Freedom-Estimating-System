@@ -41,6 +41,11 @@ export function createApp(options = {}) {
     CREATE TABLE IF NOT EXISTS access (project_id TEXT NOT NULL REFERENCES projects(id), name TEXT NOT NULL,
       opened_at TEXT NOT NULL, PRIMARY KEY(project_id,name));
     CREATE TABLE IF NOT EXISTS user_preferences (name TEXT PRIMARY KEY, cursor TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS takeoff_preferences (
+      workbook_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      name TEXT NOT NULL, list_id TEXT NOT NULL, takeoff_id TEXT NOT NULL,
+      details_collapsed INTEGER NOT NULL DEFAULT 1,
+      PRIMARY KEY(workbook_id,name,list_id,takeoff_id));
     CREATE TABLE IF NOT EXISTS project_visits (
       workbook_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE, name TEXT NOT NULL,
       project_id TEXT NOT NULL, list_id TEXT NOT NULL, takeoff_id TEXT NOT NULL, sheet_id TEXT NOT NULL,
@@ -163,6 +168,21 @@ export function createApp(options = {}) {
     const rows = db.prepare(`SELECT p.*, a.opened_at AS my_opened_at FROM projects p
       LEFT JOIN access a ON p.id=a.project_id AND a.name=? ORDER BY COALESCE(a.opened_at,p.modified_at) DESC`).all(req.user.name);
     res.json(rows.map(publicProject));
+  });
+  app.get('/api/projects/:id/takeoff-preferences',(req,res)=>{
+    if(!project(req.params.id))return res.status(404).json({error:'Workbook not found.'});
+    const rows=db.prepare('SELECT list_id,takeoff_id,details_collapsed FROM takeoff_preferences WHERE workbook_id=? AND name=?').all(req.params.id,req.user.name);
+    res.json(rows.map(row=>({list:row.list_id,takeoff:row.takeoff_id,detailsCollapsed:!!row.details_collapsed})));
+  });
+  app.put('/api/projects/:id/takeoff-preferences',(req,res)=>{
+    const row=project(req.params.id);if(!row)return res.status(404).json({error:'Workbook not found.'});
+    const {list,takeoff,detailsCollapsed}=req.body||{};
+    if(typeof list!=='string'||!list||typeof takeoff!=='string'||!takeoff||typeof detailsCollapsed!=='boolean')return res.status(400).json({error:'Choose a takeoff and a detail visibility preference.'});
+    const doc=new Y.Doc();Y.applyUpdate(doc,row.state);const book=readBook(doc);doc.destroy();
+    if(!resolveLocation(book,{list,takeoff}))return res.status(404).json({error:'Takeoff not found.'});
+    db.prepare('INSERT INTO takeoff_preferences VALUES (?,?,?,?,?) ON CONFLICT(workbook_id,name,list_id,takeoff_id) DO UPDATE SET details_collapsed=excluded.details_collapsed')
+      .run(row.id,req.user.name,list,takeoff,Number(detailsCollapsed));
+    res.json({list,takeoff,detailsCollapsed});
   });
   app.get('/api/projects/:id/recent', (req, res) => {
     const row = project(req.params.id);

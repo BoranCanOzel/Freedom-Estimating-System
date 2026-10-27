@@ -2852,7 +2852,7 @@
       <button class="btn ghost" id="saveFile">Save file</button>
       <button class="btn ghost" id="loadFile">Load file</button>
 
-      <button class="btn ghost" id="toggleNotes">Collapse all detail</button>
+      <button class="btn ghost" id="toggleNotes">Expand all detail</button>
       <button class="btn ghost" id="duplicateSheet" type="button">Duplicate page</button>
       <button class="btn ghost" id="reset">Reset sheet</button>
     </div>
@@ -3319,11 +3319,17 @@
     return b;
   }
 
+  const detailPreferences=new Map(),detailOverrides=new Map();
+  const detailKey=()=>JSON.stringify([book.activeList,book.activeTakeoff]);
+  const detailRowKey=row=>JSON.stringify([book.activeList,book.activeTakeoff,row.id]);
+  function detailsCollapsed(){return window.freedomSession?.detailsCollapsed?.(book.activeList,book.activeTakeoff)??detailPreferences.get(detailKey())??true;}
+  function noteIsOpen(row){return detailOverrides.get(detailRowKey(row))??!detailsCollapsed();}
+
   // multi-line detail under a name, on line items and section headers alike
   function attachNote(row, stackCell, noteBtn, placeholder){
     let noteEl = null;
     function syncNote(){
-      const open = row.noteOpen !== false;
+      const open = noteIsOpen(row);
       noteBtn.classList.toggle('has-note', !!noteEl);
       noteBtn.classList.toggle('note-hidden', !!noteEl && !open);
       noteBtn.title = !noteEl ? 'Add detail' : (open ? 'Hide this detail' : 'Show this detail');
@@ -3362,8 +3368,8 @@
       if (focusIt) noteEl.focus();
     }
     noteBtn.addEventListener('click', () => {
-      if (!noteEl){ row.noteOpen = true; showNote(true); syncNotesButton(); return; }
-      row.noteOpen = !(row.noteOpen !== false);
+      if (!noteEl){ detailOverrides.set(detailRowKey(row),true); showNote(true); syncNotesButton(); return; }
+      detailOverrides.set(detailRowKey(row),!noteIsOpen(row));
       syncNote();
       syncNotesButton();
       save();
@@ -4576,7 +4582,10 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
       const order = Array.from(document.querySelectorAll('#rail .tab'))
         .map(t => t.dataset.sheet).filter(Boolean);
-      book.sheets.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+      const ordered=order.map(id=>book.sheets.find(sh=>sh.id===id));
+      let at=0;
+      // Reorder only this folder's slots; pages in other folders stay put.
+      for(let i=0;i<book.sheets.length;i++)if(order.includes(book.sheets[i].id))book.sheets[i]=ordered[at++];
       showView();
       save();
     };
@@ -5410,6 +5419,36 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   }, {passive:false});
   let tabRevealFrame;
 
+  // Pages remain in one canonical array so pricing, Scope and external links
+  // continue to address the same page IDs when a page moves between folders.
+  function takeoffFolderGroups(){
+    const tk=findTakeoff(book.activeTakeoff)?.tk;
+    const groups=[{id:'',name:'Unfiled',sheets:[]},...(tk?.folders||[]).map(f=>({id:f.id,name:f.name,sheets:[]}))];
+    const byId=new Map(groups.map(f=>[f.id,f]));
+    for(const sh of book.sheets)(byId.get(sh.folderId)||groups[0]).sheets.push(sh);
+    return groups;
+  }
+
+  function pageFolderId(sh){
+    return findTakeoff(book.activeTakeoff)?.tk.folders?.some(f=>f.id===sh?.folderId)?sh.folderId:'';
+  }
+
+  function openTakeoffFolder(folderId){
+    const tk=findTakeoff(book.activeTakeoff)?.tk,group=takeoffFolderGroups().find(f=>f.id===folderId);
+    if(!tk||!group)return;
+    tk.activeFolder=folderId;
+    const sh=group.sheets.find(s=>s.id===book.active)||group.sheets[0];
+    book.active=tk.active=sh?.id||null;
+    if(sh)state=sh;
+    book.view='sheet';closeEditor();showView();save();
+  }
+
+  function addTakeoffPage(){
+    const sh=seed(nextNum()),folder=findTakeoff(book.activeTakeoff)?.tk.activeFolder;
+    if(folder)sh.folderId=folder;
+    book.sheets.push(sh);book.view='sheet';book.active=sh.id;state=sh;showView();save();
+  }
+
   function renderTabs(){
     // Option numbers describe their current position, never their creation order.
     book.sheets.forEach((sh, i) => { sh.num = i + 1; });
@@ -5434,7 +5473,8 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     scope.addEventListener('click', () => { book.view = 'scope'; showView(); save(); });
     rail.insertBefore(scope, railEnd());
 
-    book.sheets.forEach(sh => {
+    const activeFolder=findTakeoff(book.activeTakeoff)?.tk.activeFolder||'';
+    book.sheets.filter(sh=>pageFolderId(sh)===activeFolder).forEach(sh => {
       const t = document.createElement('button');
       t.type = 'button';
       t.className = 'tab';
@@ -5470,7 +5510,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
       t.addEventListener('pointerdown', e => armTabDrag(e, sh, t));
       t.addEventListener('click', e => {
-        if (e.pointerType !== 'touch') return;
+        if (e.pointerType !== 'touch' && e.detail !== 0) return;
         book.view = 'sheet'; book.active = sh.id; state = sh;
         showView(); save();
       });
@@ -5491,15 +5531,8 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     add.className = 'tab tab-add';
     add.textContent = '+';
     add.title = 'Add another option';
-    add.addEventListener('click', () => {
-      const sh = seed(nextNum());
-      book.sheets.push(sh);
-      book.view = 'sheet';
-      book.active = sh.id;
-      state = sh;
-      showView();
-      save();
-    });
+    add.setAttribute('aria-label','Add takeoff page');
+    add.addEventListener('click', addTakeoffPage);
     rail.insertBefore(add, railEnd());
 
     [['timeline','Timeline'], ['load','Load calc'], ['wage','Wage calc']].forEach(([v, label]) => {
@@ -5507,6 +5540,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       b.type = 'button';
       b.className = 'tab tab-calc tab-' + v;
       b.textContent = label;
+      if(v==='load')b.disabled=!book.active;
       b.setAttribute('aria-selected', String(book.view === v));
       b.addEventListener('click', () => { book.view = v; showView(); save(); });
       rail.insertBefore(b, railEnd());
@@ -5679,6 +5713,20 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     applyZoom();
     renderStickies();
     const hit = findTakeoff(book.activeTakeoff);
+    if(hit){
+      if(!hit.tk.folders?.some(f=>f.id===hit.tk.activeFolder))hit.tk.activeFolder='';
+      if(book.view==='sheet'&&book.active)hit.tk.activeFolder=pageFolderId(book.sheets.find(sh=>sh.id===book.active));
+      if(book.view==='load'&&!book.active)book.view='sheet';
+    }
+    let emptyFolder=document.getElementById('emptyTakeoffFolder');
+    if(!emptyFolder){
+      emptyFolder=document.createElement('div');emptyFolder.id='emptyTakeoffFolder';emptyFolder.className='card';
+      emptyFolder.innerHTML='<h2>No pages in this folder</h2><p>Add a takeoff page or move an existing page here using Page folder.</p><button type="button" class="btn">Add takeoff page</button>';
+      emptyFolder.querySelector('button').onclick=addTakeoffPage;
+      document.getElementById('sheetCard').before(emptyFolder);
+    }
+    const folderEmpty=!!hit&&!book.sheets.some(sh=>pageFolderId(sh)===(hit.tk.activeFolder||''));
+    emptyFolder.hidden=!hit||book.view!=='sheet'||!folderEmpty;
     let empty = document.getElementById('emptyTakeoff');
     if (!empty){
       empty = document.createElement('div'); empty.id = 'emptyTakeoff'; empty.className = 'card';
@@ -5689,7 +5737,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     empty.hidden = !!hit;
     document.getElementById('rail').hidden = !hit;
     const pageActions = document.getElementById('workspace-page-actions');
-    if (pageActions) pageActions.hidden = !hit;
+    if (pageActions) pageActions.hidden = !hit || folderEmpty;
     if (!hit){
       ['sheetCard','summaryCard','scopeCard','timelineCard','loadCard','wageCard','libToggle'].forEach(id => document.getElementById(id).hidden = true);
       document.body.classList.remove('lib-open');
@@ -5700,19 +5748,19 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     if (book.view === 'scopes') book.view = 'scope';
     const known = ['summary','scope','timeline','load','wage'];
     const v = known.indexOf(book.view) >= 0 ? book.view : 'sheet';
-    document.getElementById('sheetCard').hidden = v !== 'sheet';
+    document.getElementById('sheetCard').hidden = v !== 'sheet' || folderEmpty;
     document.getElementById('summaryCard').hidden = v !== 'summary';
     document.getElementById('scopeCard').hidden = v !== 'scope';
     document.getElementById('timelineCard').hidden = v !== 'timeline';
     document.getElementById('loadCard').hidden = v !== 'load';
     document.getElementById('wageCard').hidden = v !== 'wage';
-    document.getElementById('libToggle').hidden = v !== 'sheet';
-    if (v !== 'sheet') document.body.classList.remove('lib-open');
+    document.getElementById('libToggle').hidden = v !== 'sheet' || folderEmpty;
+    if (v !== 'sheet' || folderEmpty) document.body.classList.remove('lib-open');
     renderTabs();
     if (v === 'summary') renderSummary();
     else if (v === 'load') renderLoad();
     else if (v === 'wage') renderWage();
-    else if (v === 'sheet') { renderAll(); if (document.body.classList.contains('lib-open')) renderLibrary(); }
+    else if (v === 'sheet' && !folderEmpty) { renderAll(); if (document.body.classList.contains('lib-open')) renderLibrary(); }
     document.dispatchEvent(new CustomEvent('estimator:view', {detail:{view:v}}));
   }
 
@@ -5975,7 +6023,12 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     let tot = {sub:0, fee:0, grand:0, rounded:0};
     const hasRounding = book.sheets.some(sh => num(sh.roundTotal));
 
-    const rows = book.sheets.map(sh => {
+    const grouped=!!findTakeoff(book.activeTakeoff)?.tk.folders?.length;
+    const rows = takeoffFolderGroups().map(folder=>{
+      const totals=folder.sheets.map(sheetTotals);
+      const sum=key=>totals.reduce((value,t)=>value+t[key],0);
+      const header=grouped&&(folder.id||folder.sheets.length)?'<tr class="s-folder" data-summary-folder="'+esc(folder.id)+'"><td></td><td><button type="button" class="summary-folder-link" data-folder="'+esc(folder.id)+'">'+esc(folder.name)+'</button><span class="s-sub">'+folder.sheets.length+' pages</span></td><td>'+moneyHTML(sum('sub'))+'</td><td>'+moneyHTML(sum('feeSum'))+'</td><td>'+moneyHTML(sum('grand'))+'</td><td></td></tr>':'';
+      return header+folder.sheets.map(sh => {
       const s = sheetTotals(sh);
       tot.sub += s.sub; tot.fee += s.feeSum; tot.grand += s.grand; tot.rounded += s.grandRounded;
 
@@ -6042,6 +6095,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         }).join('');
       }
       return block;
+      }).join('');
     }).join('');
 
     t.innerHTML =
@@ -6061,6 +6115,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         '<td></td>' +
       '</tr></tfoot>';
 
+    t.querySelectorAll('.summary-folder-link').forEach(button=>button.onclick=()=>openTakeoffFolder(button.dataset.folder));
     t.querySelectorAll('tbody tr[data-sheet]').forEach(row => {
       const sh = book.sheets.find(sheet => sheet.id === row.dataset.sheet);
       const color = tabColor(sh?.color);
@@ -6772,7 +6827,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       }
       delete tk.loadCalc;
     });
-    if (!book.sheets.some(s => s.id === book.active)) book.active = book.sheets[0].id;
+    if (book.active && !book.sheets.some(s => s.id === book.active)) book.active = null;
     if (['summary','scope','scopes','sheet','timeline','load','wage'].indexOf(book.view) < 0) book.view = 'sheet';
     state = book.sheets.find(s => s.id === book.active) || book.sheets[0];
   }
@@ -6822,25 +6877,27 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     }, 120);
   });
   function noteHolders(){ return book.sheets.flatMap(sheet => sheet.rows.concat([sheet])); }
-  function anyNotes(){ return noteHolders().some(r => r.note && r.note.trim()); }
   function anyNotesOpen(){
-    return noteHolders().some(r => r.note && r.note.trim() && r.noteOpen !== false);
+    return noteHolders().some(r => r.note && r.note.trim() && noteIsOpen(r));
   }
 
   function syncNotesButton(){
     for (const id of ['toggleNotes','workspace-toggle-notes']) {
       const btn = document.getElementById(id);
       if (!btn) continue;
-      btn.hidden = !anyNotes();
-      btn.textContent = anyNotesOpen() ? 'Collapse all detail' : 'Expand all detail';
+      const expanded=!detailsCollapsed()||anyNotesOpen();
+      btn.hidden = !book.activeTakeoff;
+      btn.textContent = expanded ? 'Collapse all detail' : 'Expand all detail';
       btn.title = 'Show or hide detail on every option page in this takeoff';
-      btn.setAttribute('aria-expanded',String(anyNotesOpen()));
+      btn.setAttribute('aria-expanded',String(expanded));
     }
   }
 
   document.getElementById('toggleNotes').addEventListener('click', () => {
-    const collapse = anyNotesOpen();
-    noteHolders().forEach(r => { if (r.note && r.note.trim()) r.noteOpen = !collapse; });
+    const collapse = !detailsCollapsed()||anyNotesOpen();
+    detailPreferences.set(detailKey(),collapse);
+    window.freedomSession?.setDetailsCollapsed?.(book.activeList,book.activeTakeoff,collapse);
+    noteHolders().forEach(r => detailOverrides.delete(detailRowKey(r)));
     refs.forEach(ref => { if (ref.syncNote) ref.syncNote(); });
     if (headNoteSync) headNoteSync();
     syncNotesButton();
@@ -6943,6 +7000,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   });
 
   document.getElementById('duplicateSheet').addEventListener('click', () => {
+    if(!book.active)return;
     const copy = structuredClone(state);
     const ids = new Map();
     const renewIds = value => {
@@ -7005,10 +7063,11 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       takeoff.sheets.splice(at, 1);
       for(const [item,page] of Object.entries(takeoff.scopeAssignments||{}))if(page===optionId)delete takeoff.scopeAssignments[item];
       takeoff.sheets.forEach((sh,i) => { sh.num = i + 1; });
-      const next = takeoff.sheets[Math.min(at,takeoff.sheets.length - 1)];
-      if (takeoff.active === optionId) takeoff.active = next.id;
+      const remaining=takeoff.sheets.filter(sh=>(sh.folderId||'')===(option.folderId||''));
+      const next = remaining[Math.min(at,remaining.length - 1)];
+      if (takeoff.active === optionId) takeoff.active = next?.id||null;
       if (book.activeTakeoff === takeoffId && book.active === optionId){
-        book.active = next.id; state = next;
+        book.active = next?.id||null; state = next||takeoff.sheets[0];
       }
       showView(); renderProjects(); save();
       flash('option deleted');
@@ -7025,6 +7084,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       if (at < 0) return;
       const fresh = seed(takeoff.sheets[at].num);
       fresh.id = optionId; fresh.title = '';
+      if(takeoff.sheets[at].folderId)fresh.folderId=takeoff.sheets[at].folderId;
       fresh.rows = [{id:id(), kind:'labor', name:'', count:1, time:1, days:1, cost:'', markup:0}];
       takeoff.sheets[at] = fresh;
       if (state.id === optionId) state = fresh;
@@ -8034,6 +8094,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
   function optionFromScope(t){
     const sh = seed(nextNum());
+    const folder=findTakeoff(book.activeTakeoff)?.tk.activeFolder;if(folder)sh.folderId=folder;
     sh.title = t.name || '';
     sh.note = t.note || '';
     if (t.img) sh.img = t.img;   // the hero travels; attachments stay in the library
@@ -11249,7 +11310,9 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       tk.active = tk.sheets[0].id;
     }
     book.sheets = tk.sheets;              // the workbook the app edits
-    if (!tk.sheets.some(x => x.id === tk.active)) tk.active = tk.sheets[0].id;
+    if(tk.activeFolder===undefined)tk.activeFolder=pageFolderId(tk.sheets.find(sh=>sh.id===tk.active)||tk.sheets[0]);
+    if (!tk.folders?.some(f=>f.id===tk.activeFolder))tk.activeFolder='';
+    if (!tk.sheets.some(x => x.id === tk.active)) tk.active = tk.sheets.find(sh=>pageFolderId(sh)===(tk.activeFolder||''))?.id || null;
     book.active = tk.active;
     state = book.sheets.find(sh => sh.id === book.active) || book.sheets[0];
     return hit;
@@ -11439,7 +11502,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       if (!value || typeof value !== 'object') return;
       if(value.scopeAssignments)value.scopeAssignments=Object.fromEntries(Object.entries(value.scopeAssignments).map(([item,page])=>[item,ids.get(page)||page]));
       for (const key of Object.keys(value)){
-        if (['sid','active'].includes(key) && ids.has(value[key])) value[key] = ids.get(value[key]);
+        if (['sid','active','folderId','activeFolder'].includes(key) && ids.has(value[key])) value[key] = ids.get(value[key]);
         if(key!=='scopeData')remap(value[key]);
         if (ids.has(key)){ value[ids.get(key)] = value[key]; delete value[key]; }
       }
@@ -11890,7 +11953,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   const personalRoot = new Set(['view','active','activeTakeoff','activeList','activeLib',
     'theme','dark','zoom','libW','projW','edW','sumWidths','sumOpen','sumSectionClosed','sumDetail',
     'statusHidden','fieldPicks','picsOn','gameCard','stOpen']);
-  const personalNested = new Set(['active','collapsed','shut','noteOpen','widths','hiddenCols','roundColumnVisible','loadShut']);
+  const personalNested = new Set(['active','activeFolder','collapsed','shut','noteOpen','widths','hiddenCols','roundColumnVisible','loadShut']);
   const aliases = new Set(['sheets','companies','templates','folders','_app','_v']);
   let personal = new Map();
   function separate(value, path = [], capture = true){
@@ -11920,6 +11983,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     if (resumeTakeoff) {
       bk.activeList = resumeList.id; bk.activeTakeoff = resumeTakeoff.id;
       if ((resumeTakeoff.sheets || []).some(s => s.id === location.sheet)) resumeTakeoff.active = bk.active = location.sheet;
+      if(typeof location.folder==='string')resumeTakeoff.activeFolder=location.folder;
       bk.view = ['sheet','summary','scope','scopes','timeline','load','wage'].includes(location.view) ? location.view : 'sheet';
     }
     if (Array.isArray(bk.rows)) return {view:'sheet', active:null, sheets:[normalize(Object.assign(bk, {num:1}))]};
@@ -12028,7 +12092,31 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       setFilter(field, on){ book.filterFields = on ? [...new Set([...filterFields(), field])] : filterFields().filter(f => f !== field); }
     },
     getShared(){ projectTree(); templates(); return separate(book); },
-    getLocation(){ return {list:book.activeList,view:book.view, sheet:book.active, takeoff:book.activeTakeoff}; },
+    getLocation(){ return {list:book.activeList,view:book.view, sheet:book.active, takeoff:book.activeTakeoff,folder:findTakeoff(book.activeTakeoff)?.tk.activeFolder||''}; },
+    getTakeoffFolders(){
+      const tk=findTakeoff(book.activeTakeoff)?.tk;if(!tk)return null;
+      return {active:tk.activeFolder||'',sheet:book.view==='sheet'?book.active:null,groups:takeoffFolderGroups().map(f=>({id:f.id,name:f.name,count:f.sheets.length}))};
+    },
+    openTakeoffFolder,
+    saveTakeoffFolder(folderId,name){
+      const tk=findTakeoff(book.activeTakeoff)?.tk;name=String(name).trim().slice(0,200);if(!tk||!name)return;
+      if(folderId){const f=tk.folders?.find(f=>f.id===folderId);if(!f)return;f.name=name;showView();save();}
+      else{const folder={id:id(),name};(tk.folders ||= []).push(folder);openTakeoffFolder(folder.id);}
+    },
+    deleteTakeoffFolder(folderId,anchor){
+      const tk=findTakeoff(book.activeTakeoff)?.tk,folder=tk?.folders?.find(f=>f.id===folderId);if(!folder)return;
+      confirmPop(anchor,'Delete "'+folder.name+'"? Its pages will move to Unfiled.',()=>{
+        const current=findTakeoff(tk.id)?.tk;if(!current?.folders?.some(f=>f.id===folderId))return;
+        current.folders=current.folders.filter(f=>f.id!==folderId);
+        for(const sh of current.sheets)if(sh.folderId===folderId)delete sh.folderId;
+        if(book.activeTakeoff===current.id)openTakeoffFolder('');else save();
+      },'Delete folder');
+    },
+    movePageToFolder(sheetId,folderId){
+      const sh=book.sheets.find(sh=>sh.id===sheetId);if(!sh||!takeoffFolderGroups().some(f=>f.id===folderId))return;
+      if(folderId)sh.folderId=folderId;else delete sh.folderId;
+      openTakeoffFolder(folderId);
+    },
     aiDataEnabled(){ return findTakeoff(book.activeTakeoff)?.tk.aiData === true; },
     aiDataMethod(){ return findTakeoff(book.activeTakeoff)?.tk.aiDataMethod || ''; },
     setAiDataMethod(method){
@@ -12091,7 +12179,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       if (!hit) throw new Error('Open a takeoff before saving a PDF.');
       const {co,pr,tk} = hit;
       const fields = (kind,record,base) => base.concat(customFields(kind).map(key=>[key,record.custom?.[key]])).filter(([,value])=>value!=null&&String(value).trim());
-      return structuredClone({name:tk.name || 'Takeoff',project:pr.name || '',customer:co.name || '',summaryNotes:tk.summaryNotes || '',
+      return structuredClone({name:tk.name || 'Takeoff',project:pr.name || '',customer:co.name || '',summaryNotes:tk.summaryNotes || '',folders:tk.folders||[],
         metadata:[
           {title:'Customer',fields:fields('company',co,[['Customer',co.name],['Address',co.address],['Phone',co.phone],['Email',co.email]])},
           {title:'Project',fields:fields('project',pr,[['Project',pr.name],['Status',pr.status],['Job address',pr.address || co.address],['Contacts',pr.contacts],['Email',pr.email],...(includeDetails?[['Notes',pr.notes]]:[])])},
@@ -12123,7 +12211,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       book.view='sheet';book.active=sh.id;state=sh;showView();
       const target=refs.get(rowId)?.tr;if(target){revealAround(target);target.scrollIntoView({block:'center'});}save();
     },
-    getScopePages(){return book.sheets.map(sh=>({id:sh.id,title:sh.title,num:sh.num,color:sh.color}));},
+    getScopePages(){return book.sheets.map(sh=>({id:sh.id,title:sh.title,num:sh.num,color:sh.color,folderName:findTakeoff(book.activeTakeoff)?.tk.folders?.find(f=>f.id===sh.folderId)?.name||''}));},
     scopeColorControl(id){
       const sh=book.sheets.find(sh=>sh.id===id);return sh ? scopeColorBtn(sh) : null;
     },
@@ -12204,8 +12292,13 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       book.activeList = list.id; hit.co.collapsed = hit.pr.collapsed = false;
       document.getElementById('projSearch').value = '';
       openTakeoff(hit.tk.id);
+      if(typeof location.folder==='string')hit.tk.activeFolder=location.folder;
       const sh = book.sheets.find(s => s.id === location.sheet);
       if (sh) { book.active = hit.tk.active = sh.id; state = sh; }
+      else if(typeof location.folder==='string'){
+        const first=book.sheets.find(s=>pageFolderId(s)===location.folder);
+        book.active=hit.tk.active=first?.id||null;if(first)state=first;
+      }
       book.view = ['sheet','summary','scope','scopes','timeline','load','wage'].includes(location.view) ? location.view : 'summary';
       showView(); renderProjects(); save(); return true;
     },
@@ -12217,6 +12310,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       const recordId = draft && (draft.__rowId || draft.id);
       const before = recordId ? findRecord(book, recordId) : null;
       if (fresh) {
+        detailOverrides.clear();
         personal = new Map([['["theme"]',themeName()],['["dark"]',themeName() !== 'light'],['["zoom"]',book.zoom || 1]]);
         closeEditor();
       }

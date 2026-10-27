@@ -1,0 +1,22 @@
+#takeoff-folders{display:flex;align-items:center;gap:12px;padding:8px 12px;background:var(--card);border-bottom:1px solid var(--rule);min-width:0}
+#takeoff-folders[hidden]{display:none}
+.takeoff-folder-tabs{display:flex;gap:6px;overflow-x:auto;min-width:0;flex:1;padding:2px}
+.takeoff-folder-tab{display:flex;align-items:center;gap:8px;flex-shrink:0;max-width:260px;border:1px solid var(--rule);border-radius:5px;padding:8px 12px;color:var(--ink);background:var(--card);font:600 12px var(--f-sans);cursor:pointer;overflow-wrap:anywhere;text-align:left}
+.takeoff-folder-tab[aria-pressed=true]{border-color:var(--amber);background:var(--calc)}
+.takeoff-folder-count{font-size:11px;color:var(--muted);font-weight:400}
+.takeoff-folder-actions{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.takeoff-folder-move{display:flex;align-items:center;gap:6px;font:12px var(--f-sans);color:var(--muted)}
+.takeoff-folder-move select{max-width:180px;padding:6px;border:1px solid var(--rule);border-radius:4px;background:var(--card);color:var(--ink)}
+#takeoff-folder-dialog{width:min(420px,calc(100vw - 32px));box-sizing:border-box;border:1px solid var(--rule);border-radius:8px;padding:24px;background:var(--card);color:var(--ink)}
+#takeoff-folder-dialog::backdrop{background:#0008}
+#takeoff-folder-dialog h2{margin:0 0 20px;font:600 20px var(--f-sans)}
+#takeoff-folder-dialog label{display:grid;gap:8px;font:13px var(--f-sans)}
+#takeoff-folder-dialog input{width:100%;box-sizing:border-box;padding:10px;background:var(--card);color:var(--ink);border:1px solid var(--rule);border-radius:4px}
+.folder-dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:24px}
+#takeoff-folders :focus-visible,#takeoff-folder-dialog :focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+#emptyTakeoffFolder{padding:32px;text-align:center}
+#emptyTakeoffFolder p{color:var(--muted)}
+#sumTable .s-folder td{background:var(--calc);border-top:2px solid var(--rule);font-weight:600}
+.summary-folder-link{border:0;background:none;color:var(--ink);font:inherit;cursor:pointer;text-align:left;overflow-wrap:anywhere}
+@media(max-width:760px){#takeoff-folders{align-items:stretch;flex-direction:column;gap:6px}.takeoff-folder-tabs{flex:auto}.takeoff-folder-actions{gap:8px}.takeoff-folder-move{margin-left:auto}.takeoff-folder-move select{max-width:140px}}
+@media print{#takeoff-folders,#emptyTakeoffFolder{display:none!important}}
