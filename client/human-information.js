@@ -17,7 +17,6 @@ export function setupHumanInformation(api){
     if(hidden){for(const el of document.body.children)if(el!==page&&el.id!=='server-bar'&&!el.inert){el.inert=true;hiddenContent.push(el);}}
     else{for(const el of hiddenContent)el.inert=false;hiddenContent.length=0;}
   }
-  new ResizeObserver(()=>page.style.setProperty('--human-info-top',document.getElementById('server-bar').getBoundingClientRect().bottom+'px')).observe(document.getElementById('server-bar'));
   const current=()=>library.items.find(item=>item.id===selected);
   function discard(){if(!dirty)return true;if(!confirm('Discard your unsaved Human Information changes?'))return false;library=structuredClone(saved);dirty=false;return true;}
   function descendants(id){const ids=new Set([id]);let changed=true;while(changed){changed=false;for(const item of library.items)if(ids.has(item.parent)&&!ids.has(item.id)){ids.add(item.id);changed=true;}}return ids;}

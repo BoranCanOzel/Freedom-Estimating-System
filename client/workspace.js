@@ -219,12 +219,27 @@ export function setupWorkspace() {
   const closeMenus = (except = null) => document.querySelectorAll('.workspace-menu[open]').forEach(menu => { if (menu !== except) menu.open = false; });
   function fit(menu) {
     const content = menu.querySelector('.workspace-menu-content'); if (!content) return;
+    if(document.body.classList.contains('workspace-sidebar')){
+      const zoom=parseFloat(getComputedStyle(document.body).zoom)||1;
+      const bounds=menu.querySelector('summary').getBoundingClientRect();
+      const sidebar=document.getElementById('server-bar').getBoundingClientRect();
+      content.style.maxHeight=(innerHeight-24)/zoom+'px';
+      content.style.maxWidth=Math.max(120,innerWidth-sidebar.right-20)/zoom+'px';
+      const rect=content.getBoundingClientRect();
+      const inSidebar=!!menu.closest('#server-bar');
+      content.style.left=Math.max(8,Math.min(inSidebar?sidebar.right+8:bounds.left,innerWidth-rect.width-8))/zoom+'px';
+      content.style.top=Math.max(8,Math.min(inSidebar?bounds.top:bounds.bottom+8,innerHeight-rect.height-12))/zoom+'px';
+      return;
+    }
     content.style.left = '0px';
     const rect = content.getBoundingClientRect(), zoom = parseFloat(getComputedStyle(document.body).zoom) || 1;
     if (rect.right > innerWidth - 12) content.style.left = (innerWidth - 12 - rect.right) / zoom + 'px';
   }
   for (const menu of document.querySelectorAll('.workspace-menu')) {
     const summary = menu.querySelector('summary');
+    // Zoom and changing menu contents can settle after the opening event.
+    const content=menu.querySelector('.workspace-menu-content');
+    if(content)new ResizeObserver(()=>{if(menu.open)fit(menu);}).observe(content);
     menu.addEventListener('toggle', () => {
       summary.setAttribute('aria-expanded', String(menu.open));
       if (menu.open) { closeMenus(menu); fit(menu); }
@@ -242,6 +257,7 @@ export function setupWorkspace() {
   document.addEventListener('pointerdown', event => { if (!event.target.closest('.workspace-menu')) closeMenus(); });
   document.addEventListener('focusin', event => { if (!event.target.closest('.workspace-menu')) closeMenus(); });
   window.addEventListener('resize', () => document.querySelectorAll('.workspace-menu[open]').forEach(fit));
+  document.getElementById('server-bar').addEventListener('scroll',()=>document.querySelectorAll('.workspace-menu[open]').forEach(fit));
   $('workspace-file').addEventListener('click', event => { if (event.target.closest('button')) closeMenus(); });
   $('workspace-print').onclick = () => { closeMenus(); bridge.print(false); };
   $('workspace-print-all').onclick = () => { closeMenus(); bridge.print(true); };
@@ -251,6 +267,7 @@ export function setupWorkspace() {
     button.onclick = () => { bridge.setTheme(button.dataset.theme); rememberAppearance(); sync(); };
   });
   $('zoomPick').addEventListener('change', rememberAppearance);
+  $('zoomPick').addEventListener('change',()=>requestAnimationFrame(()=>document.querySelectorAll('.workspace-menu[open]').forEach(fit)));
   $('workspace-flat-add').addEventListener('change', event => { bridge.setFlatAddEnabled(event.target.checked); sync(); });
   function sync() {
     const ready = document.body.classList.contains('server-active'), view = bridge.getLocation().view || 'sheet';

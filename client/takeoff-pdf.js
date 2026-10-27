@@ -53,7 +53,8 @@ export function buildTakeoffPdf(report,{fonts,date=new Date(),includeDetails=tru
     const rows=folder.sheets.map(sh=>[`${report.sheets.indexOf(sh)+1}. ${sh.title||'Untitled scope'}`,money(sh.totals.sub),money(sh.totals.feeSum),money(sh.totals.grand),Number(sh.roundTotal)?money(sh.totals.grandRounded):'—']);
     if(folders.length&&(folder.id||rows.length)){
       const total=key=>money(folder.sheets.reduce((value,sh)=>value+(Number(sh.totals[key])||0),0));
-      rows.unshift([folder.name,total('sub'),total('feeSum'),total('grand'),''].map(content=>({content,styles:{fontStyle:'bold',fillColor:[225,232,237]}})));
+      rows.unshift([{content:folder.name,colSpan:5,styles:{fontStyle:'bold',fillColor:[225,232,237]}}]);
+      rows.push([(folder.id?'Folder total — ':'')+folder.name,total('sub'),total('feeSum'),total('grand'),''].map(content=>({content,styles:{fontStyle:'bold',fillColor:[225,232,237]}})));
     }
     return rows;
   });

@@ -151,7 +151,6 @@ Include the Authorization header on every API request. Configure the Bearer key 
     if(hidden){for(const el of document.body.children)if(el!==page&&el.id!=='server-bar'&&!el.inert){el.inert=true;hiddenContent.push(el);}}
     else{for(const el of hiddenContent)el.inert=false;hiddenContent.length=0;}
   }
-  new ResizeObserver(()=>page.style.setProperty('--ai-info-top',document.getElementById('server-bar').getBoundingClientRect().bottom+'px')).observe(document.getElementById('server-bar'));
   const item=()=>library.items.find(i=>i.id===selected);
   const message=text=>$('status').textContent=text;
   const discard=()=>{if(!dirty)return true;if(!confirm('Discard your unsaved AI Information changes?'))return false;library=structuredClone(savedLibrary);dirty=false;return true;};

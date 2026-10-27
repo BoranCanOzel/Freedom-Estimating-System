@@ -854,6 +854,11 @@
     font-family:var(--f-sans);font-size:12px;font-weight:600;
     box-shadow:0 12px 26px -12px rgba(0,0,0,.7);
   }
+  #sheetDropLine{
+    position:fixed;z-index:180;height:3px;border-radius:2px;pointer-events:none;
+    background:var(--amber);box-shadow:0 0 5px var(--amber),0 0 12px var(--amber);
+    transform:translateY(-50%);
+  }
   #sheetTable tr.drop-preview{opacity:.65;pointer-events:none}
   #sheetTable tr.drop-preview td{box-shadow:inset 0 1px 0 var(--amber),inset 0 -1px 0 var(--amber)}
   #sheetTable tr.drag-source{display:none!important}
@@ -2750,7 +2755,7 @@
     thead{display:table-header-group}
     body,.money,.cell-in,.name-in{font-size:10px}
     .item-note{font-size:9px}
-    .rail,.bar,.lib,.lib-tab,.ed,.tab-palette,.confirm-pop,.lib-ghost{display:none!important}
+    .rail,.bar,.lib,.lib-tab,.ed,.tab-palette,.confirm-pop,.lib-ghost,#sheetDropLine{display:none!important}
     .sheet,.card{display:block;height:auto;min-height:0}
     .h-adds,.sec-add,.col-resizer,.fee-x,.note-btn,.del,.grip,.caret{display:none!important}
     .card{border:0;box-shadow:none}
@@ -3038,6 +3043,7 @@
 </aside>
 
 <div id="libGhost" class="lib-ghost" hidden></div>
+<div id="sheetDropLine" aria-hidden="true" hidden></div>
 <div id="tabPalette" class="tab-palette" hidden></div>
 <div id="printAll" aria-hidden="true"></div>
 
@@ -4495,38 +4501,49 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     if (e.key === 'Escape') document.getElementById('tabPalette').hidden = true;
   });
 
-  const lastCenter = el => { const r = el.getBoundingClientRect(); return r.left + r.width / 2; };
-
   function armTabDrag(e, sh, el){
     // Touch gestures scroll the tab strip; a tap selects through the click handler.
     if (e.pointerType === 'touch') return;
     if (e.button > 0) return;
     el = el.closest('.option-tab') || el;
-    const startX = e.clientX;
-    let started = false, dropFolder = null;
+    const startX = e.clientX, startY=e.clientY, takeoffId=book.activeTakeoff;
+    let started = false, dropFolder = null, dropTakeoffFolder=null, ghost=null;
+    const clearTargets=()=>document.querySelectorAll('.takeoff-folder-tab.page-drop-target').forEach(tab=>tab.classList.remove('page-drop-target'));
+    const overRail=event=>{
+      const bounds=document.getElementById('rail').getBoundingClientRect();
+      return event.clientX>=bounds.left&&event.clientX<=bounds.right&&event.clientY>=bounds.top&&event.clientY<=bounds.bottom;
+    };
 
     const move = ev => {
       if (!started){
-        if (Math.abs(ev.clientX - startX) < 5) return;
+        if (Math.hypot(ev.clientX - startX,ev.clientY-startY) < 5) return;
         started = true;
         el.classList.add('tab-dragging');
         document.body.style.userSelect = 'none';
+        ghost=document.createElement('div');ghost.className='page-drag-ghost';ghost.setAttribute('aria-hidden','true');
+        ghost.textContent=sh.num+' - '+(sh.title||'Untitled page');document.body.append(ghost);
       }
       ev.preventDefault();
+      const zoom=Number.parseFloat(getComputedStyle(document.body).zoom)||1;
+      ghost.style.left=(ev.clientX+12)/zoom+'px';ghost.style.top=(ev.clientY+12)/zoom+'px';
+      clearTargets();clearFolderMarks();dropFolder=null;dropTakeoffFolder=null;
+      const target=document.elementFromPoint(ev.clientX,ev.clientY)?.closest('.takeoff-folder-tab');
+      if(target){
+        if(target.dataset.takeoffFolder!==pageFolderId(sh)){
+          dropTakeoffFolder=target.dataset.takeoffFolder;target.classList.add('page-drop-target');
+        }
+        return;
+      }
 
       // over the library? the drop turns this option into a scope template
       const overLib = overPanel('library', ev.clientX, ev.clientY);
-      clearFolderMarks();
-      dropFolder = null;
       if (overLib){
         const fh = folderHeadAt(ev.clientX, ev.clientY);
         if (fh){ fh.classList.add('folder-drop'); dropFolder = fh.dataset.folder || ''; }
         else dropFolder = '';
-        el.classList.add('to-library');
-        el.style.transform = 'translate(' + (ev.clientX - lastCenter(el)) + 'px,-7px)';
         return;
       }
-      el.classList.remove('to-library');
+      if(!overRail(ev))return;
 
       const tabs = Array.from(document.querySelectorAll('#rail .tab[data-sheet]')).map(t => t.closest('.option-tab') || t);
       for (const t of tabs){
@@ -4540,19 +4557,26 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
           t.parentNode.insertBefore(el, t.nextSibling);
         }
       }
-      // lift it out of the rail and keep it under the cursor
-      el.style.transform = 'none';
-      const r = el.getBoundingClientRect();
-      el.style.transform = 'translate(' + (ev.clientX - (r.left + r.width / 2)) + 'px,-7px)';
     };
 
-    const up = () => {
+    const cleanup = () => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', cancel);
+      window.removeEventListener('blur', cancel);
+      document.removeEventListener('keydown', keydown);
+      document.removeEventListener('estimator:before-receive', cancel);
+      document.removeEventListener('estimator:view', cancel);
       document.body.style.userSelect = '';
-      el.style.transform = '';
-      el.classList.remove('tab-dragging','to-library');
-      clearFolderMarks();
+      el.classList.remove('tab-dragging');
+      ghost?.remove();clearFolderMarks();clearTargets();
+    };
+    const cancel=()=>{cleanup();if(started)renderTabs();};
+    const keydown=event=>{if(event.key==='Escape'){event.preventDefault();cancel();}};
+    const up = ev => {
+      if(started)move(ev);
+      cleanup();
+      if(book.activeTakeoff!==takeoffId||!book.sheets.some(page=>page.id===sh.id)){renderTabs();return;}
 
       if (!started){
         book.view = 'sheet';
@@ -4563,6 +4587,10 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         return;
       }
 
+      if(dropTakeoffFolder!==null){
+        window.estimator.movePageToFolder(sh.id,dropTakeoffFolder);
+        flash('page moved');return;
+      }
       if (dropFolder !== null){
         templates().scopes.push({
           id:id(),
@@ -4579,6 +4607,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         flash('saved as a scope template');
         return;
       }
+      if(!overRail(ev)){renderTabs();return;}
 
       const order = Array.from(document.querySelectorAll('#rail .tab'))
         .map(t => t.dataset.sheet).filter(Boolean);
@@ -4592,6 +4621,11 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', cancel);
+    window.addEventListener('blur', cancel);
+    document.addEventListener('keydown', keydown);
+    document.addEventListener('estimator:before-receive', cancel);
+    document.addEventListener('estimator:view', cancel);
   }
 
   function scopeColorBtn(sh){
@@ -6027,7 +6061,9 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     const rows = takeoffFolderGroups().map(folder=>{
       const totals=folder.sheets.map(sheetTotals);
       const sum=key=>totals.reduce((value,t)=>value+t[key],0);
-      const header=grouped&&(folder.id||folder.sheets.length)?'<tr class="s-folder" data-summary-folder="'+esc(folder.id)+'"><td></td><td><button type="button" class="summary-folder-link" data-folder="'+esc(folder.id)+'">'+esc(folder.name)+'</button><span class="s-sub">'+folder.sheets.length+' pages</span></td><td>'+moneyHTML(sum('sub'))+'</td><td>'+moneyHTML(sum('feeSum'))+'</td><td>'+moneyHTML(sum('grand'))+'</td><td></td></tr>':'';
+      const showFolder=grouped&&(folder.id||folder.sheets.length);
+      const header=showFolder?'<tr class="s-folder" data-summary-folder="'+esc(folder.id)+'"><td></td><td colspan="5"><button type="button" class="summary-folder-link" data-folder="'+esc(folder.id)+'">'+esc(folder.name)+'</button><span class="s-sub">'+folder.sheets.length+' page'+(folder.sheets.length===1?'':'s')+'</span></td></tr>':'';
+      const footer=showFolder?'<tr class="s-folder-total" data-folder-total="'+esc(folder.id)+'"><td></td><th scope="row"><span class="folder-total-label">'+(folder.id?'Folder total':'Unfiled total')+'</span><span class="s-sub">'+esc(folder.name)+'</span></th><td>'+moneyHTML(sum('sub'))+'</td><td>'+moneyHTML(sum('feeSum'))+'</td><td class="s-grand">'+moneyHTML(sum('grand'))+(folder.sheets.some(sh=>num(sh.roundTotal))?roundedTotalHTML(sum('grandRounded')):'')+'</td><td></td></tr>':'';
       return header+folder.sheets.map(sh => {
       const s = sheetTotals(sh);
       tot.sub += s.sub; tot.fee += s.feeSum; tot.grand += s.grand; tot.rounded += s.grandRounded;
@@ -6095,7 +6131,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         }).join('');
       }
       return block;
-      }).join('');
+      }).join('')+footer;
     }).join('');
 
     t.innerHTML =
@@ -6435,6 +6471,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   let sheetDropPreview = null;
 
   function clearSheetDropPreview(restore = true){
+    document.getElementById('sheetDropLine').hidden = true;
     if (!sheetDropPreview) return;
     const preview = sheetDropPreview;
     sheetDropPreview = null;
@@ -6442,6 +6479,30 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     preview.rows.forEach(row => refs.delete(row.id));
     preview.sources.forEach(el => el.classList.remove('drag-source'));
     if (restore){ renumber(); applyCollapse(); recalc(false); }
+  }
+
+  // Library drops mark a boundary without inserting rows or changing table geometry.
+  function showSheetDropLine(beforeId){
+    const line = document.getElementById('sheetDropLine');
+    const bounds = scroller.getBoundingClientRect();
+    const before = beforeId == null ? null : refs.get(beforeId)?.tr;
+    const at = beforeId == null ? state.rows.length : state.rows.findIndex(row => row.id === beforeId);
+    if (at < 0){ line.hidden = true; return; }
+    const previous = state.rows.slice(0, at).map(row => refs.get(row.id)?.tr).filter(tr => tr && tr.offsetParent !== null);
+    const headBottom = Math.max(...[...document.querySelectorAll('#sheetTable thead th')].map(th => th.getBoundingClientRect().bottom));
+    const footTop = document.querySelector('#sheetTable tfoot td').getBoundingClientRect().top;
+    const y = before?.offsetParent != null ? before.getBoundingClientRect().top
+      : previous.length ? previous.at(-1).getBoundingClientRect().bottom : headBottom;
+    const table = document.getElementById('sheetTable').getBoundingClientRect();
+    const left = Math.max(bounds.left + 2, table.left, 0), right = Math.min(bounds.right - 2, table.right, innerWidth);
+    const top = Math.max(bounds.top, headBottom, 0), bottom = Math.min(bounds.bottom, footTop, innerHeight);
+    if (right <= left || bottom < top){ line.hidden = true; return; }
+    const zoom = parseFloat(getComputedStyle(document.body).zoom) || 1;
+    line.style.left = left / zoom + 'px';
+    line.style.width = (right - left) / zoom + 'px';
+    line.style.top = Math.max(top, Math.min(y, bottom)) / zoom + 'px';
+    line.dataset.beforeId = beforeId || '';
+    line.hidden = false;
   }
 
   function sheetDropTarget(x, y, sourceIds = new Set()){
@@ -7422,6 +7483,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       ghost.style.top  = (ev.clientY + 14) + 'px';
       tplDrag.x = ev.clientX; tplDrag.y = ev.clientY;
       markDrop(ev.clientX, ev.clientY);
+      ghost.hidden = tplDrag.mode === 'rows' && tplDrag.valid;
       ghost.classList.toggle('no', !tplDrag.valid);
       ghost.textContent = tplDrag.label
         || (t.name || 'Untitled') + (kind === 'section' ? ' (section)' : '');
@@ -7429,6 +7491,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
     const up = ev => {
       if (ev?.type === 'pointercancel') cancelled = true;
+      if (started && !cancelled && ev?.clientX != null) markDrop(ev.clientX, ev.clientY);
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', up);
@@ -7585,8 +7648,15 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     }
     tplDrag.beforeId = target.beforeId;
     tplDrag.label = 'Release to place here';
-    showSheetDropPreview(tplDrag.rows, target.beforeId);
+    showSheetDropLine(target.beforeId);
   }
+
+  document.addEventListener('scroll', () => {
+    if (tplDrag?.mode === 'rows') markDrop(tplDrag.x, tplDrag.y);
+  }, true);
+  window.addEventListener('resize', () => {
+    if (tplDrag?.mode === 'rows') markDrop(tplDrag.x, tplDrag.y);
+  });
 
   function lineFromTemplate(t){
     return {kind:t.kind || 'labor', name:t.name || '', note:t.note || '',
@@ -12098,6 +12168,12 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       return {active:tk.activeFolder||'',sheet:book.view==='sheet'?book.active:null,groups:takeoffFolderGroups().map(f=>({id:f.id,name:f.name,count:f.sheets.length}))};
     },
     openTakeoffFolder,
+    reorderTakeoffFolders(order){
+      const tk=findTakeoff(book.activeTakeoff)?.tk,folders=tk?.folders||[];
+      if(!Array.isArray(order)||order.length!==folders.length||new Set(order).size!==order.length||order.some(id=>!folders.some(folder=>folder.id===id)))return;
+      if(order.every((id,index)=>folders[index].id===id))return;
+      tk.folders=order.map(id=>folders.find(folder=>folder.id===id));showView();save();
+    },
     saveTakeoffFolder(folderId,name){
       const tk=findTakeoff(book.activeTakeoff)?.tk;name=String(name).trim().slice(0,200);if(!tk||!name)return;
       if(folderId){const f=tk.folders?.find(f=>f.id===folderId);if(!f)return;f.name=name;showView();save();}
@@ -12105,16 +12181,17 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     },
     deleteTakeoffFolder(folderId,anchor){
       const tk=findTakeoff(book.activeTakeoff)?.tk,folder=tk?.folders?.find(f=>f.id===folderId);if(!folder)return;
-      confirmPop(anchor,'Delete "'+folder.name+'"? Its pages will move to Unfiled.',()=>{
+      confirmPop(anchor,'Are you sure you want to delete "'+folder.name+'"? Its pages will move to Unfiled.',()=>{
         const current=findTakeoff(tk.id)?.tk;if(!current?.folders?.some(f=>f.id===folderId))return;
         current.folders=current.folders.filter(f=>f.id!==folderId);
         for(const sh of current.sheets)if(sh.folderId===folderId)delete sh.folderId;
-        if(book.activeTakeoff===current.id)openTakeoffFolder('');else save();
+        if(book.activeTakeoff===current.id&&current.activeFolder===folderId)openTakeoffFolder('');else{showView();save();}
       },'Delete folder');
     },
     movePageToFolder(sheetId,folderId){
       const sh=book.sheets.find(sh=>sh.id===sheetId);if(!sh||!takeoffFolderGroups().some(f=>f.id===folderId))return;
       if(folderId)sh.folderId=folderId;else delete sh.folderId;
+      book.active=sh.id;
       openTakeoffFolder(folderId);
     },
     aiDataEnabled(){ return findTakeoff(book.activeTakeoff)?.tk.aiData === true; },

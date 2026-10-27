@@ -1,8 +1,16 @@
 #takeoff-folders{display:flex;align-items:center;gap:12px;padding:8px 12px;background:var(--card);border-bottom:1px solid var(--rule);min-width:0}
 #takeoff-folders[hidden]{display:none}
 .takeoff-folder-tabs{display:flex;gap:6px;overflow-x:auto;min-width:0;flex:1;padding:2px}
+.takeoff-folder-group{display:flex;flex:none;min-width:0}
+.takeoff-folder-group:has(.takeoff-folder-close) .takeoff-folder-tab{border-radius:5px 0 0 5px}
+.takeoff-folder-close{border:1px solid var(--rule);border-left:0;border-radius:0 5px 5px 0;background:var(--card);color:var(--muted);min-width:28px;padding:3px;font:18px var(--f-sans);cursor:pointer}
+.takeoff-folder-close:hover{background:var(--calc);color:#c65a4f}
+.takeoff-folder-group.folder-dragging{opacity:.45}
 .takeoff-folder-tab{display:flex;align-items:center;gap:8px;flex-shrink:0;max-width:260px;border:1px solid var(--rule);border-radius:5px;padding:8px 12px;color:var(--ink);background:var(--card);font:600 12px var(--f-sans);cursor:pointer;overflow-wrap:anywhere;text-align:left}
 .takeoff-folder-tab[aria-pressed=true]{border-color:var(--amber);background:var(--calc)}
+.takeoff-folder-tab.page-drop-target{outline:2px solid var(--amber);outline-offset:-2px;background:var(--calc);box-shadow:0 0 0 2px var(--amber)}
+.page-drag-ghost{position:fixed;z-index:2500;pointer-events:none;max-width:300px;padding:9px 14px;border:1px solid var(--amber);border-radius:5px;background:var(--card);color:var(--ink);box-shadow:0 6px 18px #0005;font:600 12px var(--f-sans);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#rail .option-tab.tab-dragging{opacity:.45}
 .takeoff-folder-count{font-size:11px;color:var(--muted);font-weight:400}
 .takeoff-folder-actions{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
 .takeoff-folder-move{display:flex;align-items:center;gap:6px;font:12px var(--f-sans);color:var(--muted)}
@@ -17,6 +25,10 @@
 #emptyTakeoffFolder{padding:32px;text-align:center}
 #emptyTakeoffFolder p{color:var(--muted)}
 #sumTable .s-folder td{background:var(--calc);border-top:2px solid var(--rule);font-weight:600}
+#sumTable .s-folder-total>td,#sumTable .s-folder-total>th{background:var(--calc);border-top:1px solid var(--rule);border-bottom:2px solid var(--rule);font-weight:600}
+#sumTable .s-folder-total>th{text-align:left;padding:10px 12px;position:static;color:var(--ink);font-family:var(--f-sans)}
+.folder-total-label{font-size:12px;font-weight:700}
+#sumTable .s-folder-total .s-sub{font-weight:400}
 .summary-folder-link{border:0;background:none;color:var(--ink);font:inherit;cursor:pointer;text-align:left;overflow-wrap:anywhere}
 @media(max-width:760px){#takeoff-folders{align-items:stretch;flex-direction:column;gap:6px}.takeoff-folder-tabs{flex:auto}.takeoff-folder-actions{gap:8px}.takeoff-folder-move{margin-left:auto}.takeoff-folder-move select{max-width:140px}}
 @media print{#takeoff-folders,#emptyTakeoffFolder{display:none!important}}
