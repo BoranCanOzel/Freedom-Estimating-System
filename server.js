@@ -86,8 +86,16 @@ export function createApp(options = {}) {
   const publicProject = row => {
     const { state, ...metadata } = row;
     const room = rooms.get(row.id), book = room?.clients.size ? roomBook(room) : null;
-    return { ...metadata, online: [...(rooms.get(row.id)?.clients || [])].map(ws => ws.name),
-      locations: [...(room?.clients || [])].map(ws => ({name:ws.name,...(book && resolveLocation(book,ws.presence || {}) || {})})) };
+    // A browser tab has its own websocket, but the project browser lists people.
+    // Keep the most recently active tab's location for each signed-in name.
+    const clients = [...(room?.clients || [])].sort((a,b)=>(b.lastPresence||0)-(a.lastPresence||0));
+    const names = new Set(), locations = [];
+    for (const ws of clients) {
+      if (names.has(ws.name)) continue;
+      names.add(ws.name);
+      locations.push({name:ws.name,...(book && resolveLocation(book,ws.presence || {}) || {})});
+    }
+    return { ...metadata, online: locations.map(visitor => visitor.name), locations };
   };
   function project(id) {
     return validId(id) && db.prepare('SELECT * FROM projects WHERE id=?').get(id);

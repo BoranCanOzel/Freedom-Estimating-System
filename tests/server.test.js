@@ -120,6 +120,33 @@ test('recent project views are per user, resolve current names, and survive rest
   } finally {for(const ws of sockets)ws.terminate();await app.close();await rm(dataDir,{recursive:true,force:true});}
 });
 
+test('project browser lists one online entry per user and keeps their latest tab location',async()=>{
+  const dataDir=await mkdtemp(join(tmpdir(),'freedom-online-users-'));
+  const app=createApp({dataDir,users:{},production:false});
+  app.server.listen(0,'127.0.0.1');await once(app.server,'listening');
+  const base='http://127.0.0.1:'+app.server.address().port,sockets=[];
+  const login=async name=>(await fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,password:'1313'})})).headers.get('set-cookie').split(';')[0];
+  const connect=async(cookie,id)=>{const ws=new WebSocket(base.replace('http','ws')+'/live/'+id,{headers:{cookie}});sockets.push(ws);await once(ws,'open');return ws;};
+  try{
+    const alice=await login('Alice'),bob=await login('Bob');
+    const book={lists:[{id:'l',name:'Jobs',companies:[{id:'c',name:'Customer',projects:[{id:'p',name:'Project',takeoffs:[{id:'t',name:'Takeoff',sheets:[{id:'s1',num:1,rows:[]},{id:'s2',num:2,rows:[]}]}]}]}]}]};
+    const response=await fetch(base+'/api/projects',{method:'POST',headers:{cookie:alice,'Content-Type':'application/json'},body:JSON.stringify({name:'Online users workbook',book})});
+    const project=await response.json();
+    const aliceOne=await connect(alice,project.id),aliceTwo=await connect(alice,project.id),bobOne=await connect(bob,project.id),bobTwo=await connect(bob,project.id);
+    const sendPresence=(ws,sheet)=>ws.send(JSON.stringify({type:'presence',presence:{list:'l',takeoff:'t',sheet,view:'sheet'}}));
+    sendPresence(aliceOne,'s1');sendPresence(bobOne,'s1');await delay(50);sendPresence(aliceTwo,'s2');sendPresence(bobTwo,'s2');
+    let listed;
+    for(let i=0;i<100;i++){
+      listed=(await (await fetch(base+'/api/projects',{headers:{cookie:alice}})).json())[0];
+      if(listed.locations.length===2&&listed.locations.some(visitor=>visitor.name==='Alice'&&visitor.tab==='Tab 2'))break;
+      await delay(20);
+    }
+    assert.deepEqual(listed.locations.map(visitor=>visitor.name).sort(),['Alice','Bob']);
+    assert.deepEqual(listed.online.sort(),['Alice','Bob']);
+    assert.equal(listed.locations.find(visitor=>visitor.name==='Alice').tab,'Tab 2');
+  }finally{for(const ws of sockets)ws.terminate();await app.close();await rm(dataDir,{recursive:true,force:true});}
+});
+
 test('startup returns only the signed-in user’s last workspace and personal display settings',async()=>{
   const dataDir=await mkdtemp(join(tmpdir(),'freedom-startup-')),app=createApp({dataDir,production:false});
   app.server.listen(0,'127.0.0.1');await once(app.server,'listening');
