@@ -58,7 +58,7 @@ test('takeoff folders organize pages, persist and roll up prices without changin
   await expect(page.locator('#rail [data-sheet]')).toHaveCount(3);
   await page.locator('#rail .tab-summary').click();
   await expect(page.locator('#sumTable .s-folder')).toContainText('Building A');
-  await expect(page.locator('#sumTable .s-folder-total')).toContainText('Folder total');
+  await expect(page.locator('#sumTable .s-folder-total')).toContainText('Subtotal');
   await expect(page.locator('#sumTable .s-folder-total')).toContainText('257.50');
   await expect(page.locator('#sumTable tfoot')).toContainText('257.50');
   await page.locator('#rail .tab-scope').click();
@@ -104,7 +104,7 @@ test('takeoff folders isolate page ordering, deletion and takeoff selection',asy
   tk.sheets=[{...sheet('sn','First A'),folderId:'a'},{...sheet('b1','First B'),folderId:'b'},{...sheet('a2','Second A'),folderId:'a'}];
   await openWorkbook(page,data);
   await page.locator('#rail .tab-summary').click();
-  await expect(page.locator('[data-folder-total="a"] th')).toContainText('Folder total');
+  await expect(page.locator('[data-folder-total="a"] th')).toContainText('Subtotal');
   await expect(page.locator('[data-folder-total="a"] .money .v')).toHaveText(['250.00','7.50','257.50']);
   await expect(page.locator('[data-folder-total="b"] .money .v')).toHaveText(['125.00','3.75','128.75']);
   await expect(page.locator('#sumTable tfoot .money .v')).toHaveText(['375.00','11.25','386.25']);

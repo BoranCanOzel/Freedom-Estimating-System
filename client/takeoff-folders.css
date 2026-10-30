@@ -30,15 +30,17 @@
 .folder-total-label{font-size:12px;font-weight:700}
 #sumTable .s-folder-total .s-sub{font-weight:400}
 .summary-folder-link{border:0;background:none;color:var(--ink);font:inherit;cursor:pointer;text-align:left;overflow-wrap:anywhere}
-#sumTable tbody.summary-folder-group + tbody.summary-folder-group .s-folder td{border-top:10px solid var(--paper)}
 #sumTable tbody.summary-folder-group .s-folder td{background:color-mix(in srgb,var(--amber) 14%,var(--calc));border-top:1px solid var(--amber)}
 #sumTable tbody.summary-folder-group .s-folder-marker{color:var(--amber);font-size:17px}
 #sumTable tbody.summary-folder-group .summary-folder-link{font-size:14px;font-weight:700}
+#sumTable tbody.summary-folder-group .summary-folder-toggle{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;margin-right:5px;padding:2px;border:0;border-radius:4px;background:transparent;color:var(--ink);vertical-align:middle;cursor:pointer}
+#sumTable tbody.summary-folder-group .summary-folder-toggle:hover{background:var(--card)}
+#sumTable tbody.summary-folder-group .summary-folder-toggle[aria-expanded=false] svg{transform:rotate(-90deg)}
+#sumTable tbody.summary-folder-group[data-collapsed=true]>tr:not(.s-folder):not(.s-folder-total){display:none}
 #sumTable .s-folder-count{display:inline-block;margin-left:10px;padding:3px 8px;border:1px solid var(--rule);border-radius:999px;color:var(--muted);font:500 10px var(--f-sans);vertical-align:middle}
 #sumTable tbody.summary-folder-group .s-row .s-scope{position:relative;padding-left:38px!important}
 #sumTable tbody.summary-folder-group .s-row .s-scope::before{content:'';position:absolute;left:18px;top:0;bottom:0;border-left:1px solid color-mix(in srgb,var(--amber) 65%,var(--rule))}
 #sumTable tbody.summary-folder-group .s-row .s-scope::after{content:'';position:absolute;left:18px;top:50%;width:12px;border-top:1px solid color-mix(in srgb,var(--amber) 65%,var(--rule))}
 #sumTable tbody.summary-folder-group .s-folder-total>th{padding-left:38px}
-#sumTable tbody.summary-folder-group .s-folder-total .folder-total-label::before{content:'↳';margin-right:7px;color:var(--muted)}
 @media(max-width:760px){#takeoff-folders{align-items:stretch;flex-direction:column;gap:6px}.takeoff-folder-tabs{flex:auto}.takeoff-folder-actions{gap:8px}.takeoff-folder-move{margin-left:auto}.takeoff-folder-move select{max-width:140px}}
 @media print{#takeoff-folders,#emptyTakeoffFolder{display:none!important}}
