@@ -6102,7 +6102,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       const totals=folder.sheets.map(sheetTotals);
       const sum=key=>totals.reduce((value,t)=>value+t[key],0);
       const showFolder=grouped&&(folder.id||folder.sheets.length);
-      const header=showFolder?'<tr class="s-folder" data-summary-folder="'+esc(folder.id)+'"><td></td><td colspan="5"><button type="button" class="summary-folder-link" data-folder="'+esc(folder.id)+'">'+esc(folder.name)+'</button><span class="s-sub">'+folder.sheets.length+' page'+(folder.sheets.length===1?'':'s')+'</span></td></tr>':'';
+      const header=showFolder?'<tr class="s-folder" data-summary-folder="'+esc(folder.id)+'"><td></td><td colspan="5"><button type="button" class="summary-folder-link" data-folder="'+esc(folder.id)+'" aria-label="Open '+esc(folder.name)+' folder, '+folder.sheets.length+' '+(folder.sheets.length===1?'page':'pages')+'" title="Open this folder">'+esc(folder.name)+'</button><span class="s-sub">'+folder.sheets.length+' page'+(folder.sheets.length===1?'':'s')+'</span><span class="s-folder-open">Open folder</span></td></tr>':'';
       const footer=showFolder?'<tr class="s-folder-total" data-folder-total="'+esc(folder.id)+'"><td></td><th scope="row"><span class="folder-total-label">'+(folder.id?'Folder total':'Unfiled total')+'</span><span class="s-sub">'+esc(folder.name)+'</span></th><td>'+moneyHTML(sum('sub'))+'</td><td>'+moneyHTML(sum('feeSum'))+'</td><td class="s-grand">'+moneyHTML(sum('grand'))+(folder.sheets.some(sh=>num(sh.roundTotal))?roundedTotalHTML(sum('grandRounded')):'')+'</td><td></td></tr>':'';
       return header+folder.sheets.map(sh => {
       const s = sheetTotals(sh);

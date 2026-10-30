@@ -336,6 +336,14 @@ export function createApp(options = {}) {
         try {
           const msg = JSON.parse(bytes.toString());
           if (msg.type === 'duel') { duels.handle(ws, msg, room.clients); return; }
+          if (msg.type === 'close-other-sessions') {
+            let closed=0;
+            for (const activeRoom of rooms.values()) for (const client of [...activeRoom.clients]) {
+              if (client !== ws && client.name === ws.name && client.readyState === WebSocket.OPEN) { closed++;client.close(4005,'Closed from another session'); }
+            }
+            send(ws,{type:'sessions-closed',count:closed});
+            return;
+          }
           if (msg.type === 'presence') {
             if (Date.now() - (ws.lastPresence || 0) < 35) return;
             ws.lastPresence = Date.now();

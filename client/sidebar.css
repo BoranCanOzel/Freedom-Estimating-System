@@ -12,6 +12,8 @@ body.server-mode.workspace-sidebar #workspace-page-actions{display:block;flex:no
 body.server-mode.workspace-sidebar #workspace-history{flex-direction:column;padding-top:8px;border-top:1px solid var(--rule);gap:4px}
 body.server-mode.workspace-sidebar #server-people{display:flex;flex-direction:column;gap:4px;min-width:0;flex:none}
 body.server-mode.workspace-sidebar #server-people .server-person{white-space:normal;text-align:left;overflow-wrap:anywhere;max-width:100%}
+body.server-mode.workspace-sidebar #server-people .server-close-other-sessions{max-width:100%;padding:6px 7px;font:500 10px/1.35 var(--f-sans);text-align:left;white-space:normal;color:var(--muted);border:1px solid var(--rule);background:transparent}
+body.server-mode.workspace-sidebar #server-people .server-close-other-sessions:hover:not(:disabled){color:var(--ink);background:var(--calc)}
 body.server-mode.workspace-sidebar #server-status{flex:none;order:0;margin: auto 0 0;padding:10px 2px 2px;max-width:100%;white-space:normal;text-align:left;font:11px/1.5 var(--f-sans)}
 body.server-mode.workspace-sidebar #server-signout{max-width:100%;font-size:11px}
 body.server-mode.workspace-sidebar .workspace-menu-content{position:fixed;max-height:calc(100dvh - 24px);max-width:calc(100vw - var(--workspace-sidebar-width) - 36px);z-index:620;box-sizing:border-box}
@@ -22,6 +24,8 @@ body.server-mode.workspace-sidebar:not(.workspace-projects-open) .ed.ed-left{lef
 body.server-mode.workspace-sidebar.workspace-projects-open .ed.ed-left{left:calc(var(--workspace-sidebar-width) + var(--workspace-project-width) + 34px);max-width:calc(100vw - var(--workspace-sidebar-width) - var(--workspace-project-width) - 54px)}
 body.server-mode.workspace-sidebar :is(#ai-information-page,#human-information-page){inset:0 0 0 calc(var(--workspace-sidebar-width) + 16px);padding:24px;z-index:605}
 body.server-mode.workspace-sidebar.sidebar-compact #server-bar .sidebar-action{font-size:0!important;gap:0;justify-content:center;padding:8px 0;min-height:36px}
+body.server-mode.workspace-sidebar.sidebar-compact #server-people .server-close-other-sessions{font-size:0;padding:4px;min-height:26px;text-align:center}
+body.server-mode.workspace-sidebar.sidebar-compact #server-people .server-close-other-sessions::before{content:'↻';font:600 15px var(--f-sans)}
 body.server-mode.workspace-sidebar.sidebar-compact .workspace-menu>summary::after{display:none}
 body.server-mode.workspace-sidebar.sidebar-compact #workspace-sidebar-toggle::before{transform:rotate(180deg)}
 body.server-mode.workspace-sidebar.sidebar-compact #server-title{font-size:0;padding:0 0 8px;text-align:center}

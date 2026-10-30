@@ -55,6 +55,17 @@ async function api(path, options = {}) {
   return data;
 }
 function message(text, bad = false) { $('server-message').textContent = text; $('server-message').classList.toggle('error', bad); }
+function showRefreshToContinue() {
+  let dialog=$('session-closed-dialog');
+  if(!dialog){
+    dialog=document.createElement('dialog');dialog.id='session-closed-dialog';
+    dialog.innerHTML='<form method="dialog"><h2>This tab was closed from another session</h2><p>You are still signed in, but this tab has stopped syncing. Refresh to reconnect and load the latest changes.</p><div class="server-dialog-actions"><button type="button" id="session-closed-refresh">Refresh page</button></div></form>';
+    dialog.addEventListener('cancel',event=>event.preventDefault());
+    dialog.querySelector('#session-closed-refresh').onclick=()=>location.reload();
+    document.body.append(dialog);
+  }
+  if(!dialog.open)dialog.showModal();
+}
 function status(text, bad = false) {
   if($('server-status').textContent!==text)$('server-status').textContent = text;
   $('server-status').classList.toggle('error', bad);
@@ -186,6 +197,9 @@ class LiveProject {
           this.sendPresence(); this.paintPeers();
         } else if (msg.type === 'ack') {
           this.acked = Math.max(this.acked, msg.seq); this.paintStatus();
+        } else if (msg.type === 'sessions-closed') {
+          const button=this.ownSessionsButton;if(button){button.disabled=false;button.textContent=msg.count?`Closed ${msg.count} other session${msg.count===1?'':'s'}`:'No other sessions found';
+            setTimeout(()=>{if(!this.closed&&button.isConnected)button.textContent='Close my other sessions';},2500);}
         } else if (msg.type === 'presence') { if(msg.selfId)this.peerId=msg.selfId;this.peers = msg.peers; this.paintPeers(); projectPresence.update(this.peers,this.peerId,user); }
         else if (msg.type === 'duel') tankDuel.receive(msg);
         else if (msg.type === 'error') { this.failed = true; status(msg.error, true); message('Your changes are still in this browser. Export JSON before closing if the error persists.', true); }
@@ -200,6 +214,13 @@ class LiveProject {
         this.doc.destroy();
         if(connection===this){connection=null;current=null;document.body.classList.remove('server-active');$('server-title').textContent='Freedom Estimating';browsing=true;bridge.closeEditor();syncProjectPanel();status('Workbook deleted');refresh().catch(()=>{});message('This workbook was deleted.');}
         return;
+      }
+      if(event.code===4005){
+        this.closed=true;clearTimeout(this.retryTimer);clearTimeout(this.presenceTimer);cancelAnimationFrame(this.peerFrame);
+        this.peerFrame=0;this.synced=false;this.peers=[];this.ownSessionsButton?.remove();
+        for(const nodes of this.peerNodes?.values()||[]){nodes.group.remove();nodes.cursor.remove();nodes.field.remove();}this.peerNodes?.clear();
+        $('server-cursors').replaceChildren();projectPresence.clear();tankDuel.disconnect();
+        status('Other session closed this tab — refresh to continue',true);showRefreshToContinue();return;
       }
       if (event.code === 4001) { status('Session expired — export pending changes and sign in again', true); return; }
       this.paintStatus();
@@ -289,6 +310,18 @@ class LiveProject {
   updatePeers() {
     const peers = this.peerId ? this.peers.filter(peer => peer.id !== this.peerId) : [];
     this.peerNodes ||= new Map();
+    if(!this.ownSessionsButton){
+      const button=element('button','Close my other sessions','server-close-other-sessions');button.type='button';
+      button.title='Keep this tab open. Other tabs signed in as '+user+' will stop syncing and ask to refresh.';
+      button.onclick=()=>{
+        if(this.socket?.readyState!==WebSocket.OPEN)return;
+        button.disabled=true;button.textContent='Closing other sessions…';
+        this.socket.send(JSON.stringify({type:'close-other-sessions'}));
+      };
+      this.ownSessionsButton=button;
+    }
+    this.ownSessionsButton.hidden=this.closed;
+    if(!this.closed)$('server-people').prepend(this.ownSessionsButton);
     if (!peers.length && !this.peerNodes.size) return;
     const here = bridge.getLocation();
     const zoom = Number.parseFloat(getComputedStyle(document.body).zoom) || 1;
