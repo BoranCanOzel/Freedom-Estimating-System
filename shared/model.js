@@ -1,25 +1,36 @@
 import * as Y from 'yjs';
 
+const key = path => JSON.stringify(path);
+
 // Stable item IDs keep an edit attached to its row when another user reorders it.
 // Non-keyed arrays (e.g. lists of flags) are atomic values. Text is a Y.Text;
 // scalar fields use Y.Map's deterministic conflict resolution.
-const key = path => JSON.stringify(path);
-const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const equal = (a, b) => {
+  if (Object.is(a,b)) return true;
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+  return JSON.stringify(a) === JSON.stringify(b);
+};
+const childPath = (path,segment) => path==='[]'?'['+JSON.stringify(segment)+']':path.slice(0,-1)+','+JSON.stringify(segment)+']';
 const safeKey = k => !['__proto__', 'constructor', 'prototype'].includes(k);
 const textFields = new Set(['name', 'title', 'note', 'notes', 'text', 'summaryNotes', 'label', 'description', 'address']);
 
-function flatten(value, path = [], out = new Map()) {
-  const k = key(path);
+function flatten(value, path = '[]', last = null, out = new Map()) {
+  const k = path;
   if (Array.isArray(value)) {
-    const ids = value.map(x => x && typeof x === 'object' && typeof x.id === 'string' ? x.id : null);
-    if (ids.every(Boolean) && new Set(ids).size === ids.length) {
+    const ids = [], seen = new Set();let keyed = true;
+    for (const item of value) {
+      const id=item&&typeof item==='object'&&typeof item.id==='string'?item.id:null;
+      if(!id||seen.has(id)){keyed=false;break;}
+      ids.push(id);seen.add(id);
+    }
+    if (keyed) {
       out.set(k, { kind: 'array', ids });
-      value.forEach(x => flatten(x, [...path, '@' + x.id], out));
+      for(const item of value)flatten(item,childPath(k,'@'+item.id),'@'+item.id,out);
     } else out.set(k, { kind: 'value', value });
   } else if (value && typeof value === 'object') {
     out.set(k, { kind: 'object' });
-    Object.keys(value).filter(safeKey).forEach(p => flatten(value[p], [...path, p], out));
-  } else if (typeof value === 'string' && textFields.has(path.at(-1))) out.set(k, { kind: 'text', value });
+    for(const p of Object.keys(value))if(safeKey(p))flatten(value[p],childPath(path,p),p,out);
+  } else if (typeof value === 'string' && textFields.has(last)) out.set(k, { kind: 'text', value });
   else out.set(k, { kind: 'value', value: value ?? null });
   return out;
 }
@@ -59,13 +70,16 @@ function changeOrder(order, previous, next) {
   });
   const stationary = new Set();
   for (let i = tails.at(-1); i != null && i >= 0; i = parents[i]) stationary.add(sequence[i]);
+  const present = new Set(order.toArray());
   next.forEach((id, i) => {
-    if (stationary.has(id) && order.toArray().includes(id)) return;
+    if (stationary.has(id) && present.has(id)) return;
     for (let j = order.length - 1; j >= 0; j--) if (order.get(j) === id) order.delete(j, 1);
+    present.delete(id);
     const current = order.toArray();
     let before = -1;
     for (let j = i - 1; j >= 0 && before < 0; j--) before = current.lastIndexOf(next[j]);
     order.insert(before + 1, [id]);
+    present.add(id);
   });
 }
 

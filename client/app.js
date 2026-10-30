@@ -120,6 +120,7 @@ class LiveProject {
   constructor(project) {
     this.project = project; this.doc = new Y.Doc(); this.seq = 0; this.acked = 0;
     this.ready = false; this.closed = false; this.peers = []; this.persisting = Promise.resolve();
+    this.cacheDirty=false;this.cacheTimer=0;this.cacheIdle=0;
     this.cacheKey = user + ':' + project.id; this.baseline = {}; this.retry = 0;
     this.locationKey = 'freedom:location:' + this.cacheKey;
     this.detailPreferences=createDetailPreferences({api,user,workbook:project.id,onError:text=>message(text,true)});
@@ -136,9 +137,7 @@ class LiveProject {
     if (previous) Y.applyUpdate(this.doc, previous, 'cache');
     this.doc.on('update', (_update, origin) => {
       if(origin==='remote')this.remoteChanged=true;
-      const state = Y.encodeStateAsUpdate(this.doc);
-      this.persisting = this.persisting.catch(() => {}).then(() => cache(this.cacheKey, state));
-      this.persisting.catch(() => { this.cacheFailed = true; status('Device backup failed — keep this tab open', true); });
+      this.scheduleCache();
       if (origin === 'local' || origin === this.history) {
         this.seq++;
         if (this.socket?.readyState === WebSocket.OPEN && this.synced) this.sendUpdate(_update);
@@ -210,13 +209,13 @@ class LiveProject {
       this.synced = false; this.peers = []; this.paintPeers(); projectPresence.clear();
       tankDuel.disconnect();
       if(event.code===4004){
-        this.closed=true;clearTimeout(this.retryTimer);clearTimeout(this.presenceTimer);cancelAnimationFrame(this.peerFrame);
+        this.closed=true;clearTimeout(this.retryTimer);clearTimeout(this.presenceTimer);clearTimeout(this.cacheTimer);cancelAnimationFrame(this.peerFrame);
         this.doc.destroy();
         if(connection===this){connection=null;current=null;document.body.classList.remove('server-active');$('server-title').textContent='Freedom Estimating';browsing=true;bridge.closeEditor();syncProjectPanel();status('Workbook deleted');refresh().catch(()=>{});message('This workbook was deleted.');}
         return;
       }
       if(event.code===4005){
-        this.closed=true;clearTimeout(this.retryTimer);clearTimeout(this.presenceTimer);cancelAnimationFrame(this.peerFrame);
+        this.closed=true;clearTimeout(this.retryTimer);clearTimeout(this.presenceTimer);clearTimeout(this.cacheTimer);cancelAnimationFrame(this.peerFrame);
         this.peerFrame=0;this.synced=false;this.peers=[];this.ownSessionsButton?.remove();
         for(const nodes of this.peerNodes?.values()||[]){nodes.group.remove();nodes.cursor.remove();nodes.field.remove();}this.peerNodes?.clear();
         $('server-cursors').replaceChildren();projectPresence.clear();tankDuel.disconnect();
@@ -229,6 +228,23 @@ class LiveProject {
     this.socket.onerror = () => {};
   }
   sendUpdate(update) { this.socket.send(JSON.stringify({ type: 'update', update: encode(update), seq: this.seq })); }
+  scheduleCache(){
+    this.cacheDirty=true;clearTimeout(this.cacheTimer);
+    if(this.cacheIdle){if(window.cancelIdleCallback)cancelIdleCallback(this.cacheIdle);else clearTimeout(this.cacheIdle);}
+    this.cacheIdle=window.requestIdleCallback
+      ? requestIdleCallback(()=>{this.cacheIdle=0;this.persistCache();},{timeout:1000})
+      : setTimeout(()=>{this.cacheIdle=0;this.persistCache();},300);
+  }
+  persistCache(){
+    clearTimeout(this.cacheTimer);this.cacheTimer=0;
+    if(this.cacheIdle){if(window.cancelIdleCallback)cancelIdleCallback(this.cacheIdle);else clearTimeout(this.cacheIdle);this.cacheIdle=0;}
+    if(!this.cacheDirty)return this.persisting;
+    this.cacheDirty=false;
+    const state=Y.encodeStateAsUpdate(this.doc);
+    this.persisting=this.persisting.catch(()=>{}).then(()=>cache(this.cacheKey,state));
+    this.persisting.catch(()=>{this.cacheFailed=true;status('Device backup failed — keep this tab open',true);});
+    return this.persisting;
+  }
   scheduleChanges() {
     if (!this.ready || this.closed || this.applying) return;
     const alreadyPending=this.pendingChanges;
@@ -247,7 +263,9 @@ class LiveProject {
     if (!this.ready || this.closed || this.applying) return;
     const next = bridge.getShared();
     const sequence = this.seq;
-    if (JSON.stringify(this.baseline) !== JSON.stringify(next)) writeBook(this.doc, this.baseline, next);
+    // writeBook already compares each flattened field. A whole-workbook
+    // JSON.stringify before that comparison doubles the cost on large jobs.
+    writeBook(this.doc, this.baseline, next);
     // getShared returns a detached snapshot; cloning it again doubles the work.
     this.baseline = next;
     this.historyLocation = clone(bridge.getLocation());
@@ -410,6 +428,7 @@ class LiveProject {
   }
   async close() {
     this.changed();
+    this.persistCache();
     await this.persisting;
     this.closed = true; clearTimeout(this.retryTimer); clearTimeout(this.presenceTimer);
     tankDuel.disconnect();
@@ -703,8 +722,8 @@ window.freedomSession = {
   setDetailsCollapsed:(list,takeoff,value)=>connection?.detailPreferences.set(list,takeoff,value)
 };
 setupHistory(bridge, () => connection);
-window.addEventListener('beforeunload', event => { connection?.flushChanges(); if (connection && connection.seq > connection.acked) { event.preventDefault(); event.returnValue = ''; } });
-window.addEventListener('pagehide', () => connection?.flushChanges());
+window.addEventListener('beforeunload', event => { connection?.flushChanges();connection?.persistCache();if (connection && connection.seq > connection.acked) { event.preventDefault(); event.returnValue = ''; } });
+window.addEventListener('pagehide', () => {connection?.flushChanges();connection?.persistCache();});
 let lastPointer = 0;
 document.addEventListener('pointermove', event => {
   if (!connection?.ready || Date.now() - lastPointer < 60) return;
@@ -720,7 +739,7 @@ document.addEventListener('focusin', () => connection?.sendPresence());
 document.addEventListener('scroll', () => connection?.paintPeers(), {capture:true, passive:true});
 window.addEventListener('resize', () => connection?.paintPeers());
 document.fonts?.addEventListener('loadingdone',scheduleRelayout);
-document.addEventListener('visibilitychange', () => { if (document.hidden) { connection?.flushChanges(); connection?.sendPresence({ visible: false }); } });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { connection?.flushChanges();connection?.sendPresence({ visible: false }); } });
 async function signedIn(name, startup) {
   user = name; $('server-signout').textContent = name + ' · Sign out';
   if(startup?.preferences){
