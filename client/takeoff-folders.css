@@ -29,11 +29,15 @@
 #sumTable .s-folder-total>th{text-align:left;padding:10px 12px;position:static;color:var(--ink);font-family:var(--f-sans)}
 .folder-total-label{font-size:12px;font-weight:700}
 #sumTable .s-folder-total .s-sub{font-weight:400}
-.summary-folder-link{border:0;background:none;color:var(--ink);font:inherit;cursor:pointer;text-align:left;overflow-wrap:anywhere}
+.summary-folder-link{padding:0;border:0;background:none;color:var(--ink);font:inherit;cursor:pointer;text-align:left;overflow-wrap:anywhere;vertical-align:baseline}
 #sumTable tbody.summary-folder-group .s-folder td{background:color-mix(in srgb,var(--amber) 14%,var(--calc));border-top:1px solid var(--amber)}
 #sumTable tbody.summary-folder-group .s-folder-marker{color:var(--amber);font-size:17px}
+#sumTable .summary-page-number{display:flex;align-items:center;justify-content:center;gap:3px;min-width:0}
+#sumTable tbody.summary-folder-group .num-wrap.summary-row-num{display:grid;grid-template-columns:17px minmax(0,1fr);gap:3px}
+#sumTable tbody.summary-folder-group .summary-page-number{grid-column:2}
+#sumTable tbody.summary-folder-group .s-folder-icon{grid-column:2;text-align:center;line-height:20px}
 #sumTable tbody.summary-folder-group .summary-folder-link{font-size:14px;font-weight:700}
-#sumTable tbody.summary-folder-group .summary-folder-toggle{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;margin-right:5px;padding:2px;border:0;border-radius:4px;background:transparent;color:var(--ink);vertical-align:middle;cursor:pointer}
+#sumTable tbody.summary-folder-group .summary-folder-toggle{color:var(--slate)}
 #sumTable tbody.summary-folder-group .summary-folder-toggle:hover{background:var(--card)}
 #sumTable tbody.summary-folder-group .summary-folder-toggle[aria-expanded=false] svg{transform:rotate(-90deg)}
 #sumTable tbody.summary-folder-group[data-collapsed=true]>tr:not(.s-folder):not(.s-folder-total){display:none}

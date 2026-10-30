@@ -98,6 +98,20 @@ test('takeoff folders organize pages, persist and roll up prices without changin
   expect(await page.evaluate(()=>window.estimator.getScope().assignments.measured)).toBe('sn');
 });
 
+test('summary folder dropdowns line up with page dropdowns',async({page})=>{
+  const data=workbook(),tk=data.lists[0].companies[0].projects[0].takeoffs[0],sh=tk.sheets[0];
+  tk.folders=[{id:'building-a',name:'Building A'}];sh.folderId='building-a';
+  sh.rows=[{id:'alignment-section',type:'section',name:'Work'},...sh.rows,{id:'alignment-section-end',type:'sectionEnd',sid:'alignment-section'}];
+  await openWorkbook(page,data);
+  await page.locator('#rail .tab-summary').click();
+  const positions=await page.evaluate(()=>{
+    const folderToggle=document.querySelector('#sumTable .summary-folder-toggle').getBoundingClientRect();
+    const pageToggle=document.querySelector('#sumTable .s-row .sum-caret').getBoundingClientRect();
+    return Math.abs(folderToggle.left-pageToggle.left);
+  });
+  expect(positions).toBeLessThan(0.5);
+});
+
 test('takeoff folders isolate page ordering, deletion and takeoff selection',async({page})=>{
   const data=workbook(),tk=data.lists[0].companies[0].projects[0].takeoffs[0];
   tk.folders=[{id:'a',name:'Building A'},{id:'b',name:'Building B'}];
