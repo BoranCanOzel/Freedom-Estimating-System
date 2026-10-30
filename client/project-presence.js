@@ -9,15 +9,15 @@ export function peerColor(name, color) {
 }
 
 export function setupProjectPresence(bridge) {
-  let peers = [], selfId, signature = '', frame = 0, dirty = true;
+  let peers = [], selfId, selfName, signature = '', frame = 0, dirty = true;
+  const marked = new Map();
   function paint() {
     frame = 0;
     const book = {lists:bridge.getProjectLists()}, here = resolveLocation(book,bridge.getLocation());
-    const visitors = peers.filter(p=>p.id!==selfId).map(peer=>({peer,location:resolveLocation(book,peer)})).filter(p=>p.location);
+    const visitors = peers.filter(p=>p.id!==selfId && p.name!==selfName).map(peer=>({peer,location:resolveLocation(book,peer)})).filter(p=>p.location);
     const next = JSON.stringify([here,visitors.map(({peer,location})=>[peer.id,peer.name,peer.color,location])]);
     if (!dirty && signature === next) return;
     signature = next; dirty = false;
-    clear();
     const groups = new Map();
     const byId = (name,id) => document.querySelector(`#projBody [data-${name}="${CSS.escape(id)}"]`);
     if (here) {
@@ -28,9 +28,7 @@ export function setupProjectPresence(bridge) {
       ];
       for (const [host,detail] of current) {
         if (!host) continue;
-        host.classList.add('is-current-location');
-        if (host.dataset.takeoff) host.setAttribute('aria-current','location');
-        groups.set(host,{people:[`You are here · ${detail}`],colors:['var(--amber)'],tab:false});
+        groups.set(host,{people:[`You are here · ${detail}`],colors:['var(--amber)'],tab:false,current:true});
       }
     }
     function mark(host,peer,location,tab=false) {
@@ -55,7 +53,12 @@ export function setupProjectPresence(bridge) {
         mark(tab,peer,l,true);
       }
     }
-    for (const [host,{people,colors,tab}] of groups) {
+    for (const host of marked.keys()) if (!groups.has(host)) { clearHost(host); marked.delete(host); }
+    for (const [host,{people,colors,tab,current}] of groups) {
+      const key=JSON.stringify([people,colors,tab,current]);
+      if(marked.get(host)===key)continue;
+      clearHost(host);marked.set(host,key);
+      if(current){host.classList.add('is-current-location');if(host.dataset.takeoff)host.setAttribute('aria-current','location');}
       if (!tab) {
         host.classList.add('has-location');
         host.title = people.join('\n');
@@ -72,19 +75,19 @@ export function setupProjectPresence(bridge) {
       host.append(badge); host.classList.add('has-presence');
     }
   }
+  function clearHost(el){
+    if(el.classList.contains('has-location')){
+      el.removeAttribute('title');el.removeAttribute('aria-description');
+      el.style.removeProperty('--location-color');el.style.removeProperty('--location-stripe');
+    }
+    el.classList.remove('has-location','is-current-location','has-presence');el.removeAttribute('aria-current');
+    el.querySelectorAll(':scope > .project-presence,:scope > .tab-presence').forEach(badge=>badge.remove());
+  }
   function clear() {
-    document.querySelectorAll('.has-location').forEach(el=>{
-      el.classList.remove('has-location'); el.removeAttribute('title'); el.removeAttribute('aria-description');
-      el.style.removeProperty('--location-color'); el.style.removeProperty('--location-stripe');
-    });
-    document.querySelectorAll('.project-current-location').forEach(el=>el.remove());
-    document.querySelectorAll('.is-current-location').forEach(el=>{
-      el.classList.remove('is-current-location'); el.removeAttribute('aria-current');
-    });
-    document.querySelectorAll('.project-presence,.tab-presence').forEach(el=>el.remove());
-    document.querySelectorAll('.has-presence').forEach(el=>el.classList.remove('has-presence'));
+    for(const host of marked.keys())clearHost(host);marked.clear();
   }
   function schedule() { if (!frame) frame=requestAnimationFrame(paint); }
   for (const event of ['estimator:projects','estimator:view']) document.addEventListener(event,()=>{dirty=true;schedule();});
-  return {update(value,id){peers=value;selfId=id;schedule();},clear(){peers=[];signature='';dirty=true;cancelAnimationFrame(frame);frame=0;clear();}};
+  document.addEventListener('estimator:tabs',()=>{dirty=true;cancelAnimationFrame(frame);paint();});
+  return {update(value,id,name){peers=value;selfId=id;selfName=name;schedule();},clear(){peers=[];signature='';dirty=true;cancelAnimationFrame(frame);frame=0;clear();}};
 }

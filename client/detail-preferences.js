@@ -26,9 +26,9 @@ export function createDetailPreferences({api,user,workbook,storage=localStorage,
     set(list,takeoff,collapsed){
       const id=entryKey(list,takeoff);entries.set(id,collapsed);pending.set(id,collapsed);cache();return flush();
     },
-    async load(){
+    async load(initial){
       try{
-        const saved=await api('/projects/'+workbook+'/takeoff-preferences',{signal:AbortSignal.timeout(5000)});
+        const saved=Array.isArray(initial)?initial:await api('/projects/'+workbook+'/takeoff-preferences',{signal:AbortSignal.timeout(5000)});
         entries=new Map(saved.map(item=>[entryKey(item.list,item.takeoff),item.detailsCollapsed]));
         for(const [id,value] of pending)entries.set(id,value);
         cache();

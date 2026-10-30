@@ -120,6 +120,41 @@ test('recent project views are per user, resolve current names, and survive rest
   } finally {for(const ws of sockets)ws.terminate();await app.close();await rm(dataDir,{recursive:true,force:true});}
 });
 
+test('startup returns only the signed-in user’s last workspace and personal display settings',async()=>{
+  const dataDir=await mkdtemp(join(tmpdir(),'freedom-startup-')),app=createApp({dataDir,production:false});
+  app.server.listen(0,'127.0.0.1');await once(app.server,'listening');
+  const base='http://127.0.0.1:'+app.server.address().port;let ws;
+  const request=(path,cookie,method='GET',body)=>fetch(base+path,{method,headers:{...(cookie?{cookie}:{}),'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
+  const login=async name=>(await request('/api/login',null,'POST',{name,password:'1313'})).headers.get('set-cookie').split(';')[0];
+  try{
+    assert.equal((await request('/api/startup',null,'POST',{})).status,401);
+    const alice=await login('Startup Alice'),bob=await login('Startup Bob');
+    assert.equal((await (await request('/api/startup',bob,'POST',{})).json()).project,null);
+    const book={lists:[{id:'l',companies:[{id:'c',projects:[{id:'p',takeoffs:[{id:'t',sheets:[{id:'s',rows:[]}]}]}]}]}]};
+    const project=await (await request('/api/projects',alice,'POST',{name:'Resume me',book})).json();
+    await request('/api/projects/'+project.id+'/open',alice,'POST',{});
+    await request('/api/projects/'+project.id+'/takeoff-preferences',alice,'PUT',{list:'l',takeoff:'t',detailsCollapsed:false});
+    await request('/api/preferences',alice,'PUT',{cursor:'ring',color:'#2878d0'});
+    ws=new WebSocket(base.replace('http','ws')+'/live/'+project.id,{headers:{cookie:alice}});await once(ws,'open');
+    ws.send(JSON.stringify({type:'presence',presence:{list:'l',takeoff:'t',sheet:'s',view:'scope'}}));
+    let startup;
+    for(let i=0;i<100;i++){
+      startup=await (await request('/api/startup',alice,'POST',{})).json();
+      if(startup.project.lastLocation)break;await delay(10);
+    }
+    assert.equal(startup.user,'Startup Alice');assert.equal(startup.project.id,project.id);
+    assert.deepEqual(startup.preferences,{cursor:'ring',color:'#2878d0',lastWorkbook:project.id});
+    assert.deepEqual(startup.project.lastLocation,{list:'l',takeoff:'t',sheet:'s',view:'scope'});
+    assert.deepEqual(startup.project.detailPreferences,[{list:'l',takeoff:'t',detailsCollapsed:false}]);
+    assert.equal(Object.hasOwn(startup.project,'state'),false);assert.equal(Object.hasOwn(startup.project,'sheets'),false);
+    assert.equal((await (await request('/api/startup',bob,'POST',{})).json()).project,null);
+    const rejected=await fetch(base+'/api/startup',{method:'POST',headers:{cookie:alice,origin:'https://wrong.example','Content-Type':'application/json'},body:'{}'});
+    assert.equal(rejected.status,403);
+    await request('/api/projects/'+project.id,alice,'DELETE',{confirmation:'DELETE'});
+    assert.equal((await (await request('/api/startup',alice,'POST',{})).json()).project,null);
+  }finally{ws?.terminate();await app.close();await rm(dataDir,{recursive:true,force:true});}
+});
+
 test('passwordless configuration is refused in every mode',()=>{
   for (const production of [false,true]) assert.throws(()=>createApp({production,users:{},sitePasswordHash:''}),/password is required/);
 });

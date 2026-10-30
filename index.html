@@ -1,16 +1,23 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Project Breakdown</title>
-<script>document.documentElement.classList.add('workspace-starting');</script>
+<script>
+document.documentElement.classList.add('workspace-starting');
+window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})
+  .then(response=>response.ok?response.json():null).catch(()=>null):Promise.resolve(null);
+</script>
 <link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg">
 <link rel="stylesheet" href="/assets/app.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Sans+Condensed:wght@500;600;700&amp;family=Fira+Sans:wght@400;500;600;700&amp;family=Fira+Sans+Condensed:wght@500;600;700&amp;display=swap">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=Fira+Sans:wght@400;500;600;700&family=Fira+Sans+Condensed:wght@500;600;700&display=swap');
 
   html.workspace-starting body:not(.server-active)>.sheet,
   html.workspace-starting body:not(.server-active)>.proj-tab,
   html.workspace-starting body:not(.server-active)>.lib-tab,
-  html.workspace-starting #server-welcome{visibility:hidden}
+  html.workspace-starting #server-welcome,
+  html.workspace-starting #server-drawer{visibility:hidden}
   :root{
     --f-sans:"IBM Plex Sans",system-ui,sans-serif;
     --f-cond:"IBM Plex Sans Condensed",sans-serif;
@@ -3265,7 +3272,7 @@
     inp.addEventListener('input', () => {
       const value = inp.value.replace(/,/g,'');
       row[field] = serviceRate ? Math.round((num(value) - serviceExtra(row)) * 1e8) / 1e8 : value;
-      recalc();
+      scheduleRowRecalc(row);
     });
 
     if (currency){
@@ -3291,6 +3298,19 @@
     if (!el || el.offsetParent === null) return;
     el.style.height = 'auto';
     el.style.height = el.scrollHeight + 'px';
+  }
+  const pendingGrowth = new Set();
+  let growthFrame = 0;
+  function scheduleGrow(el){
+    pendingGrowth.add(el);
+    if(growthFrame)return;
+    growthFrame=requestAnimationFrame(()=>{
+      growthFrame=0;
+      const fields=[...pendingGrowth].filter(field=>field.isConnected&&field.offsetParent!==null);pendingGrowth.clear();
+      fields.forEach(field=>{field.style.height='auto';});
+      const heights=fields.map(field=>field.scrollHeight);
+      fields.forEach((field,i)=>{field.style.height=heights[i]+'px';});
+    });
   }
   function growAll(){
     // Batch geometry reads and writes instead of forcing layout for every note.
@@ -3354,9 +3374,10 @@
       noteEl.placeholder = placeholder;
       noteEl.setAttribute('aria-label','Detail');
       noteEl.addEventListener('input', () => {
+        const hadText=!!row.note?.trim();
         row.note = noteEl.value;
-        grow(noteEl);
-        syncNotesButton();
+        scheduleGrow(noteEl);
+        if(hadText!==!!row.note.trim())syncNotesButton();
         save();
       });
       noteEl.addEventListener('blur', () => {
@@ -3445,7 +3466,22 @@
     name.value = row.name || '';
     name.placeholder = 'Name this section';
     name.setAttribute('aria-label','Section name');
-    name.addEventListener('input', () => { row.name = name.value; applyCollapse(); save(); });
+    name.addEventListener('input', () => {
+      row.name = name.value;
+      // A rename changes labels, not nesting, visibility or every note's height.
+      const start=state.rows.indexOf(row),endIndex=sectionEndIndex(state.rows,start),end=state.rows[endIndex];
+      const label = end && refs.get(end.id)?.tr.querySelector('.sec-label');
+      if (label) { label.textContent = (row.name || (tr.dataset.depth > 0 ? 'Subsection' : 'Section')) + ' · Subtotal'; label.title = label.textContent; }
+      let depth=0;
+      for(let i=start+1;i<endIndex;i++){
+        const child=state.rows[i];
+        if(child.type==='section'){
+          if(depth===0){const badge=refs.get(child.id)?.tr.querySelector('.subsection-badge');if(badge)badge.title='Inside '+(row.name||'section');}
+          depth++;
+        }else if(child.type==='sectionEnd')depth--;
+      }
+      save();
+    });
     const secAdd = document.createElement('button');
     secAdd.type = 'button';
     secAdd.className = 'sec-add';
@@ -3746,7 +3782,7 @@
     const mk = tdMk.querySelector('input');
     mk.value = row.markup === 0 || row.markup === '' ? '' : row.markup;
     mk.placeholder = '0';
-    mk.addEventListener('input', () => { row.markup = mk.value; recalc(); });
+    mk.addEventListener('input', () => { row.markup = mk.value; scheduleRowRecalc(row); });
 
     const tdSub = moneyCell('sub');
     const subTip = document.createElement('span');
@@ -5483,6 +5519,15 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     book.sheets.push(sh);book.view='sheet';book.active=sh.id;state=sh;showView();save();
   }
 
+  function updateTabLabel(tab, sh){
+    const scope = (sh.title || '').trim(), chars = Array.from(scope.replace(/\s+/g, ' '));
+    const shortTitle = chars.length > 22 ? chars.slice(0,22).join('').trimEnd() + '…' : chars.join('');
+    tab.querySelector('.option-tab-label').textContent = sh.num + (shortTitle ? ' - ' + shortTitle : '');
+    tab.setAttribute('aria-label', sh.num + (scope ? ' - ' + scope : ' - Untitled option'));
+    const tip = tab.querySelector('.tab-tip');
+    tip.textContent = scope || 'Option ' + sh.num + ' — no scope written yet'; tab.title = tip.textContent;
+  }
+
   function renderTabs(){
     // Option numbers describe their current position, never their creation order.
     book.sheets.forEach((sh, i) => { sh.num = i + 1; });
@@ -5528,19 +5573,13 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
       const lab = document.createElement('span');
       lab.className = 'option-tab-label';
-      const scope = (sh.title || '').trim();
-      const titleChars = Array.from(scope.replace(/\s+/g, ' '));
-      const shortTitle = titleChars.length > 22 ? titleChars.slice(0, 22).join('').trimEnd() + '…' : titleChars.join('');
-      lab.textContent = sh.num + (shortTitle ? ' - ' + shortTitle : '');
-      t.setAttribute('aria-label', sh.num + (scope ? ' - ' + scope : ' - Untitled option'));
       t.appendChild(lab);
 
       const tip = document.createElement('span');
       tip.className = 'tab-tip';
       tip.setAttribute('aria-hidden', 'true');
-      tip.textContent = scope || 'Option ' + sh.num + ' — no scope written yet';
-      t.title = tip.textContent;
       t.appendChild(tip);
+      updateTabLabel(t, sh);
 
       t.addEventListener('pointerdown', e => armTabDrag(e, sh, t));
       t.addEventListener('click', e => {
@@ -5591,6 +5630,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       if (tab.left < bounds.left) rail.scrollLeft += (tab.left - bounds.left) / zoom;
       else if (tab.right > bounds.right) rail.scrollLeft += (tab.right - bounds.right) / zoom;
     });
+    document.dispatchEvent(new Event('estimator:tabs'));
   }
 
   // a drawer handing over to another drawer skips the slide, so the edge never
@@ -5741,7 +5781,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     save();
   }
 
-  function showView(){
+  function showView(preserveSheet = false){
     clearSectionHighlight();
     applyTheme();
     applyZoom();
@@ -5794,7 +5834,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     if (v === 'summary') renderSummary();
     else if (v === 'load') renderLoad();
     else if (v === 'wage') renderWage();
-    else if (v === 'sheet' && !folderEmpty) { renderAll(); if (document.body.classList.contains('lib-open')) renderLibrary(); }
+    else if (v === 'sheet' && !folderEmpty) { if(!preserveSheet)renderAll(); if (document.body.classList.contains('lib-open')) renderLibrary(); }
     document.dispatchEvent(new CustomEvent('estimator:view', {detail:{view:v}}));
   }
 
@@ -6251,13 +6291,26 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     grow(document.getElementById('title'));
   }
 
-  function recalc(persist = true){
+  let rowRecalcFrame = 0, pendingRowRecalcs = new Set();
+  const rowCalculations = new WeakMap();
+  function scheduleRowRecalc(row){
+    pendingRowRecalcs.add(row.id);
+    if (!rowRecalcFrame) rowRecalcFrame = requestAnimationFrame(() => {
+      rowRecalcFrame = 0;
+      const changed = pendingRowRecalcs; pendingRowRecalcs = new Set();
+      recalc(false, changed);
+    });
+    // Store the edit immediately; only the derived cell painting is batched.
+    save();
+  }
+  function recalc(persist = true, changedRows = null){
+    if (!changedRows) { cancelAnimationFrame(rowRecalcFrame); rowRecalcFrame = 0; pendingRowRecalcs.clear(); }
     let tM = 0, tS = 0, tG = 0, tR = 0;
     const tF = state.fees.map(() => 0);
     const sections = [];
 
     state.rows.forEach(r => {
-      const ref = refs.get(r.id);
+      const ref = !changedRows || changedRows.has(r.id) || r.type === 'section' || r.type === 'sectionEnd' ? refs.get(r.id) : null;
 
       if (r.type === 'section'){
         sections.push({mk:0, sub:0, grand:0, round:0, head:ref, row:r, fees: state.fees.map(() => 0)});
@@ -6308,7 +6361,8 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       if (ref && ref.paintKind) ref.paintKind();   // card edits can change the derived type
       if (r.kind === 'none') return;
 
-      const c = calc(r);
+      let c = changedRows && !changedRows.has(r.id) && rowCalculations.get(r);
+      if (!c) { c = calc(r); rowCalculations.set(r, c); }
       const mkAmt = c.markup;
       if (ref && ref.costOut) money(ref.costOut, derivedCost(r));
       if (ref && r.kind === 'service'){
@@ -6355,7 +6409,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     const tGr = roundTo(tG, rtStep);
     money(document.getElementById('tGrand'), tG);
     money(document.getElementById('tGrandLipMoney'), tGr);
-    placeGrandTab();
+    if (!changedRows) placeGrandTab();
     upTotalEls.forEach((el, i) => {
       const col = state.units[i];
       const q = col ? num(col.qty) : 0;
@@ -6925,8 +6979,9 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   /* ---------- header controls ---------- */
   document.getElementById('title').addEventListener('input', e => {
     state.title = e.target.value;
-    grow(e.target);
-    renderTabs();
+    scheduleGrow(e.target);
+    const tab = document.querySelector('#rail [data-sheet="' + CSS.escape(state.id) + '"]');
+    if (tab) updateTabLabel(tab, state);
     save();
   });
 
@@ -12381,6 +12436,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     },
     exportBook(){ return structuredClone(book); },
     receive(data, fresh = false, location){
+      const previousState=state,previousView=book.view;
       const draft = ({item:itemDraft, section:secDraft, scope:scopeDraft, part:partDraft,
         construct:conDraft, service:svcDraft, company:coDraft, project:prDraft,
         takeoff:tkDraft, subtype:subDraft})[edMode];
@@ -12393,6 +12449,9 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       }
       else separate(book);
       adoptBook(materialize(data, fresh ? location : null));
+      // Unrelated page edits must not replace the inputs and listeners in use here.
+      const preserveSheet=!fresh && previousView==='sheet' && book.view==='sheet' && JSON.stringify(state)===JSON.stringify(previousState);
+      if(preserveSheet){book.sheets[book.sheets.indexOf(state)]=previousState;state=previousState;}
       if (!fresh && before && draft) {
         const after = findRecord(book, recordId);
         if (after) {
@@ -12404,7 +12463,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         } else { closeEditor(); window.freedomSession?.notify('The record you were editing was removed by another user.'); }
       }
       if (!fresh && edMode === 'listopts') renderEditor();
-      showView(); renderProjects();
+      showView(preserveSheet); renderProjects();
     },
     prepare(data){
       const previousBook = book, previousState = state, previousPersonal = personal;

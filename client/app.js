@@ -56,8 +56,10 @@ async function api(path, options = {}) {
 }
 function message(text, bad = false) { $('server-message').textContent = text; $('server-message').classList.toggle('error', bad); }
 function status(text, bad = false) {
-  $('server-status').textContent = text; $('server-status').classList.toggle('error', bad);
-  $('status').textContent = text; $('status').classList.toggle('bad', bad);
+  if($('server-status').textContent!==text)$('server-status').textContent = text;
+  $('server-status').classList.toggle('error', bad);
+  if($('status').textContent!==text)$('status').textContent = text;
+  $('status').classList.toggle('bad', bad);
 }
 function element(tag, text, className) { const el = document.createElement(tag); if (text) el.textContent = text; if (className) el.className = className; return el; }
 function date(value) { return value ? new Date(value).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'Never'; }
@@ -119,9 +121,10 @@ class LiveProject {
     try { this.resumeLocation = JSON.parse(localStorage.getItem(this.locationKey)) || this.resumeLocation; } catch {}
   }
   async start() {
-    const [previous] = await Promise.all([cache(this.cacheKey).catch(() => null),this.detailPreferences.load()]);
+    const [previous] = await Promise.all([cache(this.cacheKey).catch(() => null),this.detailPreferences.load(this.project.detailPreferences)]);
     if (previous) Y.applyUpdate(this.doc, previous, 'cache');
     this.doc.on('update', (_update, origin) => {
+      if(origin==='remote')this.remoteChanged=true;
       const state = Y.encodeStateAsUpdate(this.doc);
       this.persisting = this.persisting.catch(() => {}).then(() => cache(this.cacheKey, state));
       this.persisting.catch(() => { this.cacheFailed = true; status('Device backup failed — keep this tab open', true); });
@@ -135,12 +138,13 @@ class LiveProject {
       // openProject has already checked server access. Show the device copy
       // immediately; local edits still merge through the normal Yjs sync.
       this.applying = true;
-      try { renderRemote(readBook(this.doc), true, this.resumeLocation); this.baseline = clone(bridge.getShared()); }
+      try { renderRemote(readBook(this.doc), true, this.resumeLocation); this.baseline = bridge.getShared(); }
       finally { this.applying = false; }
       this.historyLocation = clone(bridge.getLocation());
       this.resumeLocation = undefined;
       this.ready = true;
       document.body.classList.add('server-active');
+      document.body.classList.remove('workspace-opening');
       workspace.sync(); syncProjectPanel();
     }
     this.connect();
@@ -158,20 +162,22 @@ class LiveProject {
         // A later state refresh may omit peerId; it must not erase our identity.
         if(msg.type==='sync'&&msg.peerId)this.peerId=msg.peerId;
         if (msg.type === 'sync' || msg.type === 'update') {
-          if (this.ready) this.changed();
-          const before = this.ready ? JSON.stringify(readBook(this.doc)) : null;
+          if (this.ready) this.flushChanges();
+          this.remoteChanged=false;
           Y.applyUpdate(this.doc, decode(msg.state || msg.update), 'remote');
           this.applying = true;
           try {
-            const next = readBook(this.doc);
-            if (before !== JSON.stringify(next)) renderRemote(next, !this.ready, this.resumeLocation);
-            this.baseline = clone(bridge.getShared());
+            if(this.remoteChanged || !this.ready){
+              renderRemote(readBook(this.doc), !this.ready, this.resumeLocation);
+              this.baseline = bridge.getShared();
+            }
           }
           finally { this.applying = false; }
           this.historyLocation = clone(bridge.getLocation());
           if (msg.type === 'sync') {
             this.synced = true; this.ready = true; this.retry = 0;
             document.body.classList.add('server-active');
+            document.body.classList.remove('workspace-opening');
             workspace.sync(); syncProjectPanel();
             document.dispatchEvent(new Event('estimator:history'));
             // The merged state includes edits recovered from this browser after a disconnect.
@@ -180,7 +186,7 @@ class LiveProject {
           this.sendPresence(); this.paintPeers();
         } else if (msg.type === 'ack') {
           this.acked = Math.max(this.acked, msg.seq); this.paintStatus();
-        } else if (msg.type === 'presence') { if(msg.selfId)this.peerId=msg.selfId;this.peers = msg.peers; this.paintPeers(); projectPresence.update(this.peers,this.peerId); }
+        } else if (msg.type === 'presence') { if(msg.selfId)this.peerId=msg.selfId;this.peers = msg.peers; this.paintPeers(); projectPresence.update(this.peers,this.peerId,user); }
         else if (msg.type === 'duel') tankDuel.receive(msg);
         else if (msg.type === 'error') { this.failed = true; status(msg.error, true); message('Your changes are still in this browser. Export JSON before closing if the error persists.', true); }
       } catch (e) { status('Could not apply a shared update. Export your work before reloading.', true); console.error(e); }
@@ -204,11 +210,12 @@ class LiveProject {
   sendUpdate(update) { this.socket.send(JSON.stringify({ type: 'update', update: encode(update), seq: this.seq })); }
   scheduleChanges() {
     if (!this.ready || this.closed || this.applying) return;
+    const alreadyPending=this.pendingChanges;
     this.pendingChanges = true;
     clearTimeout(this.changeTimer);
     this.changeTimer = setTimeout(() => this.flushChanges(), 180);
     this.changeDeadline ||= setTimeout(() => this.flushChanges(), 800);
-    this.paintStatus();
+    if(!alreadyPending)this.paintStatus();
   }
   flushChanges() {
     if (this.pendingChanges) this.changed();
@@ -381,6 +388,11 @@ class LiveProject {
   }
 }
 
+let relayoutFrame=0;
+function scheduleRelayout(){
+  if(relayoutFrame)return;
+  relayoutFrame=requestAnimationFrame(()=>{relayoutFrame=0;if(document.body.classList.contains('server-active'))bridge.relayout();});
+}
 function syncProjectPanel() {
   const browse = browsing || !current;
   $('server-workbooks').hidden = !browse;
@@ -395,20 +407,23 @@ function syncProjectPanel() {
   $('server-open').title = 'Switch saved workbook';
   $('server-workbook-actions').hidden = !current;
   workspace?.sync();
-  requestAnimationFrame(() => bridge.relayout());
+  scheduleRelayout();
 }
 function panel(open = true) {
   $('server-drawer').hidden = !open;
   document.body.classList.toggle('workspace-projects-open', open);
   $('server-projects').setAttribute('aria-expanded', String(open));
   if (open) { syncProjectPanel(); bridge.refreshProjects(); if (user) { refresh().catch(e => message(e.message, true)); if (recentMode && !browsing) refreshRecent(); } }
-  requestAnimationFrame(() => bridge.relayout());
+  scheduleRelayout();
 }
 
 async function refresh() { projects = await api('/projects'); renderProjects(); }
+let projectListSignature='';
 function renderProjects() {
-  const host = $('server-list'); host.replaceChildren();
   const visible = projects.filter(p => p.name.toLowerCase().includes(filter));
+  const signature=JSON.stringify([current?.id,filter,visible]);
+  if(signature===projectListSignature)return;projectListSignature=signature;
+  const host = $('server-list'); host.replaceChildren();
   if (!visible.length) host.append(element('p', filter ? 'No matching projects.' : 'Create a workbook or import JSON from the File menu.', 'server-empty'));
   for (const project of visible) {
     const item = element('button', '', 'server-project' + (current?.id === project.id ? ' selected' : ''));
@@ -453,14 +468,17 @@ async function closeProject() {
   $('server-close').disabled = $('server-edit').disabled = $('server-export').disabled = true;
   browsing = true; recentMode = false; bridge.closeEditor(); syncProjectPanel(); status('No project open'); panel();
 }
-async function openProject(project, targetLocation) {
+async function openProject(project, targetLocation, alreadyOpened = false) {
   if (current?.id === project.id && connection?.ready) {
     if(targetLocation&&!bridge.openLocation(targetLocation))throw Error('This estimate no longer exists. Refresh the AI Data list.');
     browsing = recentMode = false; syncProjectPanel(); panel(false); return;
   }
+  panel(false);
+  document.body.classList.add('workspace-opening');
+  try{
   await connection?.close(); connection = null;
   document.body.classList.remove('server-active');
-  current = await api('/projects/' + project.id + '/open', { method: 'POST' });
+  current = alreadyOpened ? project : await api('/projects/' + project.id + '/open', { method: 'POST' });
   $('server-title').textContent = current.name;
   $('server-close').disabled = $('server-edit').disabled = $('server-export').disabled = false;
   browsing = recentMode = false; syncProjectPanel();
@@ -469,6 +487,7 @@ async function openProject(project, targetLocation) {
   connection = new LiveProject(current);
   if(targetLocation)connection.resumeLocation=targetLocation;
   await connection.start(); panel(false);
+  }catch(error){document.body.classList.remove('workspace-opening');panel();throw error;}
 }
 async function createProject(name, book) {
   const project = await api('/projects', { method: 'POST', body: JSON.stringify({ name, book }) });
@@ -667,9 +686,21 @@ document.addEventListener('pointerleave', () => connection?.sendPresence({ visib
 document.addEventListener('focusin', () => connection?.sendPresence());
 document.addEventListener('scroll', () => connection?.paintPeers(), {capture:true, passive:true});
 window.addEventListener('resize', () => connection?.paintPeers());
+document.fonts?.addEventListener('loadingdone',scheduleRelayout);
 document.addEventListener('visibilitychange', () => { if (document.hidden) { connection?.flushChanges(); connection?.sendPresence({ visible: false }); } });
-async function signedIn(name) {
+async function signedIn(name, startup) {
   user = name; $('server-signout').textContent = name + ' · Sign out';
+  if(startup?.preferences){
+    workspace.setCursor(startup.preferences.cursor);workspace.setCursorColor(startup.preferences.color,name);
+    if(startup.project){
+      projects=[startup.project];
+      status('Opening your takeoff…');
+      await openProject(startup.project,undefined,true);
+    }else{
+      browsing=true;status('No project open');panel();
+    }
+    $('server-login').close();return;
+  }
   let preferences = {cursor:'classic',lastWorkbook:null};
   const preferenceRequest = api('/preferences').catch(error => {
     if (error.status !== 404) throw error;
@@ -690,7 +721,8 @@ async function signedIn(name) {
   $('server-login').close();
 }
 async function boot() {
-  await bridge.ready;
+  const [,startup]=await Promise.all([bridge.ready,window.freedomStartup]);
+  if(startup?.user){await signedIn(startup.user,startup);startProjectRefresh();return;}
   const session = await api('/session');
   if (session.user) await signedIn(session.user);
   else {
@@ -706,7 +738,8 @@ async function boot() {
       } catch (e) { $('server-login-error').textContent = e.message; }
     };
   }
-  setInterval(() => { if (user && !$('server-drawer').hidden) { refresh().catch(() => {}); if (recentMode && !browsing) refreshRecent(); } }, 10000);
+  startProjectRefresh();
 }
+function startProjectRefresh(){setInterval(() => { if (user && !$('server-drawer').hidden) { refresh().catch(() => {}); if (recentMode && !browsing) refreshRecent(); } }, 10000);}
 boot().catch(e => { status('Could not open the workspace', true); message(e.message, true); })
   .finally(() => document.documentElement.classList.remove('workspace-starting'));

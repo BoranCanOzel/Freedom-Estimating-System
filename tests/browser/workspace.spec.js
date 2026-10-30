@@ -1358,6 +1358,92 @@ test('many option tabs scroll within the window and keep the selected page visib
   await expect(page.locator('#summaryCard')).toBeVisible();
 });
 
+test('typing performance profile on a large takeoff',async({page})=>{
+  const data=workbook(),sh=data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0];
+  sh.rows=Array.from({length:600},(_,i)=>({...sh.rows[0],id:'perf-'+i,name:'Line '+i}));
+  await openWorkbook(page,data);
+  await page.evaluate(()=>{
+    window.typingProfile={input:[],mutations:0};let start;
+    document.addEventListener('input',()=>{start=performance.now();},true);
+    document.addEventListener('input',()=>window.typingProfile.input.push(performance.now()-start));
+    new MutationObserver(records=>window.typingProfile.mutations+=records.length).observe(document.getElementById('body'),{subtree:true,childList:true,attributes:true,characterData:true});
+  });
+  const client=await page.context().newCDPSession(page);await client.send('Performance.enable');await client.send('Profiler.enable');
+  const run=async(selector,text)=>{
+    const field=page.locator(selector).first();await field.focus();await field.press('Control+a');
+    await page.evaluate(()=>{window.typingProfile.input=[];window.typingProfile.mutations=0;});
+    const before=await client.send('Performance.getMetrics');
+    await client.send('Profiler.start');
+    await field.pressSequentially(text,{delay:25});await expect(page.locator('#server-status')).toHaveText('All changes saved');
+    const after=await client.send('Performance.getMetrics');
+    const {profile}=await client.send('Profiler.stop');
+    const metrics=await page.evaluate(()=>window.typingProfile);
+    metrics.hotspots=profile.nodes.filter(n=>n.hitCount).sort((a,b)=>b.hitCount-a.hitCount).slice(0,12).map(n=>({name:n.callFrame.functionName,hits:n.hitCount}));
+    for(const key of ['TaskDuration','LayoutDuration','RecalcStyleDuration'])metrics[key]=1000*(after.metrics.find(m=>m.name===key).value-before.metrics.find(m=>m.name===key).value);
+    return metrics;
+  };
+  const numbers=await run('#body [aria-label="cost"]','12345678');
+  const names=await run('#body [aria-label="Item name"]','Measured typing performance');
+  await page.evaluate(()=>{window.profileTab=document.querySelector('#rail [data-sheet="sn"]');});
+  const title=await run('#title','Measured takeoff title');
+  expect(await page.evaluate(()=>window.profileTab===document.querySelector('#rail [data-sheet="sn"]'))).toBe(true);
+  expect(numbers.mutations).toBeLessThan(200);
+  console.log('Typing profile',JSON.stringify({numbers,names,title}));
+  await expect(page.locator('#tSub .v')).toHaveText('12,420,553.00');
+  await client.detach();
+});
+
+test('section names and details update without rebuilding unrelated rows',async({page})=>{
+  const data=workbook(),sh=data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0];
+  sh.rows=[{id:'parent',type:'section',name:'Parent'},{id:'child',type:'section',name:'Child'},...sh.rows,{id:'ce',type:'sectionEnd',sid:'child'},{id:'pe',type:'sectionEnd',sid:'parent'}];
+  await openWorkbook(page,data);
+  const work=page.locator('#body [data-id="row-sn"]');
+  await page.evaluate(()=>{window.untouchedMutations=0;new MutationObserver(records=>window.untouchedMutations+=records.length).observe(document.querySelector('#body [data-id="row-sn"]'),{attributes:true,childList:true,subtree:true});});
+  await page.locator('#body [data-id="parent"] .name-in').fill('Renamed parent');
+  await expect(page.locator('#body [data-id="pe"] .sec-label')).toHaveText('Renamed parent · Subtotal');
+  await expect(page.locator('#body [data-id="child"] .subsection-badge')).toHaveAttribute('title','Inside Renamed parent');
+  expect(await page.evaluate(()=>window.untouchedMutations)).toBe(0);
+  await work.getByRole('button',{name:'Show this detail',exact:true}).click();
+  const note=work.locator('.item-note');await expect(note).toBeVisible();
+  const before=await note.boundingBox();await note.fill('Expanded detail\n'.repeat(8));
+  await expect.poll(async()=>(await note.boundingBox()).height).toBeGreaterThan(before.height);
+  await note.fill('');await note.blur();await expect(note).toHaveCount(0);
+  await expect(page.locator('#workspace-toggle-notes')).toHaveText('Expand all detail');
+  await expect(page.locator('#tSub .v')).toHaveText('125.00');
+});
+
+test('same-account tabs keep presence stable and unrelated page edits preserve live inputs',async({page})=>{
+  const data=workbook();data.lists[0].companies[0].projects[0].takeoffs[0].sheets.push(sheet('sn2','Second page'));
+  const name='Same account '+Date.now();await openWorkbook(page,data,name);
+  const second=await page.context().newPage();
+  try{
+    await second.goto('/');await expect(second.locator('#server-status')).toHaveText('All changes saved');
+    await expect(page.locator('.server-person').filter({hasText:name})).toHaveCount(1);
+    await second.locator('#rail [data-sheet="sn2"]').click();
+    await expect(page.locator('.server-person').filter({hasText:name})).toHaveAttribute('title',/Tab 2/);
+    await expect(page.locator('#rail .tab-presence')).toHaveCount(0);
+    const field=page.locator('#body [aria-label="Item name"]').first();await field.focus();
+    await page.evaluate(()=>{
+      window.editingField=document.activeElement;window.selfPresencePaints=0;
+      new MutationObserver(records=>{for(const r of records)for(const n of r.addedNodes)if(n.nodeType===1&&(n.matches('.tab-presence')||n.querySelector('.tab-presence')))window.selfPresencePaints++;}).observe(document.getElementById('rail'),{subtree:true,childList:true});
+    });
+    for(const title of ['Another page edit','Another page edit again']){
+      await second.locator('#title').fill(title);
+      await expect(page.locator('#rail [data-sheet="sn2"]')).toHaveAttribute('aria-label','2 - '+title);
+      expect(await page.evaluate(()=>document.activeElement===window.editingField&&window.editingField.isConnected)).toBe(true);
+      await expect(page.locator('#rail .tab-presence')).toHaveCount(0);
+    }
+    await field.press('End');await field.pressSequentially(' still bound',{delay:15});
+    await expect(page.locator('#server-status')).toHaveText('All changes saved');
+    await second.locator('#rail [data-sheet="sn"]').click();
+    await expect(second.locator('#body [aria-label="Item name"]').first()).toHaveValue('Concrete cutting still bound');
+    await page.locator('#title').pressSequentially(' typed',{delay:15});
+    await expect(second.locator('#title')).toHaveValue('North scope typed');
+    expect(await page.evaluate(()=>window.selfPresencePaints)).toBe(0);
+    await page.reload();await expect(page.locator('#body [aria-label="Item name"]').first()).toHaveValue('Concrete cutting still bound');
+  }finally{await second.close();}
+});
+
 test('large takeoffs batch typing saves and add items without rebuilding existing rows', async ({page}) => {
   const data=workbook(), sh=data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0];
   sh.rows=Array.from({length:180},(_,i)=>({...sh.rows[0],id:'large-'+i,name:'Line '+i}));
@@ -1528,6 +1614,7 @@ test('undo only affects my edits and redo syncs to other estimators', async ({pa
 });
 
 test('an older server missing preferences still opens workbooks without a JSON crash',async({page})=>{
+  await page.route('**/api/startup',route=>route.fulfill({status:404,contentType:'application/json',body:'{"error":"Not found"}'}));
   await page.route('**/api/preferences',route=>route.fulfill({status:404,contentType:'text/html',body:'<!DOCTYPE html><html>Cannot GET /api/preferences</html>'}));
   await openWorkbook(page);
   await page.reload();
@@ -2871,6 +2958,65 @@ test('summary cost breakdown reconciles categories, fees and pie',async({page})=
   expect(await flat.locator('i').evaluate(el=>getComputedStyle(el).backgroundColor)).not.toBe(await markup.locator('i').evaluate(el=>getComputedStyle(el).backgroundColor));
   await expect(breakdown.locator('svg path')).toHaveCount(5);
   await expect(breakdown.locator('svg path').filter({hasText:'Flat adds: $20.00'})).toHaveAttribute('fill','#dc2626');
+});
+
+test('refresh opens the last takeoff directly without waiting for workbook lists or fonts',async({page})=>{
+  await openWorkbook(page);
+  await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'ts',sheet:'ss',view:'sheet'}));
+  await page.locator('#title').fill('Resume directly here');
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  const blocked=[];
+  await page.route(/\/api\/(session|preferences|projects)(?:\?|\/|$)/,route=>{blocked.push(new URL(route.request().url()).pathname);return route.abort();});
+  let releaseFonts;const fonts=new Promise(resolve=>{releaseFonts=resolve;});
+  await page.route('https://fonts.googleapis.com/**',async route=>{await fonts;await route.abort();});
+  await page.addInitScript(()=>{
+    window.startupFrames=[];
+    function sample(){
+      const visible=id=>{const el=document.getElementById(id);return !!el&&el.getClientRects().length>0&&getComputedStyle(el).visibility!=='hidden'&&getComputedStyle(el).display!=='none';};
+      const ready=document.body?.classList.contains('server-active');
+      window.startupFrames.push({time:performance.now(),ready,drawer:visible('server-drawer'),welcome:visible('server-welcome')});
+      if(!ready)requestAnimationFrame(sample);
+    }
+    requestAnimationFrame(sample);
+  });
+  try{
+    await page.reload({waitUntil:'domcontentloaded'});
+    await expect(page.locator('#title')).toHaveValue('Resume directly here');
+    await expect(page.locator('#sheetCard')).toBeVisible();
+    await expect(page.locator('#server-drawer')).toBeHidden();
+    await expect(page.locator('#server-status')).toHaveText('All changes saved');
+    const frames=await page.evaluate(()=>window.startupFrames);
+    expect(frames.some(frame=>frame.ready)).toBe(true);
+    expect(frames.some(frame=>frame.drawer||frame.welcome)).toBe(false);
+    expect(blocked).toEqual([]);
+    const asset=await page.request.get('/assets/app.js',{headers:{'Accept-Encoding':'br'}});
+    expect(asset.headers()['content-encoding']).toBe('br');expect(asset.headers()['cache-control']).toBe('private, no-cache');
+    expect((await page.request.get('/assets/app.js',{headers:{'Accept-Encoding':'br','If-None-Match':asset.headers().etag}})).status()).toBe(304);
+    const html=await page.request.get('/',{headers:{'Accept-Encoding':'br'}});
+    expect(html.headers()['content-encoding']).toBe('br');expect(html.headers()['cache-control']).toBe('no-store');
+    console.log('Direct refresh ready at',frames.find(frame=>frame.ready).time,'ms');
+  }finally{releaseFonts();}
+});
+
+test('a fresh device waits for the saved takeoff without flashing workbook or project screens',async({page,browser,baseURL})=>{
+  await openWorkbook(page,workbook(),'Cold start '+Date.now());
+  await page.locator('#title').fill('Cold start destination');await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  const context=await browser.newContext({baseURL});await context.addCookies(await page.context().cookies());
+  const fresh=await context.newPage();let release;
+  await fresh.routeWebSocket('**/live/**',ws=>{
+    const server=ws.connectToServer(),queued=[];let released=false;
+    server.onMessage(message=>{if(released)ws.send(message);else queued.push(message);});
+    release=()=>{released=true;for(const message of queued)ws.send(message);};
+  });
+  try{
+    await fresh.goto('/',{waitUntil:'domcontentloaded'});
+    await expect.poll(()=>typeof release).toBe('function');
+    await expect(fresh.locator('html')).not.toHaveClass(/workspace-starting/);
+    await expect(fresh.locator('#server-drawer')).toBeHidden();await expect(fresh.locator('#server-welcome')).toBeHidden();
+    await expect(fresh.locator('#sheetCard')).toBeHidden();
+    release();await expect(fresh.locator('#title')).toHaveValue('Cold start destination');
+    await expect(fresh.locator('#sheetCard')).toBeVisible();await expect(fresh.locator('#server-status')).toHaveText('All changes saved');
+  }finally{await context.close();}
 });
 
 test('refresh displays cached estimate before live sync and preserves early edits',async({page})=>{

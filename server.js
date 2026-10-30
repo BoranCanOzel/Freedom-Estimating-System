@@ -2,7 +2,7 @@ import express from 'express';
 import { createServer } from 'node:http';
 import { DatabaseSync } from 'node:sqlite';
 import { randomUUID, randomBytes, scryptSync, timingSafeEqual, createHash } from 'node:crypto';
-import { mkdirSync, writeFileSync, renameSync, readdirSync, unlinkSync } from 'node:fs';
+import { mkdirSync, writeFileSync, renameSync, readdirSync, unlinkSync, existsSync, statSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
@@ -85,12 +85,23 @@ export function createApp(options = {}) {
   }
   const publicProject = row => {
     const { state, ...metadata } = row;
-    const room = rooms.get(row.id), book = room ? readBook(room.doc) : null;
+    const room = rooms.get(row.id), book = room?.clients.size ? roomBook(room) : null;
     return { ...metadata, online: [...(rooms.get(row.id)?.clients || [])].map(ws => ws.name),
       locations: [...(room?.clients || [])].map(ws => ({name:ws.name,...(book && resolveLocation(book,ws.presence || {}) || {})})) };
   };
   function project(id) {
     return validId(id) && db.prepare('SELECT * FROM projects WHERE id=?').get(id);
+  }
+  const metadataColumns='id,name,created_at,modified_at,accessed_at,modified_by';
+  function roomBook(room){return room.book ||= readBook(room.doc);}
+  function preferencesFor(name){
+    const last=db.prepare(`SELECT a.project_id FROM access a JOIN projects p ON p.id=a.project_id WHERE a.name=? ORDER BY a.opened_at DESC,a.project_id LIMIT 1`).get(name);
+    const prefs=db.prepare('SELECT cursor,color FROM user_preferences WHERE name=?').get(name);
+    return {cursor:normalizeCursor(prefs?.cursor),color:normalizeCursorColor(prefs?.color),lastWorkbook:last?.project_id||null};
+  }
+  function detailPreferencesFor(workbook,name){
+    return db.prepare('SELECT list_id,takeoff_id,details_collapsed FROM takeoff_preferences WHERE workbook_id=? AND name=?').all(workbook,name)
+      .map(row=>({list:row.list_id,takeoff:row.takeoff_id,detailsCollapsed:!!row.details_collapsed}));
   }
   function snapshot(id) {
     const row = project(id);
@@ -112,7 +123,8 @@ export function createApp(options = {}) {
       const row = project(id);
       if (!row) return null;
       const doc = new Y.Doc(); Y.applyUpdate(doc, new Uint8Array(row.state));
-      rooms.set(id, { doc, clients: new Set(), timer: null });
+      const room={doc,clients:new Set(),timer:null,book:null};
+      doc.on('update',()=>{room.book=null;});rooms.set(id,room);
     }
     return rooms.get(id);
   }
@@ -148,12 +160,23 @@ export function createApp(options = {}) {
     for (const room of rooms.values()) for (const ws of room.clients) if (ws.token === req.user.token) ws.close(4001, 'Signed out');
     res.clearCookie('freedom_session'); res.json({ ok: true });
   });
+  // One authenticated request resumes the workspace without loading every workbook.
+  app.post('/api/startup',(req,res)=>{
+    const preferences=preferencesFor(req.user.name);
+    const row=preferences.lastWorkbook && db.prepare(`SELECT ${metadataColumns} FROM projects WHERE id=?`).get(preferences.lastWorkbook);
+    let lastProject=null;
+    if(row){
+      const time=now();
+      db.prepare('UPDATE projects SET accessed_at=? WHERE id=?').run(time,row.id);
+      db.prepare('UPDATE access SET opened_at=? WHERE project_id=? AND name=?').run(time,row.id,req.user.name);
+      const visit=db.prepare('SELECT list_id,takeoff_id,sheet_id,view FROM project_visits WHERE workbook_id=? AND name=? ORDER BY viewed_at DESC LIMIT 1').get(row.id,req.user.name);
+      lastProject={...row,accessed_at:time,lastLocation:visit?{list:visit.list_id,takeoff:visit.takeoff_id,sheet:visit.sheet_id,view:visit.view}:null,
+        detailPreferences:detailPreferencesFor(row.id,req.user.name)};
+    }
+    res.json({user:req.user.name,preferences,project:lastProject});
+  });
   app.get('/api/preferences', (req, res) => {
-    const last = db.prepare(`SELECT a.project_id FROM access a JOIN projects p ON p.id=a.project_id
-      WHERE a.name=? ORDER BY a.opened_at DESC, a.project_id LIMIT 1`).get(req.user.name);
-    const preferences = db.prepare('SELECT cursor,color FROM user_preferences WHERE name=?').get(req.user.name);
-    res.json({cursor:normalizeCursor(preferences?.cursor), color:normalizeCursorColor(preferences?.color),
-      lastWorkbook:last?.project_id || null});
+    res.json(preferencesFor(req.user.name));
   });
   app.put('/api/preferences', (req, res) => {
     const previous = db.prepare('SELECT cursor,color FROM user_preferences WHERE name=?').get(req.user.name);
@@ -165,14 +188,13 @@ export function createApp(options = {}) {
     res.json({cursor,color});
   });
   app.get('/api/projects', (req, res) => {
-    const rows = db.prepare(`SELECT p.*, a.opened_at AS my_opened_at FROM projects p
+    const rows = db.prepare(`SELECT ${metadataColumns.split(',').map(col=>'p.'+col).join(',')}, a.opened_at AS my_opened_at FROM projects p
       LEFT JOIN access a ON p.id=a.project_id AND a.name=? ORDER BY COALESCE(a.opened_at,p.modified_at) DESC`).all(req.user.name);
     res.json(rows.map(publicProject));
   });
   app.get('/api/projects/:id/takeoff-preferences',(req,res)=>{
     if(!project(req.params.id))return res.status(404).json({error:'Workbook not found.'});
-    const rows=db.prepare('SELECT list_id,takeoff_id,details_collapsed FROM takeoff_preferences WHERE workbook_id=? AND name=?').all(req.params.id,req.user.name);
-    res.json(rows.map(row=>({list:row.list_id,takeoff:row.takeoff_id,detailsCollapsed:!!row.details_collapsed})));
+    res.json(detailPreferencesFor(req.params.id,req.user.name));
   });
   app.put('/api/projects/:id/takeoff-preferences',(req,res)=>{
     const row=project(req.params.id);if(!row)return res.status(404).json({error:'Workbook not found.'});
@@ -226,7 +248,7 @@ export function createApp(options = {}) {
         if (lastLocation) break;
       }
     }
-    res.json({...publicProject(row),lastLocation});
+    res.json({...publicProject(row),lastLocation,detailPreferences:detailPreferencesFor(row.id,req.user.name)});
   });
   app.patch('/api/projects/:id', (req, res) => {
     if (!project(req.params.id)) return res.status(404).json({ error: 'Project not found.' });
@@ -261,11 +283,22 @@ export function createApp(options = {}) {
   app.use('/api', (_req, res) => res.status(404).json({error:'API route not found. Restart the Node project after deployment.'}));
   app.get('/', (req, res) => {
     res.set('Cache-Control','no-store');
-    res.sendFile(join(root, session(req) ? 'index.html' : 'signin.html'));
+    const signedIn=!!session(req);
+    if(signedIn&&compressed(req,res,join(root,'index.html'),join(root,'dist','index.html')))return;
+    res.sendFile(join(root, signedIn ? 'index.html' : 'signin.html'));
   });
+  function compressed(req,res,source,base=source){
+    res.vary('Accept-Encoding');
+    const encoding=req.acceptsEncodings('br','gzip','identity');
+    const file=base+(encoding==='br'?'.br':encoding==='gzip'?'.gz':'');
+    if(!['br','gzip'].includes(encoding)||!existsSync(file)||!existsSync(source)||statSync(file).mtimeMs<statSync(source).mtimeMs)return false;
+    res.type(source.endsWith('.js')?'application/javascript':source.endsWith('.css')?'text/css':'text/html');
+    res.set('Content-Encoding',encoding);res.sendFile(file);return true;
+  }
   app.use('/assets', (req,res,next) => {
-    res.set('Cache-Control','no-store');
-    if (!session(req)) return res.status(401).send('Please sign in.');
+    if (!session(req)) return res.status(401).set('Cache-Control','no-store').send('Please sign in.');
+    res.set('Cache-Control','private, no-cache');
+    if(/^\/[a-zA-Z0-9_-]+\.(js|css)$/.test(req.path)&&compressed(req,res,join(root,'dist',req.path.slice(1))))return;
     next();
   }, express.static(join(root, 'dist')));
   app.get('/health', (_req, res) => res.json({ ok: true }));
@@ -302,7 +335,7 @@ export function createApp(options = {}) {
             const locationKey = JSON.stringify([p.list,p.takeoff,p.sheet,p.view]);
             if (locationKey !== ws.locationKey) {
               ws.locationKey = locationKey;
-              ws.location = resolveLocation(readBook(room.doc), p);
+              ws.location = resolveLocation(roomBook(room), p);
               if (ws.location) {
                 const l = ws.location;
                 db.prepare(`INSERT INTO project_visits VALUES (?,?,?,?,?,?,?,?)

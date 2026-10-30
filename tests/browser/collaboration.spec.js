@@ -15,16 +15,24 @@ test('own cursors stay hidden across tabs and reconnects while collaborators rem
     await second.goto('/');await expect(second.locator('#server-title')).toHaveText(name);await expect(second.locator('#server-status')).toHaveText('All changes saved');
     await expect(first.locator('.server-person').filter({hasText:aliceName})).toBeVisible();
     await second.locator('#rail .tab[data-sheet]').first().click();await first.locator('#rail .tab[data-sheet]').first().click();
+    await expect(first.locator('#rail .tab-presence')).toHaveCount(0);await expect(second.locator('#rail .tab-presence')).toHaveCount(0);
     await first.locator('#title').focus();await first.locator('#title').hover();
     await expect(second.locator('.server-cursor').filter({hasText:aliceName})).toHaveAttribute('data-style','ring');
     await expect(ownCursors(second)).toHaveCount(0);await expect(ownCursors(first)).toHaveCount(0);await expect(second.locator('.server-field:visible')).toHaveCount(0);
     await login(bob,bobName);await bob.locator('#server-open').click();await bob.getByRole('button').filter({has:bob.getByText(name,{exact:true})}).click();await expect(bob.locator('#server-status')).toHaveText('All changes saved');
     await bob.locator('#rail .tab[data-sheet]').first().click();await bob.locator('#title').focus();await bob.locator('#title').hover();
     await expect(second.locator('.server-cursor:visible').filter({hasText:bobName})).toHaveCount(1);await expect(ownCursors(second)).toHaveCount(0);
+    const badge=first.locator('#rail .tab-presence').filter({hasText:bobName});await expect(badge).toBeVisible();
+    await first.evaluate(()=>{window.retainedPresence=document.querySelector('#rail .tab-presence');});
+    await first.locator('#title').fill('Title typing preserves visitors');
+    expect(await first.evaluate(()=>window.retainedPresence===document.querySelector('#rail .tab-presence'))).toBe(true);
+    await expect(second.locator('#title')).toHaveValue('Title typing preserves visitors');
+    await expect(first.locator('#rail .tab-presence').filter({hasText:aliceName})).toHaveCount(0);
     const reconnected=second.waitForEvent('websocket');await second.evaluate(()=>window.cursorTestSocket.close());await reconnected;
     await expect(second.locator('#server-status')).toHaveText('All changes saved',{timeout:20000});await expect(first.locator('#server-status')).toHaveText('All changes saved',{timeout:20000});
     await first.locator('#title').hover();await expect(second.locator('.server-person').filter({hasText:aliceName})).toBeVisible();
     await expect(ownCursors(second)).toHaveCount(0);await expect(ownCursors(first)).toHaveCount(0);
+    await expect(second.locator('#rail .tab-presence').filter({hasText:aliceName})).toHaveCount(0);
     await bob.locator('#title').hover();await expect(second.locator('.server-cursor:visible').filter({hasText:bobName})).toHaveCount(1);
   }finally{await own.close();await other.close();}
 });
