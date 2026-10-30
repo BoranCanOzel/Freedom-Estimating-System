@@ -79,17 +79,12 @@ export function setupTakeoffFolders(bridge) {
     cancelDrag?.(false);
     const scrollLeft=bar.querySelector('.takeoff-folder-tabs')?.scrollLeft||0;
     const data=bridge.getTakeoffFolders();bar.hidden=!data;bar.replaceChildren();if(!data)return;
-    const heading=document.createElement('div');heading.className='takeoff-folder-heading';
-    heading.append(document.createElement('strong'),document.createElement('span'));
-    heading.firstElementChild.textContent='Folders';
-    heading.lastElementChild.textContent='Choose a folder to open its pages';
-    bar.append(heading);
     const tabs=document.createElement('div');tabs.className='takeoff-folder-tabs';
     for(const folder of data.groups){
       const tab=button(folder.name,()=>bridge.openTakeoffFolder(folder.id),'takeoff-folder-tab');
       tab.dataset.takeoffFolder=folder.id;tab.setAttribute('aria-pressed',String(folder.id===data.active));
       tab.title=(folder.id?'Drag to reorder this folder. ':'')+'Drop a takeoff page here to move it to '+folder.name;
-      const count=document.createElement('span');count.textContent=folder.count+' page'+(folder.count===1?'':'s');count.className='takeoff-folder-count';tab.append(count);
+      const count=document.createElement('span');count.textContent=folder.count;count.className='takeoff-folder-count';tab.append(count);
       const group=document.createElement('span');group.className='takeoff-folder-group';group.dataset.folderId=folder.id;group.append(tab);
       if(folder.id){
         tab.addEventListener('pointerdown',event=>armFolderDrag(event,group,tabs));
@@ -102,22 +97,22 @@ export function setupTakeoffFolders(bridge) {
           [...bar.querySelectorAll('.takeoff-folder-tab')].find(node=>node.dataset.takeoffFolder===folder.id)?.focus();
         });
         tab.setAttribute('aria-keyshortcuts','Alt+ArrowLeft Alt+ArrowRight');
+        const close=button('×',()=>bridge.deleteTakeoffFolder(folder.id,close),'takeoff-folder-close');
+        close.setAttribute('aria-label','Delete folder '+folder.name);close.title='Delete folder '+folder.name;group.append(close);
       }
       tabs.append(group);
     }
     bar.append(tabs);
     tabs.scrollLeft=scrollLeft;
     const actions=document.createElement('div');actions.className='takeoff-folder-actions';
-    const add=button('+ New folder',()=>edit());add.setAttribute('aria-label','New takeoff folder');actions.append(add);
+    const add=button('+ Folder',()=>edit());add.setAttribute('aria-label','New takeoff folder');actions.append(add);
     const selected=data.groups.find(f=>f.id===data.active);
     if(selected?.id){
       const rename=button('Rename',()=>edit(selected));rename.setAttribute('aria-label','Rename folder');
-      const remove=button('Delete',()=>bridge.deleteTakeoffFolder(selected.id,remove));
-      remove.className='btn alt tiny takeoff-folder-delete';remove.setAttribute('aria-label','Delete folder '+selected.name);
-      actions.append(rename,remove);
+      actions.append(rename);
     }
     if(data.sheet){
-      const label=document.createElement('label');label.className='takeoff-folder-move';label.textContent='Move current page to';
+      const label=document.createElement('label');label.className='takeoff-folder-move';label.textContent='Page folder';
       const select=document.createElement('select');select.setAttribute('aria-label','Move page to folder');
       for(const folder of data.groups)select.add(new Option(folder.name,folder.id));
       select.value=data.active;select.onchange=()=>bridge.movePageToFolder(data.sheet,select.value);label.append(select);actions.append(label);

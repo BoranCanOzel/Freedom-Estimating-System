@@ -6102,9 +6102,10 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       const totals=folder.sheets.map(sheetTotals);
       const sum=key=>totals.reduce((value,t)=>value+t[key],0);
       const showFolder=grouped&&(folder.id||folder.sheets.length);
-      const header=showFolder?'<tr class="s-folder" data-summary-folder="'+esc(folder.id)+'"><td></td><td colspan="5"><button type="button" class="summary-folder-link" data-folder="'+esc(folder.id)+'" aria-label="Open '+esc(folder.name)+' folder, '+folder.sheets.length+' '+(folder.sheets.length===1?'page':'pages')+'" title="Open this folder">'+esc(folder.name)+'</button><span class="s-sub">'+folder.sheets.length+' page'+(folder.sheets.length===1?'':'s')+'</span><span class="s-folder-open">Open folder</span></td></tr>':'';
+      if(grouped&&!showFolder&&!folder.sheets.length)return '';
+      const header=showFolder?'<tr class="s-folder" data-summary-folder="'+esc(folder.id)+'"><td class="s-num s-folder-marker" aria-hidden="true"><span>📁</span></td><td colspan="5"><button type="button" class="summary-folder-link" data-folder="'+esc(folder.id)+'" aria-label="Open '+esc(folder.name)+' folder, '+folder.sheets.length+' '+(folder.sheets.length===1?'page':'pages')+'" title="Open this folder">'+esc(folder.name)+'</button><span class="s-folder-count">'+folder.sheets.length+' page'+(folder.sheets.length===1?'':'s')+'</span></td></tr>':'';
       const footer=showFolder?'<tr class="s-folder-total" data-folder-total="'+esc(folder.id)+'"><td></td><th scope="row"><span class="folder-total-label">'+(folder.id?'Folder total':'Unfiled total')+'</span><span class="s-sub">'+esc(folder.name)+'</span></th><td>'+moneyHTML(sum('sub'))+'</td><td>'+moneyHTML(sum('feeSum'))+'</td><td class="s-grand">'+moneyHTML(sum('grand'))+(folder.sheets.some(sh=>num(sh.roundTotal))?roundedTotalHTML(sum('grandRounded')):'')+'</td><td></td></tr>':'';
-      return header+folder.sheets.map(sh => {
+      const contents=header+folder.sheets.map(sh => {
       const s = sheetTotals(sh);
       tot.sub += s.sub; tot.fee += s.feeSum; tot.grand += s.grand; tot.rounded += s.grandRounded;
 
@@ -6172,6 +6173,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       }
       return block;
       }).join('')+footer;
+      return grouped?'<tbody class="summary-folder-group" data-folder-group="'+esc(folder.id)+'">'+contents+'</tbody>':contents;
     }).join('');
 
     t.innerHTML =
@@ -6182,7 +6184,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
                            c.k === 'scope' ? '' : 'num') + '" data-sw="' + c.k + '">' +
           c.label + '</th>').join('') +
       '</tr></thead>' +
-      '<tbody>' + rows + '</tbody>' +
+      (grouped?rows:'<tbody>' + rows + '</tbody>') +
       '<tfoot><tr>' +
         '<td class="s-num"></td><td><div class="tot-label">All options</div></td>' +
         '<td>' + moneyHTML(tot.sub) + '</td>' +

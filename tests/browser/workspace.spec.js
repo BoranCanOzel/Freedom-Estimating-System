@@ -171,7 +171,7 @@ test('page tabs drag between takeoff folders, cancel safely and retain pricing a
   expect(await snapshot()).toEqual(moved);
 });
 
-test('takeoff folder tabs reorder, persist and confirm deletion from folder actions',async({page})=>{
+test('takeoff folder tabs reorder, persist and confirm deletion from their close buttons',async({page})=>{
   const data=workbook(),tk=data.lists[0].companies[0].projects[0].takeoffs[0];
   tk.folders=[{id:'a',name:'Building A'},{id:'b',name:'Building B'},{id:'c',name:'Empty folder'}];
   tk.sheets[0].folderId='a';tk.sheets.push({...sheet('b-page','Building B work'),folderId:'b'});
@@ -184,8 +184,8 @@ test('takeoff folder tabs reorder, persist and confirm deletion from folder acti
     await page.mouse.move(source.x+source.width/2,source.y+source.height/2);await page.mouse.down();
     await page.mouse.move(target.x+2,target.y+target.height/2,{steps:12});
   };
-  await expect(page.locator('.takeoff-folder-close')).toHaveCount(0);
-  await expect(page.locator('.takeoff-folder-delete')).toHaveCount(1);
+  await expect(page.locator('.takeoff-folder-close')).toHaveCount(3);
+  await expect(page.locator('.takeoff-folder-group[data-folder-id=""] .takeoff-folder-close')).toHaveCount(0);
   await drag('c','a');await page.mouse.up();
   expect(await order()).toEqual(['','c','a','b']);
   await expect(page.locator('[data-takeoff-folder="a"]')).toHaveAttribute('aria-pressed','true');
@@ -204,7 +204,7 @@ test('takeoff folder tabs reorder, persist and confirm deletion from folder acti
   await expect(page.locator('#server-status')).toHaveText('All changes saved');
   expect(await order()).toEqual(['','a','c','b']);
   await page.screenshot({path:'.tools/takeoff-folder-close-reorder.png'});
-  const remove=async name=>{await page.locator('[data-takeoff-folder]').filter({hasText:name}).click();await page.getByRole('button',{name:'Delete folder '+name,exact:true}).click();};
+  const remove=async name=>page.getByRole('button',{name:'Delete folder '+name,exact:true}).click();
   await remove('Building B');
   await expect(page.getByRole('alertdialog')).toContainText('Are you sure you want to delete "Building B"?');
   await page.getByRole('alertdialog').getByRole('button',{name:'Cancel',exact:true}).click();
@@ -217,7 +217,7 @@ test('takeoff folder tabs reorder, persist and confirm deletion from folder acti
   await remove('Building A');await page.getByRole('alertdialog').getByRole('button',{name:'Delete folder',exact:true}).click();
   await expect(page.locator('[data-takeoff-folder=""]')).toHaveAttribute('aria-pressed','true');
   await expect(page.locator('#rail [data-sheet]')).toHaveCount(2);
-  await expect(page.locator('.takeoff-folder-delete')).toHaveCount(0);
+  await expect(page.locator('.takeoff-folder-close')).toHaveCount(0);
   expect((await snapshot()).sheets.map(sh=>sh.rows)).toEqual(original.sheets.map(sh=>sh.rows));
   await page.locator('#rail .tab-summary').click();await expect(page.locator('#sumTable tfoot')).toContainText('257.50');
 });
