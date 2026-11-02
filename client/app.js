@@ -1,5 +1,5 @@
 import * as Y from 'yjs';
-import { readBook, writeBook, validateBook } from '../shared/model.js';
+import { readBook, writeBook } from '../shared/model.js';
 import './style.css';
 import { setupWorkspace } from './workspace.js';
 import { setupSidebar } from './sidebar.js';
@@ -18,7 +18,7 @@ import { createDetailPreferences } from './detail-preferences.js';
 import { setupTakeoffFolders } from './takeoff-folders.js';
 import { setupTimeline } from './timeline.js';
 import { setupTransfers } from './transfers.js';
-import { detectTransfer, transferChoices } from '../shared/transfers.js';
+import { setupImportDialog } from './import-dialog.js';
 import { WORKBOOK_LIMIT_BYTES, WORKBOOK_LIMIT_MB } from '../shared/limits.js';
 
 const $ = id => document.getElementById(id);
@@ -644,10 +644,8 @@ setupTakeoffFolders(bridge);
 setupAiInformation(api,item=>openProject({id:item.workbook},{list:item.list,takeoff:item.takeoff,sheet:item.sheet,view:'summary'}));
 setupHumanInformation(api);
 setupSidebar(bridge);
-const transfers=setupTransfers(bridge,()=>connection,message);
-const importDialog=document.createElement('dialog');importDialog.id='import-preview';
-importDialog.innerHTML='<form><h2>Import JSON</h2><p id="import-detected"></p><label>Import as <select id="import-kind"></select></label><p>A workbook creates a new saved workbook. Individual records are added as copies to a destination you select.</p><div class="server-dialog-actions"><button type="button">Cancel</button><button type="submit">Continue</button></div></form>';
-document.body.append(importDialog);importDialog.querySelector('button[type=button]').onclick=()=>importDialog.close();
+const transfers=setupTransfers(bridge,()=>connection);
+const importDialog=setupImportDialog(bridge,()=>connection,createProject,message);
 const exportDialog=document.createElement('dialog');exportDialog.id='export-options';
 exportDialog.innerHTML='<form><h2>Export JSON</h2><label>Export type <select id="export-kind"><option value="workbook">Workbook</option><option value="project">Project</option><option value="takeoff">Takeoff / estimate</option><option value="customer">Customer</option></select></label><div class="server-dialog-actions"><button type="button">Cancel</button><button type="submit">Continue</button></div></form>';
 document.body.append(exportDialog);exportDialog.querySelector('button[type=button]').onclick=()=>exportDialog.close();
@@ -720,13 +718,7 @@ $('server-import-file').onchange = event => run(async () => {
   for (const file of files) {
     if (file.size > WORKBOOK_LIMIT_BYTES) throw new Error(file.name + ' exceeds the ' + WORKBOOK_LIMIT_MB + ' MB limit.');
     const raw = JSON.parse(await file.text());
-    const inferred=detectTransfer(raw),name=file.name.replace(/\.json$/i,'');
-    const labels={workbook:'Workbook',customer:'Customer',project:'Project',takeoff:'Takeoff / estimate'};
-    $('import-detected').textContent=`Detected: ${labels[inferred]} — ${file.name}. You are about to import this as a ${labels[inferred].toLowerCase()}.`;
-    const kinds=[inferred,...['customer','project','takeoff'].filter(k=>k!==inferred&&transferChoices(raw,k,name).length)];
-    $('import-kind').replaceChildren(...kinds.map(k=>new Option(labels[k],k)));
-    importDialog.querySelector('form').onsubmit=e=>{e.preventDefault();const kind=$('import-kind').value;importDialog.close();run(async()=>{if(kind==='workbook'){validateBook(raw);await createProject(name,bridge.prepare(raw));}else transfers.import(raw,kind,name);});};
-    importDialog.showModal();break;
+    importDialog.open(raw,file.name.replace(/\.json$/i,''),file.name);break;
   }
 });
 // Existing file controls use the server project workflow as well.

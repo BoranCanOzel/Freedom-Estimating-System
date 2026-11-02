@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {transferChoices,exportTransfer,importTransfer,detectTransfer} from '../shared/transfers.js';
+import {transferChoices,exportTransfer,importTransfer,detectTransfer,transferDependencies} from '../shared/transfers.js';
 const takeoff={id:'t',name:'Estimate',summaryNotes:'Estimate-specific notes',sheets:[{id:'s',rows:[{id:'section',type:'section',name:'Labor'},{id:'r',kind:'labor',cost:'75',count:2,time:8,days:1},{id:'end',type:'sectionEnd',sid:'section'}]}]};
 const project={id:'p',name:'Vons',takeoffs:[takeoff]};
 const customer={id:'c',name:'Centennial',projects:[project]};
@@ -75,4 +75,30 @@ test('copied takeoffs keep timeline tasks, resources and costs linked to copied 
  assert.notEqual(copy.timeline.costs[0].id,source.timeline.costs[0].id);
  assert.equal(copy.timeline.costs[0].amount,200);
  assert.equal(JSON.stringify(source),snapshot);
+});
+
+test('flat estimate imports retain page folders, Scope, planning and unit overrides',()=>{
+ const source={name:'Flat estimate',folders:[{id:'building',name:'Building A'},{id:'empty',name:'Future work'}],activeFolder:'building',summaryNotes:'Included work',
+  sheets:[{id:'page',folderId:'building',units:[{id:'unit',label:'SF',qty:20}],rows:[{id:'section',type:'section',name:'Concrete',units:{unit:{qty:12,label:'LF'}}}]}],
+  scopeData:{items:[{id:'section',name:'External scope'}]},scopeAssignments:{section:'page'},timeline:{hoursPerDay:8,tasks:[],costs:[]}};
+ for(const raw of [source,{_app:'project-breakdown',...source},exportTransfer(book,'takeoff',{id:'estimate',...source})]){
+  const record=transferChoices(raw,'takeoff')[0].data;
+  const copy=importTransfer(book,'takeoff',record,'p').lists[0].companies[0].projects[0].takeoffs.at(-1);
+  assert.deepEqual(copy.folders.map(f=>f.name),['Building A','Future work']);
+  assert.notEqual(copy.folders[0].id,'building');assert.equal(copy.sheets[0].folderId,copy.folders[0].id);
+  if(copy.activeFolder)assert.equal(copy.activeFolder,copy.folders[0].id);
+  assert.equal(copy.summaryNotes,'Included work');assert.deepEqual(copy.timeline,source.timeline);
+  assert.equal(copy.scopeAssignments.section,copy.sheets[0].id);assert.deepEqual(copy.scopeData,source.scopeData);
+  assert.deepEqual(copy.sheets[0].rows[0].units,{[copy.sheets[0].units[0].id]:{qty:12,label:'LF'}});
+ }
+});
+
+test('legacy scoped imports carry library templates and nested and empty library folders',()=>{
+ const raw={_app:'project-breakdown',sheets:takeoff.sheets,templates:{items:[{id:'item',name:'Crew',folder:'Labor / Concrete'}]},folders:['Labor','Labor / Concrete','Empty']};
+ const record=transferChoices(raw,'takeoff')[0].data;
+ assert.equal(record.folders,undefined);
+ const dependencies=transferDependencies(raw),copy=importTransfer(book,'takeoff',record,'p',dependencies);
+ assert.deepEqual(copy.libs[0].folders,raw.folders);assert.equal(copy.libs[0].templates.items[0].folder,'Labor / Concrete');
+ assert.ok(copy.libs[0].id);assert.notEqual(copy.libs[0].templates.items[0].id,'item');
+ assert.deepEqual(raw.folders,['Labor','Labor / Concrete','Empty']);
 });

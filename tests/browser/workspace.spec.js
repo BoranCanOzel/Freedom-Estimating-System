@@ -804,10 +804,10 @@ test('scoped imports append projects and export just the selected customer',asyn
   const chooser=page.waitForEvent('filechooser');await page.locator('#server-import').click();
   await (await chooser).setFiles({name:'legacy.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(workbook()))});
   await expect(page.locator('#import-detected')).toContainText('Detected: Workbook');
-  await page.locator('#import-kind').selectOption('project');await page.locator('#import-preview button[type=submit]').click();
-  await expect(page.locator('#transfer-dialog')).toBeVisible();
-  await page.locator('#transfer-source').selectOption('1');
-  await page.locator('#transfer-dialog button[type=submit]').click();
+  await page.locator('#import-kind').selectOption('project');
+  await page.locator('input[name="import-source"][value="1"]').check();
+  await page.locator('#import-preview button[type=submit]').click();
+  await expect(page.locator('#import-preview')).not.toBeVisible();
   await expect(page.locator('#transfer-dialog')).not.toBeVisible();
   await expect(page.locator('#server-status')).toHaveText('All changes saved');
   const data=await page.evaluate(()=>window.estimator.getShared());
@@ -822,6 +822,43 @@ test('scoped imports append projects and export just the selected customer',asyn
   expect(exported._scope).toBe('customer');expect(exported.data.projects).toHaveLength(3);expect(exported.lists).toBeUndefined();
   await page.reload();await expect(page.locator('#server-status')).toHaveText('All changes saved');
   expect(await page.evaluate(()=>window.estimator.getShared().lists[0].companies[0].projects.length)).toBe(3);
+});
+
+test('one-screen takeoff import defaults to the current project and retains folders and library data',async({page})=>{
+  const data=workbook();
+  data.lists.push({id:'second-list',name:'Second list',companies:[{id:'second-customer',name:'Freedom Customer',projects:[{id:'second-project',name:'North job',takeoffs:[{id:'second-takeoff',name:'Existing',sheets:[sheet('existing-page','Existing page')]}]}]}]});
+  await openWorkbook(page,data);
+  await page.evaluate(()=>window.estimator.openLocation({list:'second-list',takeoff:'second-takeoff',view:'summary'}));
+  const imported={_app:'project-breakdown',name:'Folder import',summaryNotes:'Imported summary',folders:[{id:'folder-a',name:'Building A'},{id:'folder-empty',name:'Future work'}],
+    sheets:[{...sheet('incoming-page','Imported page'),folderId:'folder-a'}],scopeData:{items:[{id:'measurement',name:'Measured work'}]},scopeAssignments:{measurement:'incoming-page'},
+    libs:[{id:'incoming-library',name:'Imported rates',folders:['Labor','Labor / Concrete','Empty library folder'],templates:{items:[{id:'incoming-item',name:'Crew rate',folder:'Labor / Concrete',cost:40}],sections:[],scopes:[]}}]};
+  await page.locator('#server-import-file').setInputFiles({name:'folders.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(imported))});
+  await expect(page.locator('#import-summary')).toContainText('2 folders');
+  await expect(page.locator('#import-summary')).toContainText('Future work');
+  await expect(page.locator('input[name="import-target"]:checked')).toHaveValue('second-project');
+  await expect(page.locator('#import-result')).toContainText('Second list / Freedom Customer / North job');
+  await expect(page.locator('#import-sources input')).toHaveCount(0);
+  await page.locator('#import-search').fill('Second list');
+  await expect(page.locator('#import-targets input')).toHaveCount(1);
+  await page.screenshot({path:'test-results/import-desktop.png'});
+  await page.setViewportSize({width:390,height:844});
+  await expect(page.locator('#import-preview button[type=submit]')).toBeInViewport();
+  await page.screenshot({path:'test-results/import-mobile.png'});
+  await page.locator('#import-preview button[type=submit]').click();
+  await expect(page.locator('#import-preview')).not.toBeVisible();
+  await expect(page.locator('#transfer-dialog')).not.toBeVisible();
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  const saved=await page.evaluate(()=>window.estimator.getShared());
+  expect(saved.lists[0].companies[0].projects[0].takeoffs).toHaveLength(1);
+  const copy=saved.lists[1].companies[0].projects[0].takeoffs.at(-1);
+  expect(copy.name).toBe('Folder import');expect(copy.folders.map(f=>f.name)).toEqual(['Building A','Future work']);
+  expect(copy.sheets[0].folderId).toBe(copy.folders[0].id);expect(copy.folders[0].id).not.toBe('folder-a');
+  expect(copy.scopeAssignments.measurement).toBe(copy.sheets[0].id);expect(copy.summaryNotes).toBe('Imported summary');
+  expect(saved.libs.find(l=>l.name==='Imported rates').folders).toEqual(imported.libs[0].folders);
+  expect(await page.evaluate(()=>window.estimator.getLocation().takeoff)).toBe(copy.id);
+  await page.reload();await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await expect(page.locator('#takeoff-folders')).toContainText('Building A');
+  await expect(page.locator('#takeoff-folders')).toContainText('Future work');
 });
 
 test('takeoff Share creates selectable access links and revokes them',async({page})=>{
@@ -842,7 +879,6 @@ test('imported takeoff can create a view link immediately and after reload',asyn
   const imported={name:'Imported takeoff',sheets:[sheet('import-page','Imported scope')]};
   await (await chooser).setFiles({name:'takeoff.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(imported))});
   await page.locator('#import-preview button[type=submit]').click();
-  await page.locator('#transfer-dialog button[type=submit]').click();
   await page.evaluate(()=>{
     const list=window.estimator.getShared().lists[0];
     const takeoff=list.companies[0].projects[0].takeoffs.at(-1);

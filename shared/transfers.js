@@ -24,15 +24,28 @@ export function transferChoices(raw, kind, fallback='Imported estimate') {
   else if(Array.isArray(value.companies)&&value.companies.length)for(const c of value.companies)customer(c,'');
   else if(Array.isArray(value.projects))customer(value,'');
   else if(Array.isArray(value.takeoffs))project(value,'');
-  else if(Array.isArray(value.sheets))takeoff(raw._scope==='takeoff'||(!value._app&&value.id)?{...value,name:value.name||fallback}:{name:value.name||fallback,note:value.note||'',custom:value.custom||{},sheets:value.sheets},'');
+  else if(Array.isArray(value.sheets)){
+    const record=raw._scope==='takeoff'||(!value._app&&value.id)?{...value}:Object.fromEntries(
+      ['name','note','custom','summaryNotes','sheets','folders','scopeData','scopeLink','scopeAiAccess','scopeAssignments','timeline','aiData','aiDataWorkTypes','aiDataMethod','aiDataPrevailingWage','aiDataNightWork','loadCalc'].filter(key=>value[key]!==undefined).map(key=>[key,value[key]]));
+    // Legacy workbook folders are library paths (strings), not page folders.
+    if(record.folders?.some(folder=>typeof folder==='string'))delete record.folders;
+    record.name ||= fallback;takeoff(record,'');
+  }
   else if(Array.isArray(value.rows))takeoff({name:fallback,sheets:[value]},'');
   else throw Error('No customers, projects or takeoffs found in this JSON.');
   return result;
 }
 
-export function exportTransfer(book,kind,record){
+export function transferDependencies(raw){
+  const book=raw.dependencies||raw;
   const dependencies={};
   for(const key of ['libs','catalog','wageGroups','customFields','customFieldSettings','statuses'])if(book[key]!==undefined)dependencies[key]=structuredClone(book[key]);
+  if(!dependencies.libs?.length&&book.templates)dependencies.libs=[{name:'Imported library',templates:structuredClone(book.templates),folders:structuredClone((book.folders||[]).filter(folder=>typeof folder==='string'))}];
+  return dependencies;
+}
+
+export function exportTransfer(book,kind,record){
+  const dependencies=transferDependencies(book);
   return {_app:'project-breakdown',_v:3,_scope:kind,data:structuredClone(record),dependencies};
 }
 
@@ -40,7 +53,16 @@ export function importTransfer(book,kind,record,target,dependencies={},uuid=()=>
   const next=structuredClone(book),bundle=structuredClone({record,dependencies}),ids=new Map();
   function scan(v){if(!v||typeof v!=='object')return;if(typeof v.id==='string'&&!ids.has(v.id))ids.set(v.id,uuid());for(const [key,x] of Object.entries(v))if(key!=='scopeData')scan(x);}
   scan(bundle);
-  function rewrite(v){if(!v||typeof v!=='object')return;if(v.scopeAssignments)v.scopeAssignments=Object.fromEntries(Object.entries(v.scopeAssignments).map(([item,page])=>[ids.get(item)||item,ids.get(page)||page]));for(const [k,x]of Object.entries(v)){if(typeof x==='string'&&ids.has(x)&&(/id$/i.test(k)||['active','sid','ref','template','subtype','service','construct'].includes(k)))v[k]=ids.get(x);else if(k!=='scopeData')rewrite(x);}if(!Array.isArray(v)&&!v.id&&('rows'in v||'sheets'in v||'takeoffs'in v||'projects'in v))v.id=uuid();}
+  function rewrite(v){
+    if(!v||typeof v!=='object')return;
+    if(v.scopeAssignments)v.scopeAssignments=Object.fromEntries(Object.entries(v.scopeAssignments).map(([item,page])=>[item,ids.get(page)||page]));
+    if(v.units&&!Array.isArray(v.units))v.units=Object.fromEntries(Object.entries(v.units).map(([unit,value])=>[ids.get(unit)||unit,value]));
+    for(const [k,x]of Object.entries(v)){
+      if(typeof x==='string'&&ids.has(x)&&(/id$/i.test(k)||['active','activeFolder','sid','ref','template','subtype','service','construct'].includes(k)))v[k]=ids.get(x);
+      else if(k!=='scopeData')rewrite(x);
+    }
+    if(!Array.isArray(v)&&!v.id&&('rows'in v||'sheets'in v||'takeoffs'in v||'projects'in v||'templates'in v))v.id=uuid();
+  }
   rewrite(bundle);
   const lists=next.lists||[],companies=lists.flatMap(l=>l.companies||[]),projects=companies.flatMap(c=>c.projects||[]);
   const parent=(kind==='customer'?lists:kind==='project'?companies:projects).find(p=>p.id===target);
