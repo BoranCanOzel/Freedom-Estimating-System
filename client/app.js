@@ -148,7 +148,12 @@ class LiveProject {
       // openProject has already checked server access. Show the device copy
       // immediately; local edits still merge through the normal Yjs sync.
       this.applying = true;
-      try { renderRemote(readBook(this.doc), true, this.resumeLocation); this.baseline = bridge.getShared(); }
+      try {
+        const stored = readBook(this.doc);
+        renderRemote(stored, true, this.resumeLocation);
+        this.baseline = bridge.getShared();
+        writeBook(this.doc, stored, this.baseline, 'normalize');
+      }
       finally { this.applying = false; }
       this.historyLocation = clone(bridge.getLocation());
       this.resumeLocation = undefined;
@@ -178,8 +183,12 @@ class LiveProject {
           this.applying = true;
           try {
             if(this.remoteChanged || !this.ready){
-              renderRemote(readBook(this.doc), !this.ready, this.resumeLocation);
+              const stored = readBook(this.doc);
+              renderRemote(stored, !this.ready, this.resumeLocation);
               this.baseline = bridge.getShared();
+              // Legacy imports gain lists/takeoffs while rendering. Persist those
+              // IDs in the initial sync so server-side sharing can resolve them.
+              if(msg.type==='sync')writeBook(this.doc, stored, this.baseline, 'normalize');
             }
           }
           finally { this.applying = false; }

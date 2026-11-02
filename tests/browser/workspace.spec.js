@@ -835,6 +835,50 @@ test('takeoff Share creates selectable access links and revokes them',async({pag
   await expect(page.locator('#share-links p').filter({hasText:'View and edit'})).toContainText('Revoked');
 });
 
+test('imported takeoff can create a view link immediately and after reload',async({page})=>{
+  await openWorkbook(page);
+  await page.locator('#workspace-file').evaluate(el=>el.open=true);
+  const chooser=page.waitForEvent('filechooser');await page.locator('#server-import').click();
+  const imported={name:'Imported takeoff',sheets:[sheet('import-page','Imported scope')]};
+  await (await chooser).setFiles({name:'takeoff.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(imported))});
+  await page.locator('#import-preview button[type=submit]').click();
+  await page.locator('#transfer-dialog button[type=submit]').click();
+  await page.evaluate(()=>{
+    const list=window.estimator.getShared().lists[0];
+    const takeoff=list.companies[0].projects[0].takeoffs.at(-1);
+    window.estimator.openLocation({list:list.id,takeoff:takeoff.id,view:'summary'});
+  });
+  for(const reload of [false,true]){
+    if(reload){await page.reload();await expect(page.locator('#server-status')).toHaveText('All changes saved');}
+    await page.locator('#takeoff-share').click();
+    await expect(page.locator('#share-message')).toBeEmpty();
+    await page.locator('#share-create').click();
+    await expect(page.locator('#share-url')).toHaveValue(/\/share#[a-f0-9]{64}$/);
+    const url=await page.locator('#share-url').inputValue();
+    const response=await page.request.get('/api/shared-takeoff',{headers:{Authorization:'Bearer '+url.split('#')[1]}});
+    expect(response.ok()).toBeTruthy();expect((await response.json()).takeoff.name).toBe('Imported takeoff');
+    await page.locator('#share-close').click();
+  }
+});
+
+test('legacy imported workbook saves its takeoff structure before sharing',async({page})=>{
+  await openWorkbook(page);
+  const created=await page.request.post('/api/projects',{data:{name:'Legacy imported workbook',book:{sheets:[sheet('legacy-page','Legacy scope')]}}});
+  const project=await created.json();
+  await page.request.post('/api/projects/'+project.id+'/open');
+  await page.reload();
+  await expect(page.locator('#server-title')).toHaveText('Legacy imported workbook');
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.locator('#takeoff-share').click();
+  await expect(page.locator('#share-links')).toHaveText('No share links yet.');
+  await page.locator('#share-create').click();
+  await expect(page.locator('#share-url')).toHaveValue(/\/share#[a-f0-9]{64}$/);
+  const url=await page.locator('#share-url').inputValue();
+  await page.reload();await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  const response=await page.request.get('/api/shared-takeoff',{headers:{Authorization:'Bearer '+url.split('#')[1]}});
+  expect(response.ok()).toBeTruthy();expect((await response.json()).takeoff.sheets[0].title).toBe('Legacy scope');
+});
+
 test('takeoff AI access generates a scoped package, updates live, and offers undo', async ({page}) => {
   await openWorkbook(page,workbook(),'AI browser '+Date.now());
   await page.locator('#takeoff-ai-access').click();
