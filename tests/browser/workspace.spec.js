@@ -3077,6 +3077,29 @@ test('a fresh device waits for the saved takeoff without flashing workbook or pr
   }finally{await context.close();}
 });
 
+test('reconnect recovers from a save error and uploads only missing changes',async({page})=>{
+  let live;
+  const uploads=[],downloads=[];
+  await page.routeWebSocket('**/live/**',socket=>{
+    live=socket;const server=socket.connectToServer();
+    socket.onMessage(message=>{if(JSON.parse(message).type==='update')uploads.push(message.length);server.send(message);});
+    server.onMessage(message=>{if(JSON.parse(message).type==='sync')downloads.push(message.length);socket.send(message);});
+  });
+  const data=workbook();data.lists[0].companies[0].projects[0].takeoffs[0].note='Imported scope details. '.repeat(10000);
+  await openWorkbook(page,data);
+  live.send(JSON.stringify({type:'error',error:'Edit was not saved: Temporary save failure.'}));
+  await expect(page.locator('#server-status')).toContainText('Temporary save failure');
+  uploads.length=0;downloads.length=0;
+  live.close({code:1012,reason:'Reconnect test'});
+  await expect.poll(()=>downloads.length).toBe(1);
+  await expect.poll(()=>uploads.length).toBeGreaterThan(0);
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  expect(uploads[0]).toBeLessThan(downloads[0]/10);
+  await page.locator('#title').fill('Saved after reconnect');
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();await expect(page.locator('#title')).toHaveValue('Saved after reconnect');
+});
+
 test('refresh displays cached estimate before live sync and preserves early edits',async({page})=>{
   await openWorkbook(page);
   await page.evaluate(()=>window.estimator.openLocation({list:'list',takeoff:'tn',sheet:'sn',view:'sheet'}));

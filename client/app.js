@@ -28,6 +28,7 @@ let user, current, connection, projects = [], filter = '', busy = false, browsin
 let workspace, projectPresence, recentMode = false, recentRequest = 0, preferencesAvailable = true;
 let tankDuel;
 const bridge = window.estimator;
+const saveErrorHint = 'Your changes are still in this browser. Export JSON before closing if the error persists.';
 const cacheDB = new Promise((resolve, reject) => {
   const request = indexedDB.open('freedom-collaboration', 1);
   request.onupgradeneeded = () => request.result.createObjectStore('documents');
@@ -168,7 +169,8 @@ class LiveProject {
     if (this.closed) return;
     this.synced = false;
     this.socket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/live/${this.project.id}`);
-    status(this.ready ? 'Reconnecting…' : 'Opening project…');
+    if(this.failed||this.cacheFailed)this.paintStatus();
+    else status(this.ready ? 'Reconnecting…' : 'Opening project…');
     this.socket.onmessage = event => {
       if (this.closed) return;
       try {
@@ -179,7 +181,8 @@ class LiveProject {
         if (msg.type === 'sync' || msg.type === 'update') {
           if (this.ready) this.flushChanges();
           this.remoteChanged=false;
-          Y.applyUpdate(this.doc, decode(msg.state || msg.update), 'remote');
+          const remoteUpdate = decode(msg.state || msg.update);
+          Y.applyUpdate(this.doc, remoteUpdate, 'remote');
           this.applying = true;
           try {
             if(this.remoteChanged || !this.ready){
@@ -199,18 +202,27 @@ class LiveProject {
             document.body.classList.remove('workspace-opening');
             workspace.sync(); syncProjectPanel();
             document.dispatchEvent(new Event('estimator:history'));
-            // The merged state includes edits recovered from this browser after a disconnect.
-            this.seq++; this.sendUpdate(Y.encodeStateAsUpdate(this.doc));
+            // Upload recovered edits and normalization, without echoing the
+            // entire workbook (including its history) back on every reconnect.
+            this.syncSeq=++this.seq;
+            this.sendUpdate(Y.encodeStateAsUpdate(this.doc,Y.encodeStateVectorFromUpdate(remoteUpdate)));
           }
           this.sendPresence(); this.paintPeers();
         } else if (msg.type === 'ack') {
-          this.acked = Math.max(this.acked, msg.seq); this.paintStatus();
+          this.acked = Math.max(this.acked, msg.seq);
+          // Only the reconnect upload includes all previously rejected edits.
+          // An acknowledgement for a later incremental edit cannot prove that.
+          if(this.failed&&msg.seq===this.syncSeq){
+            this.failed='';
+            if($('server-message').textContent===saveErrorHint)message('');
+          }
+          this.paintStatus();
         } else if (msg.type === 'sessions-closed') {
           const button=this.ownSessionsButton;if(button){button.disabled=false;button.textContent=msg.count?`Closed ${msg.count} other session${msg.count===1?'':'s'}`:'No other sessions found';
             setTimeout(()=>{if(!this.closed&&button.isConnected)button.textContent='Close my other sessions';},2500);}
         } else if (msg.type === 'presence') { if(msg.selfId)this.peerId=msg.selfId;this.peers = msg.peers; this.paintPeers(); projectPresence.update(this.peers,this.peerId,user); }
         else if (msg.type === 'duel') tankDuel.receive(msg);
-        else if (msg.type === 'error') { this.failed = true; status(msg.error, true); message('Your changes are still in this browser. Export JSON before closing if the error persists.', true); }
+        else if (msg.type === 'error') { this.failed = msg.error; this.paintStatus(); message(saveErrorHint, true); }
       } catch (e) { status('Could not apply a shared update. Export your work before reloading.', true); console.error(e); }
     };
     this.socket.onclose = event => {
@@ -307,7 +319,8 @@ class LiveProject {
     this.sendPresence();
   }
   paintStatus() {
-    if (this.failed || this.cacheFailed) return;
+    if(this.failed){status(this.failed,true);return;}
+    if(this.cacheFailed){status('Device backup failed — keep this tab open',true);return;}
     status(!this.synced ? 'Offline · reconnecting · edits kept on this device' : this.pendingChanges || this.acked < this.seq ? 'Saving…' : 'All changes saved');
   }
   sendPresence(pointer) {
