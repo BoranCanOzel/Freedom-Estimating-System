@@ -2,6 +2,7 @@ import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import * as Y from 'yjs';
 import { readBook, writeBook, validateBook } from './shared/model.js';
+import {WORKBOOK_LIMIT_BYTES,WORKBOOK_LIMIT_MESSAGE} from './shared/limits.js';
 import { locateTakeoff, findTakeoff, aiVisibleTakeoff, revision, validateTakeoff, differences, takeoffSchema, changeSchema } from './shared/ai-takeoff.js';
 
 import {deriveTimeline} from './shared/timeline.js';
@@ -87,7 +88,7 @@ export function mountAiAccess({app,db,session,project,rooms,snapshot,readAiInfor
       const applied=findTakeoff(readBook(doc),data.scope),expected=findTakeoff(data.next,data.scope);
       if(revision(applied)!==revision(expected))fail(422,'The supplied JSON contains a structure that cannot be saved.');
       const update=Y.encodeStateAsUpdate(doc,vector),state=Buffer.from(Y.encodeStateAsUpdate(doc));
-      if(state.length>25*1024*1024)fail(413,'Workbook exceeds the storage limit.');
+      if(state.length>WORKBOOK_LIMIT_BYTES)fail(413,WORKBOOK_LIMIT_MESSAGE);
       db.exec('BEGIN IMMEDIATE');
       try{transaction();db.prepare('UPDATE projects SET state=?,modified_at=?,modified_by=? WHERE id=?').run(state,new Date().toISOString(),actor,workbook);db.exec('COMMIT');}
       catch(error){db.exec('ROLLBACK');throw error;}

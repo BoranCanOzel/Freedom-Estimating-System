@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as Y from 'yjs';
 import { writeBook, readBook, validateBook } from './shared/model.js';
+import { WORKBOOK_LIMIT_BYTES, WORKBOOK_LIMIT_MESSAGE, SYNC_UPDATE_LIMIT_CHARS, SYNC_MESSAGE_LIMIT_BYTES } from './shared/limits.js';
 import { resolveLocation } from './shared/navigation.js';
 import { cursorStyles, normalizeCursor, cursorColors, normalizeCursorColor } from './shared/cursors.js';
 import { createDuels } from './server-duels.js';
@@ -73,7 +74,7 @@ export function createApp(options = {}) {
     next();
   });
   app.get('/favicon.svg', (req, res) => res.sendFile(join(root, 'favicon.svg')));
-  app.use(express.json({ limit: '25mb' }));
+  app.use(express.json({ limit: WORKBOOK_LIMIT_BYTES }));
   function sameOrigin(req) {
     if (!req.headers.origin) return true;
     try { return new URL(req.headers.origin).host === req.headers.host; } catch { return false; }
@@ -237,7 +238,9 @@ export function createApp(options = {}) {
     try { validateBook(req.body.book); } catch (e) { return res.status(400).json({ error: e.message }); }
     const id = randomUUID(), time = now(), doc = new Y.Doc();
     writeBook(doc, {}, req.body.book);
-    db.prepare('INSERT INTO projects VALUES (?,?,?,?,?,?,?)').run(id, name, time, time, time, req.user.name, Buffer.from(Y.encodeStateAsUpdate(doc)));
+    const state=Buffer.from(Y.encodeStateAsUpdate(doc));
+    if(state.length>WORKBOOK_LIMIT_BYTES){doc.destroy();return res.status(413).json({error:WORKBOOK_LIMIT_MESSAGE});}
+    db.prepare('INSERT INTO projects VALUES (?,?,?,?,?,?,?)').run(id, name, time, time, time, req.user.name, state);
     doc.destroy(); snapshot(id);
     res.status(201).json(publicProject(project(id)));
   });
@@ -312,9 +315,9 @@ export function createApp(options = {}) {
   app.get('/health', (_req, res) => res.json({ ok: true }));
   app.use((err, _req, res, _next) => {
     console.error(err.message);
-    res.status(err.status || 500).json({ error: err.status === 413 ? 'File exceeds the 25 MB limit.' : 'The server could not complete this request.' });
+    res.status(err.status || 500).json({ error: err.status === 413 ? WORKBOOK_LIMIT_MESSAGE : 'The server could not complete this request.' });
   });
-  const wss = new WebSocketServer({ noServer: true, maxPayload: 35 * 1024 * 1024 });
+  const wss = new WebSocketServer({ noServer: true, maxPayload: SYNC_MESSAGE_LIMIT_BYTES });
   server.on('upgrade', (req, socket, head) => {
     const user = session(req), url = new URL(req.url, 'http://localhost');
     if(url.pathname==='/share-live'&&sameOrigin(req)){sharePresence.upgrade(req,socket,head);return;}
@@ -371,7 +374,8 @@ export function createApp(options = {}) {
               visible: p.visible === true
             }; presence(); return;
           }
-          if (msg.type !== 'update' || typeof msg.update !== 'string' || msg.update.length > 34 * 1024 * 1024) return;
+          if (msg.type !== 'update' || typeof msg.update !== 'string') return;
+          if (msg.update.length > SYNC_UPDATE_LIMIT_CHARS) throw new Error(WORKBOOK_LIMIT_MESSAGE);
           // Validate on a candidate document before either publishing or persisting.
           const candidate = new Y.Doc();
           try {
@@ -379,7 +383,7 @@ export function createApp(options = {}) {
             Y.applyUpdate(candidate, Buffer.from(msg.update, 'base64'));
             validateBook(readBook(candidate));
             const state = Buffer.from(Y.encodeStateAsUpdate(candidate));
-            if (state.length > 25 * 1024 * 1024) throw new Error('Project exceeds the 25 MB limit.');
+            if (state.length > WORKBOOK_LIMIT_BYTES) throw new Error(WORKBOOK_LIMIT_MESSAGE);
             if (!state.equals(Buffer.from(Y.encodeStateAsUpdate(room.doc)))) {
               db.prepare('UPDATE projects SET state=?,modified_at=?,modified_by=? WHERE id=?').run(state, now(), ws.name, id);
               Y.applyUpdate(room.doc, Buffer.from(msg.update, 'base64'));

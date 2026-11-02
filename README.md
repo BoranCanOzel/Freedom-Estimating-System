@@ -138,7 +138,7 @@ DATA_DIR/
         <timestamp>.json   # most recent 50 snapshots
 ```
 
-Edits are acknowledged only after SQLite writes succeed. JSON snapshots are generated within roughly two seconds of edits, and on clean shutdown/last-client disconnect. Existing inline images and attachments remain in the workbook JSON; they are not extracted into separate files in this version. Imports and saved collaborative state are limited to 25 MB.
+Edits are acknowledged only after SQLite writes succeed. JSON snapshots are generated within roughly two seconds of edits, and on clean shutdown/last-client disconnect. Existing inline images and attachments remain in the workbook JSON; they are not extracted into separate files in this version. Imports and saved collaborative state support up to 256 MB, including normal edits, shared-link edits, and AI saves. WebSocket transport allows for base64 overhead. Existing deployments must rebuild and restart Node to apply this limit; set Nginx `client_max_body_size 256m;` and reload Nginx for large HTTP imports and API saves.
 
 For a full backup, stop the process and copy all of `DATA_DIR`, or use SQLite's supported online backup facilities. Do not copy only `projects.sqlite` while the database is running in WAL mode. The JSON snapshot history is a convenience, not a substitute for an independent backup. Never edit a snapshot to change an open project; import it as a new workbook instead.
 

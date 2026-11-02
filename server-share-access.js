@@ -2,6 +2,7 @@ import {randomBytes,randomUUID,createHash} from 'node:crypto';
 import {readFileSync,existsSync} from 'node:fs';
 import * as Y from 'yjs';
 import {readBook,writeBook,validateBook} from './shared/model.js';
+import {WORKBOOK_LIMIT_BYTES,WORKBOOK_LIMIT_MESSAGE} from './shared/limits.js';
 import {locateTakeoff,findTakeoff,revision,validateTakeoff} from './shared/ai-takeoff.js';
 import {createSharePresence} from './server-share-presence.js';
 
@@ -69,7 +70,7 @@ export function mountShareAccess({app,db,session,project,rooms,snapshot,authChan
       const vector=Y.encodeStateVector(doc);writeBook(doc,book,next,'share');
       const saved=findTakeoff(readBook(doc),scope);
       if(revision(saved)!==revision(target))fail(422,'This takeoff structure cannot be saved.');
-      const state=Buffer.from(Y.encodeStateAsUpdate(doc));if(state.length>25*1024*1024)fail(413,'Workbook exceeds storage limit.');
+      const state=Buffer.from(Y.encodeStateAsUpdate(doc));if(state.length>WORKBOOK_LIMIT_BYTES)fail(413,WORKBOOK_LIMIT_MESSAGE);
       db.prepare('UPDATE projects SET state=?,modified_at=?,modified_by=? WHERE id=?').run(state,new Date().toISOString(),'Share link via '+link.created_by,link.workbook);
       const room=rooms.get(link.workbook),update=Y.encodeStateAsUpdate(doc,vector);
       if(room){Y.applyUpdate(room.doc,update,'share');for(const ws of room.clients)if(ws.readyState===1)ws.send(JSON.stringify({type:'update',update:Buffer.from(update).toString('base64')}));}

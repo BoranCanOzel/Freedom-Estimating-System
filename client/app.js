@@ -19,6 +19,7 @@ import { setupTakeoffFolders } from './takeoff-folders.js';
 import { setupTimeline } from './timeline.js';
 import { setupTransfers } from './transfers.js';
 import { detectTransfer, transferChoices } from '../shared/transfers.js';
+import { WORKBOOK_LIMIT_BYTES, WORKBOOK_LIMIT_MB } from '../shared/limits.js';
 
 const $ = id => document.getElementById(id);
 const clone = value => structuredClone(value);
@@ -717,7 +718,7 @@ $('server-import').onclick = () => {$('server-import-file').multiple=false;$('se
 $('server-import-file').onchange = event => run(async () => {
   const files = [...event.target.files]; event.target.value = '';
   for (const file of files) {
-    if (file.size > 25 * 1024 * 1024) throw new Error(file.name + ' exceeds the 25 MB limit.');
+    if (file.size > WORKBOOK_LIMIT_BYTES) throw new Error(file.name + ' exceeds the ' + WORKBOOK_LIMIT_MB + ' MB limit.');
     const raw = JSON.parse(await file.text());
     const inferred=detectTransfer(raw),name=file.name.replace(/\.json$/i,'');
     const labels={workbook:'Workbook',customer:'Customer',project:'Project',takeoff:'Takeoff / estimate'};
