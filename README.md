@@ -123,6 +123,8 @@ Project settings save automatically. Custom fields for companies, projects, and 
 
 View → Shared cursor offers Classic (original), Pointer arrow, Crosshair, and Ring. It controls the cursor other collaborators see, leaving your local mouse pointer unchanged. This setting is stored per signed-in account in SQLite and loaded on sign-in across browsers; it does not change shared workbooks. After deploying this change, restart the Node project as well as building the client. An older running server rejects the new cursor options with “Choose a supported cursor style.”
 
+View → Appearance includes Light, Dark, Medieval, Christmas, and Halloween. Christmas adds evergreen/cranberry surfaces, a light strand, snowfall, snowy edges and Berkshire Swash headings. Halloween adds plum/amber surfaces, pumpkin lanterns, bats, cobwebs, mist and Creepster headings. Seasonal fonts and their licenses are bundled locally. Estimate data keeps its regular readable fonts; decorations cannot intercept clicks, motion respects reduced-motion preferences, and printing uses the normal light appearance. Theme choice stays personal and persists across refreshes.
+
 Scrolling reuses collaborator markers and batches their position updates once per animation frame. Medieval theme textures are pre-rendered PNGs with the same appearance as the original SVG filters. They are committed in `client/textures/` and bundled by `npm run build`; deployment does not require a browser. To regenerate them after editing the original texture definitions, run `node scripts/rasterize-textures.mjs` on a development machine with Microsoft Edge installed.
 
 Storage layout:

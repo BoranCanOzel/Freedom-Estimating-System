@@ -5707,7 +5707,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
   // Medieval rides on top of dark: the drawers, editor and menus keep the dark
   // surfaces, and body.medieval restyles the sheet, the tabs and the bars
-  const THEMES = ['light', 'dark', 'medieval'];
+  const THEMES = ['light', 'dark', 'medieval', 'christmas', 'halloween'];
   // Medieval is the default. A file from before themes had names keeps what it chose:
   // dark:true was Dark, dark:false was a deliberate pick of Light, no key means no pick
   function themeName(){
@@ -5721,6 +5721,8 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     const t = themeName();
     document.body.classList.toggle('dark', t !== 'light');
     document.body.classList.toggle('medieval', t === 'medieval');
+    document.body.classList.toggle('christmas', t === 'christmas');
+    document.body.classList.toggle('halloween', t === 'halloween');
     THEMES.forEach(k => {
       const b = document.getElementById(k + 'Mode');
       if (b) b.classList.toggle('on', k === t);
@@ -5739,7 +5741,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
   // paper is always printed in the light colours, whatever is on screen
   window.addEventListener('beforeprint', () => {
-    document.body.classList.remove('dark', 'medieval');
+    document.body.classList.remove('dark', 'medieval', 'christmas', 'halloween');
   });
   window.addEventListener('afterprint', applyTheme);
 

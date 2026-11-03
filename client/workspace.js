@@ -3,6 +3,7 @@ import { peerColor } from './project-presence.js';
 import { renderProjectSettings } from './project-settings.js';
 import './workspace.css';
 import './textures.css';
+import './seasonal-themes.css';
 import { setupMobileSheet } from './mobile-sheet.js';
 import { normalizeCursor, cursorColors, normalizeCursorColor } from '../shared/cursors.js';
 
@@ -10,6 +11,9 @@ const $ = id => document.getElementById(id);
 
 export function setupWorkspace() {
   const bridge = window.estimator;
+  for(const id of ['seasonal-scenery','seasonal-trim']){
+    const decoration=document.createElement('div');decoration.id=id;decoration.setAttribute('aria-hidden','true');decoration.inert=true;document.body.append(decoration);
+  }
   window.freedomWorkspace = { renderProjectSettings };
   try { const preferences = JSON.parse(localStorage.getItem('freedom:appearance')); if (preferences) bridge.setAppearance(preferences); } catch {}
   const rememberAppearance = () => { try { localStorage.setItem('freedom:appearance', JSON.stringify(bridge.getAppearance())); } catch {} };
@@ -35,6 +39,8 @@ export function setupWorkspace() {
           <button id="lightMode" type="button" data-theme="light">Light</button>
           <button id="darkMode" type="button" data-theme="dark">Dark</button>
           <button id="medievalMode" type="button" data-theme="medieval">Medieval</button>
+          <button id="christmasMode" type="button" data-theme="christmas">Christmas</button>
+          <button id="halloweenMode" type="button" data-theme="halloween">Halloween</button>
         </div>
         <div id="workspace-zoom"></div>
         <div class="workspace-cursor-setting"><label for="workspace-cursor">Shared cursor</label>

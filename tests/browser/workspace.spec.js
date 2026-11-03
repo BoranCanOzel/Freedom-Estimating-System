@@ -2441,6 +2441,55 @@ test('left sidebar frees the top edge, remembers its size and keeps menus and pa
   await page.screenshot({path:'.tools/workspace-sidebar-mobile.png'});
 });
 
+test('seasonal styles stay readable, persist, and keep decoration away from editing and print',async({page})=>{
+  await openWorkbook(page);
+  for(const theme of ['christmas','halloween']){
+    await page.locator('#workspace-view > summary').click();
+    await page.locator('[data-theme="'+theme+'"]').click();
+    await page.locator('#workspace-view > summary').press('Escape');
+    await expect(page.locator('body')).toHaveClass(new RegExp(theme));
+    await expect(page.locator('#seasonal-trim')).toBeVisible();
+    await expect(page.locator('#seasonal-trim')).toHaveCSS('pointer-events','none');
+    await page.evaluate(()=>document.fonts.ready);
+    expect(await page.evaluate(theme=>document.fonts.check('30px "'+(theme==='christmas'?'Berkshire Swash':'Creepster')+'"'),theme)).toBe(true);
+    const contrast=await page.evaluate(()=>{
+      const rgb=color=>color.match(/[\d.]+/g).slice(0,3).map(Number);
+      const luminance=color=>rgb(color).map(n=>{n/=255;return n<=.04045?n/12.92:((n+.055)/1.055)**2.4;}).reduce((sum,n,i)=>sum+n*[.2126,.7152,.0722][i],0);
+      const root=getComputedStyle(document.body),surface=root.getPropertyValue('--card');
+      return ['--ink','--muted','--season-title'].map(key=>{
+        const probe=document.createElement('span');probe.style.color=root.getPropertyValue(key);probe.style.backgroundColor=surface;document.body.append(probe);
+        const style=getComputedStyle(probe),a=luminance(style.color),b=luminance(style.backgroundColor);probe.remove();return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+      });
+    });
+    expect(contrast.every(ratio=>ratio>=4.5)).toBe(true);
+    await page.locator('#title').fill(theme+' scope');await page.locator('#title').blur();
+    await expect(page.locator('#server-status')).toHaveText('All changes saved');
+    await page.mouse.move(2,700);
+    await page.screenshot({path:'test-results/theme-'+theme+'-sheet.png'});
+    await page.locator('#rail .tab-summary').click();
+    await page.screenshot({path:'test-results/theme-'+theme+'-summary.png'});
+    await page.reload();await expect(page.locator('body')).toHaveClass(new RegExp(theme));
+    await expect(page.locator('#server-status')).toHaveText('All changes saved');
+    await page.emulateMedia({reducedMotion:'reduce'});
+    expect(await page.locator('#seasonal-scenery').evaluate(el=>getComputedStyle(el,'::before').animationName)).toBe('none');
+    await page.evaluate(()=>window.dispatchEvent(new Event('beforeprint')));
+    await expect(page.locator('body')).not.toHaveClass(/christmas|halloween|dark/);
+    await expect(page.locator('#seasonal-trim')).toBeHidden();
+    await page.evaluate(()=>window.dispatchEvent(new Event('afterprint')));
+    await expect(page.locator('body')).toHaveClass(new RegExp(theme));
+    await page.setViewportSize({width:390,height:844});
+    await page.locator('#workspace-view > summary').click();
+    await expect(page.locator('[data-theme="'+theme+'"]')).toBeInViewport();
+    await page.screenshot({path:'test-results/theme-'+theme+'-mobile.png'});
+    await page.locator('#workspace-view > summary').press('Escape');
+    await page.setViewportSize({width:1440,height:1000});
+    await page.evaluate(()=>window.estimator.openLocation({...window.estimator.getLocation(),view:'sheet'}));
+  }
+  await page.evaluate(()=>window.estimator.setTheme('light'));
+  await expect(page.locator('#seasonal-scenery')).toBeHidden();
+  await expect(page.locator('#seasonal-trim')).toBeHidden();
+});
+
 test('menus preserve rounding, display, downloads, printing and keyboard access', async ({page}) => {
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await openWorkbook(page);
