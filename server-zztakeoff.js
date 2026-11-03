@@ -166,6 +166,9 @@ export function scopePayload(response,projectId){
       if(fenced)text=fenced[1];
       try{pending.push({value:JSON.parse(text),path:path+'.json',depth:depth+1});}
       catch{
+        if(/^(?:Script Error|InvalidStateError)\s*:/i.test(text)){
+          const diagnostic=zzScopeError(text);if(diagnostic)throw fail(diagnostic);
+        }
         const frames=[...text.matchAll(/FREEDOM_SCOPE_V1:([\s\S]*?):END_FREEDOM_SCOPE_V1/g)];
         if(frames.length){
           for(const frame of frames){
@@ -183,7 +186,7 @@ export function scopePayload(response,projectId){
     const fields=['structuredContent','content','success','isError','error','result','data','output','returnValue','projectId','records','logs'];
     const known=fields.filter(key=>Object.hasOwn(value,key));
     shapes.push(path+':{'+known.map(key=>key+':'+type(value[key])).join(',')+'}');
-    if(value.success===false||value.isError===true)throw fail(zzScopeError(value.error)||'ZZTakeoff could not complete the scope script. No saved items were changed.');
+    if(value.success===false||value.isError===true)throw fail(zzScopeError(value.error)||zzScopeError((Array.isArray(value.content)?value.content:[]).filter(block=>block?.type==='text').map(block=>block.text).join('\n'))||'ZZTakeoff could not complete the scope script. No saved items were changed.');
     if(Object.hasOwn(value,'projectId')||Object.hasOwn(value,'records')){
       payloads.push(value);continue;
     }
@@ -212,7 +215,9 @@ export function scriptTool(tools){
 
 export function zzScopeError(text){
   // Only expose our own narrow diagnostics, not arbitrary upstream logs or context.
-  const message=String(text||'').match(/ZZ_SCOPE_(?:CONTEXT|PROJECT):[^\r\n]{1,1200}/)?.[0];
+  const detail=typeof text==='string'?text:typeof text?.message==='string'?text.message:'';
+  if(/\b(?:the )?database connection is closing\b/i.test(detail))return 'ZZTakeoff\'s local database connection is closing. Once any pending changes in ZZTakeoff have synced, reload the connected ZZTakeoff tab and reopen the linked project. Then click Fetch from ZZTakeoff again. If the tab is no longer connected, use Reconnect ZZTakeoff. Your saved Scope in Freedom Estimating is unchanged.';
+  const message=detail.match(/ZZ_SCOPE_(?:CONTEXT|PROJECT):[^\r\n]{1,1200}/)?.[0];
   return message ? message.replace(/^ZZ_SCOPE_(?:CONTEXT|PROJECT):\s*/, '').replace(/[\u0000-\u001f]/g,' ') : '';
 }
 
@@ -302,7 +307,7 @@ export function mountZZTakeoff({app,db,session,fetchImpl=fetch}){
       if(notification){await response.body?.cancel();return;}
       let result;
       try{result=await readMcpResponse(response,id);}catch(error){throw zzTransportError(error,stage);}
-      if(!result||result.error)throw fail(zzScopeError(result?.error?.message)||'ZZTakeoff could not run the read request. Check the connected project and your permissions.');
+      if(!result||result.error)throw fail(zzScopeError(result?.error)||'ZZTakeoff could not run the read request. Check the connected project and your permissions.');
       return result.result;
     }
     const init=await call('initialize',{protocolVersion:protocol,capabilities:{},clientInfo:{name:'Freedom Estimating',version:'1.0'}});

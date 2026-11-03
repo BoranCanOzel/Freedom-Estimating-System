@@ -8,6 +8,8 @@ The **Scope** tab beside Summary stores a separate ZZTakeoff scope for each take
 
 ZZTakeoff authorization is stored on the server for the signed-in website session and never included in workbook exports. The integration uses the public live MCP endpoint and discovers an advertised script runner before sending a fixed read-only script. The linked project must match its active context. Measurement properties use ZZTakeoff's evaluated/formatted values; unavailable measurements are labeled **Not supplied**. Unsupported tool schemas or responses fail without replacing the saved scope. Automated integration checks use a simulated OAuth/MCP server; live account compatibility still needs verification after connecting a ZZTakeoff account.
 
+If ZZTakeoff reports that its database connection is closing, allow any pending ZZTakeoff changes to sync, then reload the connected ZZTakeoff tab and reopen the linked project. Fetch again from Scope; reconnect ZZTakeoff if that tab lost its connection. Freedom displays these recovery steps and keeps the saved Scope unchanged. Its read-only integration cannot reopen ZZTakeoff's internal browser database.
+
 ## Run locally
 
 Use **Node.js 24 LTS or newer**:

@@ -9,7 +9,7 @@ import { Script } from 'node:vm';
 import { createApp } from '../server.js';
 
 test('ZZTakeoff OAuth is session bound and fetch only invokes the fixed read script',async()=>{
-  let challenge,called=false,hold=false,release,arrived,simulateError=false,stream=false,redirect=false;
+  let challenge,called=false,hold=false,release,arrived,simulateError=false,stream=false,redirect=false,scriptFailure;
   const zzFetch=async(url,options)=>{
     if(url.endsWith('/oauth/register'))return Response.json({client_id:'test-client'});
     if(url.endsWith('/oauth/token')){
@@ -27,6 +27,7 @@ test('ZZTakeoff OAuth is session bound and fetch only invokes the fixed read scr
     else{
       assert.equal(request.method,'tools/call');assert.equal(request.params.name,'run_script');
       assert.match(request.params.arguments.code,/projectId !== "source"/);assert.doesNotMatch(request.params.arguments.code,/\.update\(/);
+      if(scriptFailure)return Response.json({jsonrpc:'2.0',id:request.id,...scriptFailure});
       if(hold){arrived?.();await new Promise(resolve=>{release=resolve;});}
       const payload=new Script('(function () {\n'+request.params.arguments.code+'\n})()').runInNewContext({
         Pages:{list:()=>({records:[]})},DrawObjects:{list:()=>({records:[]})},Projects:{getCurrent:()=>({_id:'source'})},
@@ -77,6 +78,21 @@ test('ZZTakeoff OAuth is session bound and fetch only invokes the fixed read scr
     assert.equal(result.state,'failed');assert.match(result.error,/timed out.*starting the ZZTakeoff session/);
     assert.equal(result.result,undefined);
     simulateError=false;
+    const closing="Script Error: Failed to execute 'transaction' on 'IDBDatabase': The database connection is closing.";
+    for(const failure of [
+      {error:{code:-32603,message:closing}},
+      {result:{isError:true,content:[{type:'text',text:closing}]}},
+      {result:{structuredContent:{success:false,error:{message:closing}}}},
+      {result:{content:[{type:'text',text:closing}]}}
+    ]){
+      scriptFailure=failure;
+      const job=await (await call('scope/jobs',{link:'https://www.zztakeoff.com/app/takeoff?projectId=source'})).json();
+      for(let i=0;i<30;i++){result=await (await call('scope/jobs/'+job.id)).json();if(result.state!=='pending')break;await new Promise(resolve=>setTimeout(resolve,5));}
+      assert.equal(result.state,'failed');assert.match(result.error,/reload the connected ZZTakeoff tab/);
+      assert.match(result.error,/saved Scope.*unchanged/);assert.equal(result.result,undefined);
+    }
+    scriptFailure=undefined;
+    assert.equal((await (await call('scope',{link:'https://www.zztakeoff.com/app/takeoff?projectId=source'})).json()).items[0].name,'Slab');
     assert.match(await (await call(callback)).text(),/expired/);
     assert.equal((await call('scope',{link:'https://elsewhere.example/?projectId=source'})).status,422);
     await call('disconnect',{});assert.deepEqual(await (await call('status')).json(),{connected:false});

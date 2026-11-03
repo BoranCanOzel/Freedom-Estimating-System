@@ -86,6 +86,26 @@ test('scope accepts ZZTakeoff execution envelopes and rejects failed or mismatch
   });
 });
 
+test('closing ZZTakeoff database errors explain recovery without accepting partial scope or exposing logs',()=>{
+  const text="Script Error: Failed to execute 'transaction' on 'IDBDatabase': The database connection is closing. Private upstream details";
+  for(const value of [text,{message:text}]){
+    const message=zzScopeError(value);
+    assert.match(message,/reload the connected ZZTakeoff tab/);
+    assert.match(message,/pending changes.*synced/);
+    assert.match(message,/saved Scope.*unchanged/);
+    assert.doesNotMatch(message,/Private upstream details/);
+  }
+  const payload={projectId:'source',records:[]};
+  for(const response of [
+    {isError:true,content:[{type:'text',text}]},
+    {structuredContent:{success:false,error:{message:text},result:payload}},
+    {content:[{type:'text',text:JSON.stringify({success:false,error:text})}]},
+    {structuredContent:payload,content:[{type:'text',text}]}
+  ])assert.throws(()=>scopePayload(response,'source'),/reload the connected ZZTakeoff tab/);
+  const valid={projectId:'source',records:[{_id:'a',name:text}]};
+  assert.deepEqual(scopePayload({structuredContent:valid},'source'),valid);
+});
+
 test('scope unwraps nested and JSON-encoded MCP results without importing logs or failed envelopes',()=>{
   const payload={projectId:'source',records:[{_id:'a'}]};
   for(const wrapped of [
