@@ -798,6 +798,43 @@ test('delete workbook requires DELETE and removes the active workbook',async({pa
   await expect(page.getByRole('button',{name:'Delete workbook '+name,exact:true})).toHaveCount(0);
 });
 
+test('sidebar links open the requested page in another tab without disturbing drafts',async({page,context,browser,baseURL})=>{
+  await openWorkbook(page);
+  const ai=page.getByRole('link',{name:'AI Information',exact:true});
+  await expect(ai).toHaveAttribute('href','/?page=ai-information');
+  await ai.click({button:'right'});await page.keyboard.press('Escape');
+  await expect(page.locator('#ai-information-page')).toBeHidden();
+  const opened=context.waitForEvent('page');await ai.click({button:'middle'});const other=await opened;
+  try{
+    await expect(other.locator('#ai-information-page')).toBeVisible();
+    await expect(other.locator('#ai-info-status')).toHaveText('Library loaded.');
+    await other.reload();await expect(other.locator('#ai-information-page')).toBeVisible();
+    await other.locator('#ai-information-page [data-action=close]').click();
+    expect(new URL(other.url()).searchParams.has('page')).toBe(false);
+  }finally{await other.close();}
+  await ai.click();await expect(page.locator('#ai-info-status')).toHaveText('Library loaded.');
+  await page.locator('#ai-information-page [data-action=entry]').click();
+  await page.locator('#ai-info-title').fill('Unsaved tab test');
+  const dialogs=[];page.on('dialog',dialog=>{dialogs.push(dialog.message());dialog.dismiss();});
+  const humanOpened=context.waitForEvent('page');
+  await page.getByRole('link',{name:'Human Information',exact:true}).click({modifiers:['Control']});
+  const human=await humanOpened;
+  try{await expect(human.locator('#human-information-page')).toBeVisible();await expect(human.locator('#human-info-status')).toHaveText('Notes loaded.');}
+  finally{await human.close();}
+  await expect(page.locator('#ai-info-title')).toHaveValue('Unsaved tab test');expect(dialogs).toEqual([]);
+  const projects=await context.newPage();
+  try{await projects.goto(await page.locator('#server-projects').getAttribute('href'));await expect(projects.locator('#server-drawer')).toBeVisible();}
+  finally{await projects.close();}
+  const signedOut=await browser.newContext({baseURL});
+  try{
+    const fresh=await signedOut.newPage();await fresh.goto('/?page=human-information');
+    await fresh.locator('#server-login-name').fill('New tab login '+Date.now());await fresh.locator('#server-login-password').fill('1313');
+    await fresh.locator('#server-login-form button').click();
+    await expect(fresh.locator('#human-information-page')).toBeVisible();
+    await expect(fresh.locator('#human-info-status')).toHaveText('Notes loaded.');
+  }finally{await signedOut.close();}
+});
+
 test('scoped imports append projects and export just the selected customer',async({page})=>{
   await openWorkbook(page);
   await page.locator('#workspace-file').evaluate(el=>el.open=true);

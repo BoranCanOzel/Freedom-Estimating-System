@@ -1,7 +1,8 @@
 import './human-information.css';
+import {currentTabClick,clearPageLink} from './navigation-links.js';
 
 export function setupHumanInformation(api){
-  const button=document.createElement('button');button.id='human-information-open';button.type='button';button.textContent='Human Information';button.setAttribute('aria-pressed','false');
+  const button=document.createElement('a');button.id='human-information-open';button.href='/?page=human-information';button.textContent='Human Information';button.setAttribute('aria-current','false');
   document.getElementById('ai-information-open').after(button);
   const page=document.createElement('section');page.id='human-information-page';page.hidden=true;page.setAttribute('aria-label','Human Information');
   page.innerHTML=`<header><div><p class="human-info-eyebrow">TEAM NOTEBOOK</p><h1>Human Information</h1><p>Notes, reminders, and useful information for your team. Shared across all workbooks, and kept out of AI connections.</p></div><button type="button" data-action="close">Back to estimating</button></header>
@@ -51,10 +52,11 @@ export function setupHumanInformation(api){
   }
   async function reload(){library=await request();saved=structuredClone(library);dirty=false;if(!current())selected='';render();message('Notes loaded.');}
   async function persist(items){library=await request({method:'PUT',body:JSON.stringify({revision:library.revision,items})});saved=structuredClone(library);dirty=false;render();message('Saved.');}
-  button.onclick=()=>run(async()=>{if(!page.hidden)return;page.hidden=false;background(true);button.setAttribute('aria-pressed','true');message('Loading notes...');await reload();if(!page.hidden)page.querySelector('[data-action="close"]').focus();});
-  function close(){if(!discard())return;operation?.abort();operation=null;setBusy(false);page.hidden=true;background(false);button.setAttribute('aria-pressed','false');button.focus();}
+  button.onclick=event=>{if(!currentTabClick(event))return;event.preventDefault();run(async()=>{if(!page.hidden)return;page.hidden=false;background(true);button.setAttribute('aria-current','page');message('Loading notes...');await reload();if(!page.hidden)page.querySelector('[data-action="close"]').focus();});};
+  function close(){if(!discard())return;operation?.abort();operation=null;setBusy(false);page.hidden=true;background(false);button.setAttribute('aria-current','false');clearPageLink('human-information');button.focus();}
   page.querySelector('[data-action="close"]').onclick=close;
   document.getElementById('server-bar').addEventListener('click',event=>{
+    if(event.target.closest('a[href]')&&!currentTabClick(event))return;
     if(page.hidden||button.contains(event.target))return;
     if(!discard()){event.preventDefault();event.stopImmediatePropagation();return;}close();
   },true);

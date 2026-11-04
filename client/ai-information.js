@@ -1,10 +1,11 @@
 import { aiDataMethods, aiDataMethodLabel, aiDataWorkTypes, normalizeAiDataWorkTypes } from '../shared/ai-data.js';
 import './ai-information.css';
 import {publicUrl} from './public-url.js';
+import {currentTabClick,clearPageLink} from './navigation-links.js';
 
 export function setupAiInformation(api,openEstimate) {
-  const button=document.createElement('button');button.id='ai-information-open';button.type='button';button.textContent='AI Information';
-  button.setAttribute('aria-pressed','false');
+  const button=document.createElement('a');button.id='ai-information-open';button.href='/?page=ai-information';button.textContent='AI Information';
+  button.setAttribute('aria-current','false');
   document.getElementById('workspace-menus').append(button);
   const page=document.createElement('section');page.id='ai-information-page';page.hidden=true;page.setAttribute('aria-label','AI Information');
   page.innerHTML=`<header><div><p class="ai-info-eyebrow">SHARED REFERENCE LIBRARY</p><h1>AI Information</h1><p>One place for the knowledge your AI should read first. Shared across all workbooks.</p></div><button type="button" data-action="close">Back to estimating</button></header>
@@ -242,10 +243,11 @@ Include the Authorization header on every API request. Configure the Bearer key 
   }
   async function reload(){library=await request('/ai-information');savedLibrary=structuredClone(library);dirty=false;if(!item())selected='';render();message('Library loaded.');}
   async function persist(items){library=await request('/ai-information',{method:'PUT',body:JSON.stringify({revision:library.revision,items})});savedLibrary=structuredClone(library);dirty=false;render();message('Saved. AI access now includes the latest information.');}
-  button.onclick=()=>run(async()=>{if(!page.hidden)return;page.hidden=false;background(true);button.setAttribute('aria-pressed','true');document.body.classList.add('ai-information-open');message('Loading library...');await reload();if(activeTab==='data')await loadEstimates();else if(activeTab==='keys')await loadKeys();setTimeout(()=>page.querySelector('[data-action="close"]').focus(),0);});
-  function closePage(){if(!discard())return;operation?.abort();operation=null;setBusy(false);endDrag();page.hidden=true;dirty=false;$('universal-connection').value='';$('universal-package').hidden=true;background(false);document.body.classList.remove('ai-information-open');button.setAttribute('aria-pressed','false');button.focus();}
+  button.onclick=event=>{if(!currentTabClick(event))return;event.preventDefault();run(async()=>{if(!page.hidden)return;page.hidden=false;background(true);button.setAttribute('aria-current','page');document.body.classList.add('ai-information-open');message('Loading library...');await reload();if(activeTab==='data')await loadEstimates();else if(activeTab==='keys')await loadKeys();setTimeout(()=>page.querySelector('[data-action="close"]').focus(),0);});};
+  function closePage(){if(!discard())return;operation?.abort();operation=null;setBusy(false);endDrag();page.hidden=true;dirty=false;$('universal-connection').value='';$('universal-package').hidden=true;background(false);document.body.classList.remove('ai-information-open');button.setAttribute('aria-current','false');clearPageLink('ai-information');button.focus();}
   page.querySelector('[data-action="close"]').onclick=closePage;
   document.getElementById('server-bar').addEventListener('click',event=>{
+    if(event.target.closest('a[href]')&&!currentTabClick(event))return;
     if(page.hidden||button.contains(event.target))return;
     if(!discard()){event.preventDefault();event.stopImmediatePropagation();return;}
     page.querySelector('[data-action="close"]').click();

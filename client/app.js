@@ -20,6 +20,7 @@ import { setupTimeline } from './timeline.js';
 import { setupTransfers } from './transfers.js';
 import { setupImportDialog } from './import-dialog.js';
 import { WORKBOOK_LIMIT_BYTES, WORKBOOK_LIMIT_MB } from '../shared/limits.js';
+import {currentTabClick,clearPageLink} from './navigation-links.js';
 
 const $ = id => document.getElementById(id);
 const clone = value => structuredClone(value);
@@ -590,7 +591,7 @@ function exportLocal() {
 
 document.body.insertAdjacentHTML('afterbegin', `
   <header id="server-bar">
-    <button id="server-projects" type="button" aria-expanded="true" aria-controls="server-drawer">☰ Projects</button>
+    <a id="server-projects" href="/?page=projects" aria-expanded="true" aria-controls="server-drawer">☰ Projects</a>
     <nav id="workspace-menus" aria-label="Workspace menus"></nav>
     <div id="workspace-history" role="group" aria-label="Edit history">
       <button id="workspace-undo" type="button" title="Undo (Ctrl+Z)" disabled>Undo</button>
@@ -695,7 +696,7 @@ $('workspace-cursor').onchange = async event => {
   finally { control.disabled = false; connection?.sendPresence(); }
 };
 syncProjectPanel();
-$('server-projects').onclick = () => { if (current && ($('server-drawer').hidden || browsing)) { browsing = recentMode = false; panel(); } else panel($('server-drawer').hidden); };
+$('server-projects').onclick = event => { if(!currentTabClick(event))return;event.preventDefault();if (current && ($('server-drawer').hidden || browsing)) { browsing = recentMode = false; panel(); } else panel($('server-drawer').hidden);if($('server-drawer').hidden)clearPageLink('projects'); };
 $('server-hide').onclick = () => panel(false);
 $('server-open').onclick = () => { browsing = true; panel(); $('server-search').focus(); };
 $('server-back').onclick = () => { browsing = recentMode = false; syncProjectPanel(); bridge.refreshProjects(); };
@@ -766,7 +767,7 @@ async function signedIn(name, startup) {
     }else{
       browsing=true;status('No project open');panel();
     }
-    $('server-login').close();return;
+    $('server-login').close();openLinkedPage();return;
   }
   let preferences = {cursor:'classic',lastWorkbook:null};
   const preferenceRequest = api('/preferences').catch(error => {
@@ -786,6 +787,12 @@ async function signedIn(name, startup) {
   if (last) { status('Opening project…'); await openProject(last); }
   else status('No project open');
   $('server-login').close();
+  openLinkedPage();
+}
+function openLinkedPage(){
+  const page=new URLSearchParams(location.search).get('page');
+  if(page==='projects'){browsing=!current;recentMode=false;panel(true);}
+  else if(page==='ai-information'||page==='human-information')$(page+'-open').click();
 }
 async function boot() {
   const [,startup]=await Promise.all([bridge.ready,window.freedomStartup]);
