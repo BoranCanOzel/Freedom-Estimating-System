@@ -9,6 +9,37 @@ function workbook() {
   ]}]}],customFields:{company:['Account'],project:['Region'],takeoff:['Estimator']},filterFields:['Region']};
 }
 let workspaceCookies;
+test('page load calculator stays accessible and supports keyboard entry and page persistence',async({page})=>{
+  const data=workbook(),tk=data.lists[0].companies[0].projects[0].takeoffs[0];
+  tk.sheets.push(sheet('second','Second page'));
+  tk.sheets[0].rows=Array.from({length:80},(_,i)=>({...tk.sheets[0].rows[0],id:'long-'+i}));
+  await openWorkbook(page,data);
+  const toggle=page.locator('#sheetLoadOpen'),calc=page.locator('#sheetLoad');
+  await expect(toggle).toBeInViewport();await toggle.click();
+  await expect(calc.getByLabel('Load item',{exact:true})).toBeFocused();
+  for(const [label,value]of [['Load item','Slab'],['Count','1'],['Length (ft)','27'],['Width (ft)','10'],['Depth (in)','12'],['Fluff (%)','0'],['Truck capacity (CY)','9']]){
+    await expect(calc.getByLabel(label,{exact:true})).toBeFocused();
+    await calc.getByLabel(label,{exact:true}).fill(value);
+    if(label!=='Truck capacity (CY)')await page.keyboard.press('Enter');
+  }
+  await expect(page.locator('#sheetLoadSummary')).toHaveText('10.00 total CY · 1.11 loads');
+  await page.keyboard.press('Enter');await expect(calc.getByLabel('Load item',{exact:true}).last()).toBeFocused();
+  await expect(calc.getByLabel('Load item',{exact:true})).toHaveCount(2);
+  await page.locator('#rail [data-sheet="second"]').click();
+  await expect(calc).toBeHidden();await toggle.click();await expect(calc.getByLabel('Load item',{exact:true})).toHaveValue('');
+  await page.locator('#rail [data-sheet="sn"]').click();
+  await expect(calc.getByLabel('Load item',{exact:true}).first()).toHaveValue('Slab');
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();await expect(page.locator('#sheetLoadSummary')).toHaveText('10.00 total CY · 1.11 loads');
+  await page.screenshot({path:'.tools/load-dock-desktop.png'});
+  await page.setViewportSize({width:390,height:844});
+  await expect(toggle).toBeInViewport();
+  await calc.getByLabel('Length (ft)',{exact:true}).first().fill('54');
+  await expect(page.locator('#sheetLoadSummary')).toHaveText('20.00 total CY · 2.22 loads');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await page.screenshot({path:'.tools/load-dock-mobile.png'});
+  await toggle.click();await expect(calc).toBeHidden();await expect(page.locator('#sheetLoadSummary')).toHaveText('20.00 total CY · 2.22 loads');
+});
 async function openWorkbook(page, data = workbook(), name = 'Workspace tester') {
   const reuse = name === 'Workspace tester' && workspaceCookies;
   if (reuse) await page.context().addCookies(workspaceCookies);

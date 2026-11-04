@@ -2828,7 +2828,6 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
         </tfoot>
       </table>
         <div class="grand-gap"></div>
-        <div class="load-embed" id="sheetLoad" hidden></div>
         <div class="sum-notes">
           <div class="eyebrow">Notes</div>
           <textarea id="sheetNotes" rows="3" placeholder="Notes for this option"></textarea>
@@ -2836,6 +2835,10 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
       </div>
     </div>
 
+    <section id="sheetLoadDock" aria-label="This page's load calculator">
+      <div class="sheet-load-dock-head"><button type="button" class="btn alt" id="sheetLoadOpen" aria-expanded="false" aria-controls="sheetLoad">+ Load calc</button><span id="sheetLoadSummary">This page · disposal quantities</span></div>
+      <div class="load-embed" id="sheetLoad" hidden></div>
+    </section>
     <div class="grand-rail" id="grandRail" hidden></div>
     <div class="grand-lip" id="tGrandLip" hidden>
       <span class="lip-tag" title="Rounded total">&#8776;</span>
@@ -4743,6 +4746,13 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
   const LOAD_HEAD = ['Item','Ct','L','W','D in','SF','CY','Fluff %','Fluff',
                      'Total CY','L/T','Loads',''];
+  const LOAD_LABELS=['Item','Count','Length (ft)','Width (ft)','Depth (in)','Area (SF)','Volume (CY)','Fluff (%)','Fluff (CY)','Total CY','Truck capacity (CY)','Loads','Remove'];
+  const LOAD_FIELDS={ct:'Count',l:'Length (ft)',w:'Width (ft)',d:'Depth (in)',fluff:'Fluff (%)',lt:'Truck capacity (CY)'};
+  function focusLoadField(sh,rowId,field='name'){
+    const host=document.getElementById(book.view==='load'?'loadBody':'sheetLoad');
+    const input=host.querySelector('[data-load-sheet="'+CSS.escape(sh.id)+'"] [data-load-row="'+CSS.escape(rowId)+'"] [data-load-field="'+field+'"]');
+    if(input){input.focus({preventScroll:true});input.scrollIntoView({block:'nearest',inline:'nearest'});}
+  }
 
   // builds one option's table into t; again() re-renders whichever view owns it
   function buildLoadTable(t, sh, again){
@@ -4752,6 +4762,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       '<th' + (i === 0 ? ' class="c1"' : '') + '>' + hd + '</th>').join('') + '</tr></thead>';
     const tb = document.createElement('tbody');
     const refs = [];
+    const paint=()=>{paintLoad(refs,foot);if(sh===state)updateSheetLoadSummary();};
 
     rows.forEach((r, i) => {
       const removeAt = () => {
@@ -4764,6 +4775,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       // a section band that totals whatever sits under it
       if (r.type === 'section'){
         const tr = document.createElement('tr');
+        tr.dataset.loadRow=r.id;
         tr.className = 'lc-sec';
         const td = document.createElement('td');
         td.className = 'c1 lc-sec-cell';
@@ -4776,6 +4788,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         const nm = document.createElement('input');
         nm.autocomplete = 'off';
         nm.className = 'lc-secname';
+        nm.dataset.loadField='name';nm.setAttribute('aria-label','Load section name');
         nm.value = r.name || '';
         nm.placeholder = 'Concrete trash enclosure\u2026';
         nm.addEventListener('input', () => { r.name = nm.value; save(); });
@@ -4814,6 +4827,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       }
 
       const tr = document.createElement('tr');
+      tr.dataset.loadRow=r.id;
       if (openSec){
         tr.className = 'lc-in';
         if (openSec.shut) tr.hidden = true;
@@ -4824,6 +4838,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       nameTd.className = 'c1';
       const nm = document.createElement('input');
       nm.autocomplete = 'off';
+      nm.dataset.loadField='name';nm.setAttribute('aria-label','Load item');
       nm.value = r.name || '';
       nm.placeholder = 'Slab, wall, footing\u2026';
       nm.addEventListener('input', () => { r.name = nm.value; save(); });
@@ -4835,11 +4850,13 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         const td = document.createElement('td');
         const inp = document.createElement('input');
         inp.className = 'calc-in';
+        inp.dataset.loadField=key;inp.setAttribute('aria-label',LOAD_FIELDS[key]);
         inp.autocomplete = 'off';
         inp.inputMode = 'decimal';
         inp.placeholder = ph;
         inp.value = r[key] == null ? '' : r[key];
-        inp.addEventListener('input', () => { r[key] = inp.value; paintLoad(refs, foot); save(); });
+        inp.addEventListener('focus',()=>inp.select());
+        inp.addEventListener('input', () => { r[key] = inp.value; paint(); save(); });
         td.appendChild(inp);
         return td;
       };
@@ -4889,7 +4906,15 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
     const outs = ftr.querySelectorAll('.calc-out');
     foot = {sf:outs[0], cy:outs[1], fluff:outs[2], total:outs[3], loads:outs[4]};
-    paintLoad(refs, foot);
+    for(const row of t.rows)for(const [index,cell]of [...row.cells].entries())cell.dataset.label=LOAD_LABELS[index];
+    t.addEventListener('keydown',event=>{
+      if(event.key!=='Enter'||event.isComposing||!event.target.matches('input'))return;
+      event.preventDefault();
+      const inputs=[...t.querySelectorAll('tbody tr:not([hidden]) input')],at=inputs.indexOf(event.target),next=inputs[at+(event.shiftKey?-1:1)];
+      if(next){next.focus();next.scrollIntoView({block:'nearest',inline:'nearest'});}
+      else if(!event.shiftKey){const row=blankLoad();rows.push(row);again();save();focusLoadField(sh,row.id);}
+    });
+    paint();
     return refs;
   }
 
@@ -4897,6 +4922,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   function loadBlock(sh, again, withHead){
     const box = document.createElement('div');
     box.className = 'load-block';
+    box.dataset.loadSheet=sh.id;
 
     // in the tab each option folds from its head; a folded one shows its totals there
     if (withHead){
@@ -4947,12 +4973,12 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     };
     acts.append(
       mk('+ Line', 'Add a line to this option', () => {
-        loadRowsFor(sh).push(blankLoad()); again(); save();
+        const row=blankLoad();loadRowsFor(sh).push(row);again();save();focusLoadField(sh,row.id);
       }),
       mk('+ Section', 'Add a section band to this option', () => {
-        loadRowsFor(sh).push({id:id(), type:'section', name:''});
+        const section={id:id(),type:'section',name:''};loadRowsFor(sh).push(section);
         loadRowsFor(sh).push(blankLoad());
-        again(); save();
+        again(); save();focusLoadField(sh,section.id);
       }, 'alt')
     );
     box.appendChild(acts);
@@ -5009,10 +5035,17 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   });
 
   // the same calc, folded into the option sheet itself
+  function updateSheetLoadSummary(){
+    const total=(state.loadCalc||[]).filter(row=>row.type!=='section').reduce((sum,row)=>{const value=loadLine(row);sum.cy+=value.total;sum.loads+=value.loads;return sum;},{cy:0,loads:0});
+    document.getElementById('sheetLoadSummary').textContent=total.cy||total.loads?total.cy.toFixed(2)+' total CY · '+total.loads.toFixed(2)+' loads':'This page · disposal quantities';
+  }
   function renderSheetLoad(){
     const host = document.getElementById('sheetLoad');
     const btn = document.getElementById('sheetLoadBtn');
     const on = !!state.loadOn;
+    const open=document.getElementById('sheetLoadOpen');
+    open.textContent=on?'Hide load calc':'+ Load calc';open.setAttribute('aria-expanded',String(on));
+    updateSheetLoadSummary();
     if (btn){
       btn.textContent = on ? 'Hide load calc' : '+ Load calc';
       btn.classList.toggle('on', on);
@@ -5021,6 +5054,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     host.innerHTML = '';
     if (!on) return;
     host.appendChild(loadBlock(state, renderSheetLoad, false));
+    const help=document.createElement('p');help.className='sheet-load-help';help.textContent='Length / width in feet · depth in inches · truck capacity in CY. Enter moves to the next field; Shift+Enter moves back.';host.prepend(help);
   }
 
   function paintLoad(refs, foot){
@@ -7124,6 +7158,11 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     state.loadOn = !state.loadOn;
     renderSheetLoad();
     save();
+  });
+  document.getElementById('sheetLoadOpen').addEventListener('click',()=>{
+    state.loadOn=!state.loadOn;renderSheetLoad();save();
+    if(state.loadOn){const first=document.querySelector('#sheetLoad tbody tr:not([hidden]) input');first?.focus({preventScroll:true});}
+    requestAnimationFrame(layout);
   });
 
   document.getElementById('addSection').addEventListener('click', () => {
