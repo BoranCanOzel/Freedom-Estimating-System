@@ -360,3 +360,8 @@ body.server-mode #sheetLoadDock:has(#sheetLoad[hidden]) #sheetLoadSummary{font-s
   #sheetLoad{max-height:none;overflow:visible;padding:0}
   #sheetLoad .load-block{min-width:0}
 }
+#sheetTable select.up-unit-select{width:62px;min-width:54px;max-width:100%;padding:4px 2px;font:600 11px var(--f-sans);color:var(--ink);background:var(--card);border:1px solid var(--rule);border-radius:3px;text-transform:none;letter-spacing:0}
+#sheetTable select.up-unit-select:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+body.medieval #sheetTable select.up-unit-select{background:#263139;color:#eee8dc;border-color:#64717b}
+body.win98 #sheetTable select.up-unit-select{background:#fff;color:#000;border-radius:0}
+@media(max-width:760px){#sheetTable .sec-unit select.up-unit-select{min-height:36px}}

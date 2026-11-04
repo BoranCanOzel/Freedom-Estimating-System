@@ -3553,13 +3553,9 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
       qty.classList.toggle('inherited', !cur.ownQty);
       qty.setAttribute('aria-label','Section quantity for this unit');
       qty.addEventListener('input', () => { setSecUnit(row, col, {qty: qty.value}); recalc(); });
-      const lab = document.createElement('input');
-      lab.className = 'lab';
-      lab.value = cur.label;
-      lab.placeholder = 'unit';
+      const lab = unitSelect(cur.label, 'Section unit label', value => { setSecUnit(row, col, {label:value}); recalc(); }, col.label);
+      lab.classList.add('lab');
       lab.classList.toggle('inherited', !cur.ownLab);
-      lab.setAttribute('aria-label','Section unit label');
-      lab.addEventListener('input', () => { setSecUnit(row, col, {label: lab.value}); recalc(); });
       uw.append(qty, lab);
       td.appendChild(uw);
 
@@ -4047,6 +4043,25 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
     return i;
   }
 
+  function syncUnitSelect(select,value,pageLabel){
+    select.querySelectorAll('[data-legacy-unit]').forEach(option=>option.remove());
+    if(pageLabel!==undefined)select.options[0].textContent='Use page unit ('+(pageLabel||'unset')+')';
+    if(!['LF','EA','SF'].includes(value)&&(value||pageLabel===undefined)){
+      const saved=new Option(value?value+' (saved)':'Choose unit',value||'');
+      saved.disabled=true;saved.dataset.legacyUnit='true';select.append(saved);
+    }
+    select.value=value||'';
+  }
+  function unitSelect(value,label,onChange,pageLabel){
+    const select=document.createElement('select');
+    select.className='up-unit-select';select.setAttribute('aria-label',label);
+    if(pageLabel!==undefined)select.append(new Option('Use page unit',''));
+    for(const unit of ['LF','EA','SF'])select.append(new Option(unit,unit));
+    syncUnitSelect(select,value,pageLabel);
+    select.addEventListener('change',()=>{onChange(select.value);});
+    return select;
+  }
+
   function renderColumnHeaders(){
     const row = document.querySelector('#sheetTable thead tr');
     Array.from(row.querySelectorAll('th.col-fee, th.col-up')).forEach(el => el.remove());
@@ -4123,11 +4138,7 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
       qty.value = u.qty;
       qty.setAttribute('aria-label','Unit quantity');
       qty.addEventListener('input', () => { u.qty = qty.value; recalc(); });
-      const lab = document.createElement('input');
-      lab.className = 'h-input w-lab';
-      lab.value = u.label;
-      lab.setAttribute('aria-label','Unit label');
-      lab.addEventListener('input', () => { u.label = lab.value; recalc(); });
+      const lab = unitSelect(u.label,'Unit label',value=>{u.label=value;syncUnitSelect(lab,value);recalc();});
       ctl.append(qty, lab);
 
       stack.append(top, ctl);
@@ -4207,7 +4218,7 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
   // pointer actually moves, so a plain click still lands in the input
   function armColDrag(e, group, colId, th){
     if (e.button > 0) return;
-    if (e.target.closest('.col-resizer, .fee-x')) return;
+    if (e.target.closest('.col-resizer, .fee-x, select')) return;
     const startX = e.clientX;
     let started = false;
 
@@ -6382,7 +6393,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
             if (!col) return;
             const cur = secUnit(r, col);
             if (!cur.ownQty && document.activeElement !== ui.qty) ui.qty.value = col.qty;
-            if (!cur.ownLab && document.activeElement !== ui.lab) ui.lab.value = col.label;
+            syncUnitSelect(ui.lab,cur.label,col.label);
             ui.qty.classList.toggle('inherited', !cur.ownQty);
             ui.lab.classList.toggle('inherited', !cur.ownLab);
           });

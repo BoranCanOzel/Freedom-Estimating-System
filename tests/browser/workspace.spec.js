@@ -9,6 +9,29 @@ function workbook() {
   ]}]}],customFields:{company:['Account'],project:['Region'],takeoff:['Estimator']},filterFields:['Region']};
 }
 let workspaceCookies;
+test('UP unit dropdowns limit choices and preserve subsection inheritance and saved labels',async({page})=>{
+  const data=workbook(),sh=data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0];
+  sh.units=[{id:'up',label:'SF',qty:100}];
+  sh.rows=[{id:'parent',type:'section',name:'Parent'},{id:'child',type:'section',name:'Child'},...sh.rows,
+    {id:'child-end',type:'sectionEnd',sid:'child'},{id:'parent-end',type:'sectionEnd',sid:'parent'}];
+  await openWorkbook(page,data);
+  const unit=page.getByRole('combobox',{name:'Unit label',exact:true});
+  const section=id=>page.locator('#body tr[data-id="'+id+'"]');
+  const parent=section('parent').getByRole('combobox',{name:'Section unit label'}),child=section('child').getByRole('combobox',{name:'Section unit label'});
+  await expect(unit.locator('option')).toHaveText(['LF','EA','SF']);
+  await unit.selectOption('LF');await expect(parent).toHaveValue('LF');await expect(child).toHaveValue('LF');
+  await child.selectOption('EA');await unit.selectOption('SF');
+  await expect(parent).toHaveValue('SF');await expect(child).toHaveValue('EA');
+  await expect(section('child').locator('.unit-tag')).toContainText('EA');
+  await child.selectOption('');await expect(child).toHaveValue('SF');
+  await parent.selectOption('LF');await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.reload();await expect(parent).toHaveValue('LF');await expect(child).toHaveValue('SF');
+  await expect(page.locator('#tGrand .v')).toHaveText('128.75');
+  await parent.scrollIntoViewIfNeeded();await page.screenshot({path:'test-results/up-unit-dropdowns.png'});
+  const legacy=workbook();legacy.lists[0].companies[0].projects[0].takeoffs[0].sheets[0].units=[{id:'legacy-up',label:'CY',qty:10}];
+  await openWorkbook(page,legacy);await expect(unit).toHaveValue('CY');await expect(unit.locator('option[value="CY"]')).toBeDisabled();
+  await unit.selectOption('EA');await expect(unit.locator('option')).toHaveText(['LF','EA','SF']);
+});
 test('page load calculator stays accessible and supports keyboard entry and page persistence',async({page})=>{
   const data=workbook(),tk=data.lists[0].companies[0].projects[0].takeoffs[0];
   tk.sheets.push(sheet('second','Second page'));
