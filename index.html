@@ -2836,6 +2836,11 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
     </div>
 
     <section id="sheetLoadDock" aria-label="This page's load calculator">
+      <div id="rowSelectionActions" role="group" aria-label="Selected item actions" hidden>
+        <span id="rowSelectionCount" role="status"></span>
+        <button type="button" class="btn" id="sectionFromSelection">Create new section with these items</button>
+        <button type="button" class="btn alt" id="clearRowSelection">Clear selection</button>
+      </div>
       <div class="sheet-load-dock-head"><button type="button" class="btn alt" id="sheetLoadOpen" aria-expanded="false" aria-controls="sheetLoad">+ Load calc</button><span id="sheetLoadSummary">This page · disposal quantities</span></div>
       <div class="load-embed" id="sheetLoad" hidden></div>
     </section>
@@ -6502,12 +6507,36 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   let rangeInputAnchor = null;
   let rangeRowAnchor = null;
   let copyingSelectedInput = false;
+  function selectedItemRows(){
+    const ids=new Set(selectedLineIds);
+    selectedInputs.forEach(input=>{if(input.isConnected)ids.add(input.closest('tr')?.dataset.id);});
+    return state.rows.filter(row=>ids.has(row.id)&&row.type!=='section'&&row.type!=='sectionEnd');
+  }
+  function syncSelectionActions(){
+    const count=selectedItemRows().length;
+    document.getElementById('rowSelectionActions').hidden=count<2||document.body.classList.contains('shared-readonly');
+    document.getElementById('rowSelectionCount').textContent=count+' items selected';
+  }
+  document.getElementById('clearRowSelection').addEventListener('click',clearMultiSelection);
+  document.getElementById('sectionFromSelection').addEventListener('click',()=>{
+    const rows=selectedItemRows();
+    if(rows.length<2||document.body.classList.contains('shared-readonly'))return;
+    const at=state.rows.indexOf(rows[0]),ids=new Set(rows.map(row=>row.id));
+    const head={id:id(),type:'section',name:'New section',units:{}};
+    const foot={id:id(),type:'sectionEnd',sid:head.id};
+    state.rows=state.rows.filter(row=>!ids.has(row.id));
+    state.rows.splice(at,0,head,...rows,foot);
+    renderAll();save();
+    const ref=refs.get(head.id);
+    if(ref){ref.name.focus({preventScroll:true});ref.name.select();ref.tr.scrollIntoView({block:'nearest',inline:'nearest'});}
+  });
   function clearMultiSelection(){
     singleInputAnchor = null;
     rangeInputAnchor = null;
     rangeRowAnchor = null;
     selectedLineIds.clear(); selectedInputs.clear();
     document.querySelectorAll('.multi-row,.multi-input').forEach(el => el.classList.remove('multi-row','multi-input'));
+    syncSelectionActions();
   }
   body.addEventListener('pointerdown', event => {
     if(event.button!==0)return;
@@ -6530,6 +6559,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       }
       body.querySelectorAll('tr[data-type="item"]').forEach(el=>el.classList.toggle('multi-row',selectedLineIds.has(el.dataset.id)));
       event.preventDefault();event.stopPropagation();
+      syncSelectionActions();
       return;
     }
     // A drag handle also moves the rows belonging to a bulk cell selection.
@@ -6555,6 +6585,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         });
         singleInputAnchor = null;
         event.preventDefault(); event.stopPropagation(); input.focus(); input.select();
+        syncSelectionActions();
         return;
       }
     }
@@ -6588,6 +6619,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       if (row && input && !input.readOnly && !input.disabled) rangeInputAnchor = input;
       if(rowTarget)rangeRowAnchor=row.dataset.id;
     }
+    syncSelectionActions();
   }, true);
   body.addEventListener('keydown', event => {
     if (event.key !== 'Tab' || event.ctrlKey || event.altKey || event.metaKey) return;
@@ -6612,7 +6644,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   });
   document.addEventListener('keydown', event => { if (event.key === 'Escape') clearMultiSelection(); });
   document.addEventListener('pointerdown', event => {
-    if (!body.contains(event.target)) clearMultiSelection();
+    if (!body.contains(event.target)&&!event.target.closest('#rowSelectionActions')) clearMultiSelection();
   });
   let drag = null;
   let sheetDropPreview = null;

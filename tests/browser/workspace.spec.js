@@ -9,6 +9,47 @@ function workbook() {
   ]}]}],customFields:{company:['Account'],project:['Region'],takeoff:['Estimator']},filterFields:['Region']};
 }
 let workspaceCookies;
+test('selected items form a named subsection with order, pricing, undo and persistence intact',async({page})=>{
+  const data=workbook(),sh=data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0];
+  const item=id=>({id,kind:'labor',name:id,count:1,time:1,days:1,cost:10});
+  sh.rows=[{id:'parent',type:'section',name:'Parent'},item('a'),item('b'),
+    {id:'child',type:'section',name:'Existing child'},item('c'),{id:'child-end',type:'sectionEnd',sid:'child'},
+    {id:'parent-end',type:'sectionEnd',sid:'parent'},item('d')];
+  await openWorkbook(page,data);
+  const row=id=>page.locator('#body tr[data-id="'+id+'"]');
+  const actions=page.locator('#rowSelectionActions');
+  const snapshot=()=>page.evaluate(()=>window.estimator.exportBook().sheets[0].rows);
+  const original=await snapshot(),total=await page.locator('#tGrand .v').textContent();
+  await expect(actions).toBeHidden();
+  await row('a').locator('.grip').click({modifiers:['Control']});await expect(actions).toBeHidden();
+  await row('c').locator('.grip').click({modifiers:['Control']});
+  await expect(actions).toContainText('2 items selected');await expect(actions).toBeInViewport();
+  await page.screenshot({path:'test-results/selected-item-actions.png'});
+  await actions.getByRole('button',{name:'Create new section with these items'}).click();
+  await expect(actions).toBeHidden();
+  let rows=await snapshot();const group=rows[1];
+  expect(group.type).toBe('section');expect(rows.slice(2,4).map(r=>r.id)).toEqual(['a','c']);
+  expect(rows[4]).toMatchObject({type:'sectionEnd',sid:group.id});
+  expect(rows.filter(r=>!['a','c',group.id,rows[4].id].includes(r.id))).toEqual(original.filter(r=>!['a','c'].includes(r.id)));
+  await expect(row(group.id).locator('.name-in')).toBeFocused();
+  await expect(page.locator('#tGrand .v')).toHaveText(total);
+  await page.keyboard.press('Control+z');expect(await snapshot()).toEqual(original);
+  await page.keyboard.press('Control+y');expect((await snapshot()).map(r=>r.id)).toEqual(rows.map(r=>r.id));
+  await row(group.id).locator('.name-in').fill('Concrete removal');await row(group.id).locator('.name-in').blur();
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');await page.reload();
+  await expect(row(group.id).locator('.name-in')).toHaveValue('Concrete removal');
+  await expect(page.locator('#tGrand .v')).toHaveText(total);
+  // Shift-selected fields offer the same action; clearing or Escape makes no edit.
+  await row('a').locator('.name-in').click();await row('c').locator('.name-in').click({modifiers:['Shift']});
+  await expect(actions).toContainText('2 items selected');
+  const saved=await snapshot();await actions.getByRole('button',{name:'Clear selection'}).click();
+  await expect(actions).toBeHidden();expect(await snapshot()).toEqual(saved);
+  await row('a').locator('.name-in').click();await row('c').locator('.name-in').click({modifiers:['Shift']});
+  await actions.getByRole('button',{name:'Create new section with these items'}).click();
+  rows=await snapshot();expect(rows.filter(r=>r.type==='section')).toHaveLength(4);
+  const stack=[];for(const r of rows){if(r.type==='section')stack.push(r.id);if(r.type==='sectionEnd')expect(stack.pop()).toBe(r.sid);}expect(stack).toEqual([]);
+  await expect(page.locator('#tGrand .v')).toHaveText(total);
+});
 test('UP unit dropdowns limit choices and preserve subsection inheritance and saved labels',async({page})=>{
   const data=workbook(),sh=data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0];
   sh.units=[{id:'up',label:'SF',qty:100}];

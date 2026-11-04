@@ -365,3 +365,7 @@ body.server-mode #sheetLoadDock:has(#sheetLoad[hidden]) #sheetLoadSummary{font-s
 body.medieval #sheetTable select.up-unit-select{background:#263139;color:#eee8dc;border-color:#64717b}
 body.win98 #sheetTable select.up-unit-select{background:#fff;color:#000;border-radius:0}
 @media(max-width:760px){#sheetTable .sec-unit select.up-unit-select{min-height:36px}}
+#rowSelectionActions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--rule);background:var(--calc);color:var(--ink);font:12px var(--f-sans)}
+#rowSelectionCount{font-weight:600}
+#rowSelectionActions .btn{font-size:12px;padding:7px 10px;min-height:32px;max-width:100%;white-space:normal}
+@media print{#rowSelectionActions{display:none!important}}

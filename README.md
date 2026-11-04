@@ -111,6 +111,8 @@ Use **Ctrl+Z** to undo and **Ctrl+Y** or **Ctrl+Shift+Z** to redo (Command short
 
 To move multiple items, Ctrl-click (Cmd-click on Mac) their drag handles or row numbers to toggle individual rows. Shift-click selects a range of visible items from the last anchor. Drag any selected handle to move the group into another section or subsection, preserving item order. Escape clears the selection or cancels a drag. Selected input fields can still be edited together; dragging a handle in that selection moves their rows together.
 
+Selecting two or more items also shows a bottom action bar with **Create new section with these items** and **Clear selection**. Creating a section gathers the items in their existing order at the first selected item's position and focuses the new section name. Inside an existing section, it creates a subsection. Other section boundaries remain intact, and the operation supports undo/redo.
+
 | Location | Controls |
 | --- | --- |
 | File | JSON import/export, estimate Excel export, printing, company and project directory exports |
