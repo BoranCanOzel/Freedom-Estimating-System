@@ -1,67 +1,762 @@
-@font-face{font-family:'Berkshire Swash';src:url('./fonts/BerkshireSwash-Regular.ttf') format('truetype');font-style:normal;font-weight:400;font-display:swap}
 @font-face{font-family:'Creepster';src:url('./fonts/Creepster-Regular.ttf') format('truetype');font-style:normal;font-weight:400;font-display:swap}
-
-/* Decoration stays outside editable surfaces and never receives pointer events. */
-#seasonal-scenery,#seasonal-trim{display:none;pointer-events:none;user-select:none;position:fixed}
-body.server-mode:is(.christmas,.halloween){isolation:isolate;--f-sans:'IBM Plex Sans',system-ui,sans-serif;--f-cond:'IBM Plex Sans Condensed',sans-serif;--f-mono:'IBM Plex Mono',monospace;--faint:var(--muted);--rule-strong:var(--muted);--section-line:var(--amber);--subsection-line:var(--muted);--slate:var(--ink);--slate-2:var(--ink);--slate-bg:var(--calc);--tip-bg:var(--card)}
-body.server-mode.workspace-sidebar:is(.christmas,.halloween){padding-top:40px}
-body.server-mode.workspace-sidebar:is(.christmas,.halloween) #server-bar{top:40px}
-body.server-mode:is(.christmas,.halloween) #seasonal-scenery{display:block;inset:0;z-index:-1;overflow:hidden}
-body.server-mode:is(.christmas,.halloween) #seasonal-trim{display:block;inset:0 0 auto;height:30px;z-index:620;background-repeat:repeat-x}
-body.server-mode:is(.christmas,.halloween) :is(.card,#server-bar,#server-drawer,.lib,.proj,.ed,dialog,.workspace-menu-content){border-color:var(--rule);box-shadow:0 8px 28px #0005}
-body.server-mode:is(.christmas,.halloween) .card>.head{position:relative;background:var(--season-header);border-bottom:1px solid var(--rule);padding-right:78px}
-body.server-mode:is(.christmas,.halloween) :is(#title,.sum-title,#timeline-title){font-family:var(--season-font);font-weight:400;line-height:1.3;color:var(--season-title);text-shadow:0 2px 3px #0006}
-body.server-mode:is(.christmas,.halloween) :is(#title,.sum-title){font-size:30px}
-body.server-mode:is(.christmas,.halloween) :is(.eyebrow,.eyebrow-row,.sum-label){color:var(--muted)}
-body.server-mode:is(.christmas,.halloween) .card>.head::after{content:'';position:absolute;right:16px;bottom:14px;width:46px;height:46px;background:var(--season-emblem) center/contain no-repeat;pointer-events:none}
-body.server-mode:is(.christmas,.halloween) :is(button,input,textarea,select){text-shadow:none}
-body.server-mode:is(.christmas,.halloween) :is(input,textarea)::placeholder{color:var(--muted);opacity:1}
-body.server-mode:is(.christmas,.halloween) :is(button,input,textarea,select,summary):focus-visible{outline:2px solid var(--season-title);outline-offset:3px}
-body.server-mode:is(.christmas,.halloween) :is(.btn,.rail .tab,.takeoff-folder-tab){border-color:var(--rule)}
-body.server-mode:is(.christmas,.halloween) :is(.btn.ghost,.btn.alt){color:var(--ink);background:var(--calc)}
-body.server-mode:is(.christmas,.halloween) :is(.btn,.btn.ghost,.btn.alt):hover{background:var(--season-hover);color:var(--ink)}
-body.server-mode:is(.christmas,.halloween) .rail .tab[aria-selected=true],body.server-mode:is(.christmas,.halloween) .takeoff-folder-tab[aria-pressed=true]{background:var(--season-active);color:var(--ink);border-color:var(--amber);box-shadow:inset 0 -2px var(--amber)}
-body.server-mode:is(.christmas,.halloween) :is(#sheetTable,.sum-table,.calc-table) thead th{background:var(--season-active);color:var(--ink)}
-body.server-mode:is(.christmas,.halloween) :is(.h-input,.h-lab-in){color:var(--season-title)}
-body.server-mode:is(.christmas,.halloween) :is(#sheetTable,.sum-table) tfoot td{color:var(--ink)}
-.workspace-themes{flex-wrap:wrap}
-.workspace-themes button{flex:1 1 28%}
-body.server-mode .workspace-themes button[data-theme=christmas]{border-bottom:3px solid #b84150!important}
-body.server-mode .workspace-themes button[data-theme=halloween]{border-bottom:3px solid #efa247!important}
-
-/* Christmas: evergreen, cranberry, candlelight and fresh snow. */
-body.server-mode.christmas{
- --season-font:'Berkshire Swash',Georgia,serif;--paper:#081d17;--card:#102d23;--ink:#f7f5e9;--muted:#bdcfc3;--rule:#51745e;--rule-hair:#31513e;--fill:#253c26;--calc:#1a392c;--amber:#f2ca76;
- --season-title:#ffe2a0;--season-header:linear-gradient(115deg,#163e2b,#102d23 65%);--season-hover:#34533d;--season-active:#642b35;
- --labor:#b2dbec;--equip:#f2ca76;--material:#b1d6a3;--tool:#edb29d;--part:#f0c19e;--service:#95d9cb;--construct:#bed2ed;--hybrid:#d5bce7;
- --s23:#51362d;--s30:#203e2a;--s37:#51362d;--s38:#432c2c;--s42:#263c28;--s43:#51362d;--s44:#1b342e;--s45:#1a3e32;
- background:radial-gradient(ellipse at 75% 0,#214a38,transparent 55%),#081d17;
- --season-emblem:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M31 32C5 29 7 6 7 6l13 7 5-8 4 16 12-2zM33 33C32 9 56 7 56 7l-6 13 9 5-16 5 2 12z' fill='%234c9362' stroke='%23aed29c' stroke-width='1.5'/%3E%3Cpath d='m13 14 20 20L52 14' fill='none' stroke='%23cde4b8'/%3E%3Cg fill='%23d64e5b' stroke='%23ffb4a8'%3E%3Ccircle cx='28' cy='34' r='8'/%3E%3Ccircle cx='40' cy='34' r='8'/%3E%3Ccircle cx='34' cy='45' r='8'/%3E%3C/g%3E%3C/svg%3E");
-}
-body.christmas #seasonal-trim{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='30'%3E%3Cpath d='M-10 1Q40 20 80 3T170 1' fill='none' stroke='%235a8864' stroke-width='3'/%3E%3Cg stroke='%23213e2c' stroke-width='3'%3E%3Cpath d='M20 9v7M60 9v7M100 0v12M140 0v12'/%3E%3C/g%3E%3Cg stroke-width='2'%3E%3Cellipse cx='20' cy='21' rx='5' ry='7' fill='%23f7797c' stroke='%23ffc3ae'/%3E%3Cellipse cx='60' cy='21' rx='5' ry='7' fill='%23ffd97a' stroke='%23fff1c8'/%3E%3Cellipse cx='100' cy='17' rx='5' ry='7' fill='%2389d99c' stroke='%23d2f9d5'/%3E%3Cellipse cx='140' cy='17' rx='5' ry='7' fill='%23acd9f8' stroke='%23e5f6ff'/%3E%3C/g%3E%3C/svg%3E");filter:drop-shadow(0 0 5px #f9d87c75)}
-body.christmas #seasonal-scenery::before,body.christmas #seasonal-scenery::after{content:'';position:absolute;inset:-160px 0;background-image:radial-gradient(circle,#e9f8ec 1.5px,transparent 2px),radial-gradient(circle,#d9ece7b3 1px,transparent 2px);background-size:113px 137px,79px 97px;background-position:20px 30px,45px 75px;animation:season-snow 20s linear infinite;opacity:.48}
-body.christmas #seasonal-scenery::after{background-size:173px 193px,227px 157px;animation-duration:32s;animation-direction:reverse;opacity:.25}
-body.server-mode.christmas .card>.head::before{content:'';position:absolute;top:0;left:0;right:0;height:7px;background:radial-gradient(ellipse at 50% 0,#edf8ef 65%,transparent 70%) 0 0/95px 9px repeat-x;pointer-events:none}
-body.server-mode.christmas #server-bar{border-top:3px solid #e7f0df;border-bottom:3px solid #b84150}
-body.server-mode.christmas .card{background-image:radial-gradient(circle,#edf8ef24 1px,transparent 1.8px),radial-gradient(circle,#edf8ef16 1.5px,transparent 2px);background-size:127px 163px,193px 227px;background-position:18px 42px,79px 113px}
-body.server-mode.christmas .card>.bar{border-bottom:3px solid transparent;border-image:repeating-linear-gradient(45deg,#962f40 0 8px,#e2e9da 8px 16px) 3}
-@keyframes season-snow{to{transform:translateY(137px)}}
-
-/* Halloween: moonlit plum, carved lanterns, copper and fine cobwebs. */
+@font-face{font-family:'Mountains of Christmas';src:url('./fonts/MountainsofChristmas-Bold.ttf') format('truetype');font-style:normal;font-weight:700;font-display:swap}
+/* ---------- Halloween theme ----------
+Rides on body.dark like Neon. A night sky with a harvest moon and bats, pumpkin
+orange for whatever is open or active, witch purple for edges, candy-corn
+yellow for the answers. A cobweb with its spider hangs in the card's corner and
+a few bats fly across the top now and then (behind the drawers, never in the
+way of a click). Creepster is bundled locally for the title lettering. */
 body.server-mode.halloween{
- --season-font:'Creepster',Georgia,serif;--paper:#140e20;--card:#241b31;--ink:#fff2dd;--muted:#d0bed9;--rule:#81688e;--rule-hair:#493754;--fill:#392b23;--calc:#30243d;--amber:#ffb65c;
- --season-title:#ffc575;--season-header:linear-gradient(115deg,#3a254b,#241b31 70%);--season-hover:#50354f;--season-active:#503128;
- --labor:#b9d6f3;--equip:#ffbd70;--material:#c2d9a5;--tool:#f0b196;--part:#f2c092;--service:#a0dbd0;--construct:#bed0ef;--hybrid:#e1b7ee;
- --s23:#493222;--s30:#352637;--s37:#493222;--s38:#402b32;--s42:#3c3030;--s43:#493222;--s44:#31283e;--s45:#263b39;
- background:radial-gradient(circle at 88% 8%,#e9dcb0 0 29px,#b6a07380 30px,transparent 80px),radial-gradient(ellipse at 80% 0,#4b315d,transparent 60%),#140e20;
- --season-emblem:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M30 15Q24 5 38 5' fill='none' stroke='%2397b073' stroke-width='5'/%3E%3Cellipse cx='32' cy='36' rx='27' ry='22' fill='%23ec8c36' stroke='%23ffbe6b' stroke-width='2'/%3E%3Cpath d='M25 16Q14 36 25 56M39 16Q50 36 39 56' fill='none' stroke='%23b85725' stroke-width='2'/%3E%3Cpath d='m14 32 11-9 3 12zm22 3 3-12 11 9zM17 41l8 4 4-3 5 5 5-5 8-1-7 11H25z' fill='%23352a31'/%3E%3C/svg%3E");
+--f-fest:"Creepster",var(--f-cond);--fest-w:400;--fest-ls:.05em;--fest-c:#FF9A3C;
+--fx1:#FF7518;--fx2:#B07CFF;--fx3:#FFC93C;--fxr:#E5383B;--fxg:#9BE15D;
+--paper:#0A070B;
+--card:#140E17;
+--ink:#F3E9D2;
+--muted:#C2B3CC;
+--faint:#846E8E;
+--rule:#46324E;
+--rule-hair:#322338;
+--rule-strong:#745781;
+--fill:#1C1320;
+--calc:#120C15;
+--slate:#C9A4FF;
+--slate-2:#E4D0FF;
+--slate-bg:#3A1F4D;
+--amber:var(--fx1);
+--tip-bg:#321C3B;
+--labor:#FFA94D;
+--equip:#F5D547;
+--material:#9BE15D;
+--tool:#FF6B6B;
+--part:#FF8F5A;
+--service:#5EEAD4;
+--construct:#C9B8FF;
+--hybrid:#D98CFF;
+--none:#846E8E;
+--lv1:#B07CFF;--lv2:#9BE15D;--lv3:#E8DCC0;
+--s1:#1D1421;--s2:#271B2C;--s3:#221727;--s4:#29180E;--s5:#311D12;--s6:#201625;--s7:#1F1524;--s8:#142C2F;
+--s9:#11282A;--s10:#153336;--s11:#211726;--s12:#27202A;--s13:#18101B;--s14:#112E31;--s15:#1C131F;--s16:#1A111E;
+--s17:#291B2F;--s18:#163235;--s19:#201524;--s20:#1D1321;--s21:#122D30;--s22:#2A565B;--s23:#301C10;--s24:#2B1D31;
+--s25:#163134;--s26:#201525;--s27:#231828;--s28:#29180E;--s29:#211626;--s30:#241929;--s31:#211626;--s32:#231827;
+--s33:#1F1524;--s34:#201625;--s35:#1F1524;--s36:#152D30;--s37:#2A2410;--s38:#2C2612;--s39:#201625;--s40:#1E1422;
+--s41:#201525;--s42:#2B2810;--s43:#2A2610;--s44:#211626;--s45:#0F2022;--s46:#0E302F;--s47:#201525;--s48:#251F28;
+--s49:#241E27;--s50:#1A3B3F;--s51:#2D2812;--s52:#201525;--s53:#0F2418;--s54:#12301C;--s55:#122426;--s56:#1A121E;
+--s57:#34233B;--s58:#1E1423;--s59:#120B15;
+background:
+radial-gradient(circle at calc(100% - 92px) 22px,#FFF3D2 0 12px,#FFD98A 13.5px,rgba(255,190,90,.38) 16px,rgba(255,150,50,.12) 36px,transparent 72px),
+url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 40'%3E%3Cg transform='translate(0 14) scale(0.7)'%3E%3Cpath d='M24 9 C22 6 19 4 15 4 C12 4 7 3 2 6 C5 7 7 9 7 12 C9 10 12 10 14 13 C16 11 19 11 21 14 L24 17 L27 14 C29 11 32 11 34 13 C36 10 39 10 41 12 C41 9 43 7 46 6 C41 3 36 4 33 4 C29 4 26 6 24 9 Z M22.4 8.2 L21.8 5.2 L23.6 7.4 Z M25.6 8.2 L26.2 5.2 L24.4 7.4 Z' fill='%23120A18' stroke='rgba(255,170,90,.45)' stroke-width='.9' stroke-linejoin='round'/%3E%3C/g%3E%3Cg transform='translate(40 2) scale(0.5)'%3E%3Cpath d='M24 9 C22 6 19 4 15 4 C12 4 7 3 2 6 C5 7 7 9 7 12 C9 10 12 10 14 13 C16 11 19 11 21 14 L24 17 L27 14 C29 11 32 11 34 13 C36 10 39 10 41 12 C41 9 43 7 46 6 C41 3 36 4 33 4 C29 4 26 6 24 9 Z M22.4 8.2 L21.8 5.2 L23.6 7.4 Z M25.6 8.2 L26.2 5.2 L24.4 7.4 Z' fill='%23120A18' stroke='rgba(255,170,90,.4)' stroke-width='.9' stroke-linejoin='round'/%3E%3C/g%3E%3Cg transform='translate(66 20) scale(0.42)'%3E%3Cpath d='M24 9 C22 6 19 4 15 4 C12 4 7 3 2 6 C5 7 7 9 7 12 C9 10 12 10 14 13 C16 11 19 11 21 14 L24 17 L27 14 C29 11 32 11 34 13 C36 10 39 10 41 12 C41 9 43 7 46 6 C41 3 36 4 33 4 C29 4 26 6 24 9 Z M22.4 8.2 L21.8 5.2 L23.6 7.4 Z M25.6 8.2 L26.2 5.2 L24.4 7.4 Z' fill='%23120A18' stroke='rgba(255,170,90,.35)' stroke-width='.9' stroke-linejoin='round'/%3E%3C/g%3E%3C/svg%3E") calc(100% - 196px) 4px/96px 40px no-repeat,
+radial-gradient(1100px 620px at 12% -12%,rgba(166,107,255,.22),transparent 62%),
+radial-gradient(900px 520px at 108% 112%,rgba(255,117,24,.14),transparent 60%),
+radial-gradient(circle,rgba(255,240,220,.4) 0 .8px,transparent 1.4px) 0 0/124px 92px,
+radial-gradient(circle,rgba(255,240,220,.25) 0 .7px,transparent 1.2px) 60px 40px/170px 130px,
+linear-gradient(180deg,#160C1E,#0B0810 60%);
 }
-body.halloween #seasonal-trim{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='170' height='30'%3E%3Cpath d='M0 1Q85 20 170 1' fill='none' stroke='%23927b9b'/%3E%3Cpath d='M40 7v7M130 7v7' stroke='%23bf934f'/%3E%3Cg fill='%23ef9c46' stroke='%23ffd28e'%3E%3Cellipse cx='40' cy='21' rx='9' ry='7'/%3E%3Cellipse cx='130' cy='21' rx='9' ry='7'/%3E%3C/g%3E%3Cpath d='m35 19 3-2v3zm7 1v-3l3 2zM36 23h8l-4 3zm89-4 3-2v3zm7 1v-3l3 2zM126 23h8l-4 3z' fill='%233c2544'/%3E%3Cpath d='m75 12 5 2 5-5 5 5 5-2-3 8-7-2-7 2z' fill='%23c3a4d7'/%3E%3C/svg%3E");filter:drop-shadow(0 0 4px #e7884266)}
-body.halloween #seasonal-scenery::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 20% 95%,#ae81bd29,transparent 45%),radial-gradient(ellipse at 75% 100%,#d4ac8520,transparent 40%);animation:season-mist 16s ease-in-out infinite alternate}
-body.halloween #seasonal-scenery::after{content:'';position:absolute;inset:30px 0 auto auto;width:160px;height:160px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 160'%3E%3Cg fill='none' stroke='%23d1b7dd' opacity='.55'%3E%3Cpath d='M160 0 0 0m160 0L0 160M160 0v160M160 0 0 66M160 0 94 160M120 0q0 40 40 40M80 0q0 80 80 80M40 0q0 120 120 120M0 0q0 160 160 160'/%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat}
-body.server-mode.halloween #server-bar{border-top:3px solid #dc9450;border-bottom:3px solid #aa81bd}
-body.server-mode.halloween .card>.head{border-top:2px solid #d29453}
-@keyframes season-mist{to{transform:translateX(-25px);opacity:.55}}
-@media(prefers-reduced-motion:reduce){body.christmas #seasonal-scenery::before,body.christmas #seasonal-scenery::after,body.halloween #seasonal-scenery::before{animation:none}}
-@media(max-width:650px){body.server-mode:is(.christmas,.halloween) :is(#title,.sum-title){font-size:25px}body.server-mode:is(.christmas,.halloween) .card>.head{padding-right:52px}body.server-mode:is(.christmas,.halloween) .card>.head::after{width:30px;height:30px;right:10px}}
-@media print{#seasonal-scenery,#seasonal-trim{display:none!important}body.server-mode.workspace-sidebar:is(.christmas,.halloween){padding-top:0}body.server-mode:is(.christmas,.halloween) .card>.head::before,body.server-mode:is(.christmas,.halloween) .card>.head::after{display:none}}
+body.server-mode.halloween ::selection{background:rgba(255,117,24,.5);color:#FFFFFF}
+body.server-mode.halloween .cell-in,body.server-mode.halloween .money,body.server-mode.halloween .rownum,
+body.server-mode.halloween .pct,body.server-mode.halloween .mk-cash,body.server-mode.halloween .up-chip{font-variant-numeric:tabular-nums}
+
+/* ---- tabs ---- */
+body.server-mode.halloween .rail .tab{background:rgba(20,14,23,.9);color:#CDB3D9;border:1px solid #46324E;border-bottom:none;text-shadow:none}
+body.server-mode.halloween .rail .tab:hover{background:#26192B;color:var(--fx2);border-color:rgba(176,124,255,.55);text-shadow:0 0 6px rgba(176,124,255,.6)}
+body.server-mode.halloween .rail .tab[aria-selected="true"]{
+background:#231729;color:#FFFFFF;border-color:var(--fx1);
+box-shadow:inset 0 2px 0 var(--fx1),0 -3px 14px -3px rgba(255,117,24,.6);
+text-shadow:0 0 7px rgba(255,117,24,.9);
+}
+body.server-mode.halloween .rail .tab-add{color:var(--fx2)}
+body.server-mode.halloween .rail .ftab{background:rgba(20,14,23,.9);color:#CDB3D9;border-color:#46324E;text-shadow:none}
+body.server-mode.halloween .rail .ftab:hover{background:#26192B;color:var(--fx2);border-color:rgba(176,124,255,.55)}
+body.server-mode.halloween .rail .ftab.colored{background:color-mix(in srgb,var(--fc) 32%,#140E17);color:#FFFFFF;border-color:var(--fc);box-shadow:0 0 10px -3px var(--fc)}
+body.server-mode.halloween .rail .ftab[aria-selected="true"]{
+background:#120C15;color:#FFFFFF;border-color:rgba(176,124,255,.6);
+box-shadow:inset 0 2px 0 var(--fx2),0 -3px 14px -4px rgba(176,124,255,.55);text-shadow:0 0 7px rgba(176,124,255,.8);
+}
+body.server-mode.halloween .rail .ftab.ftab-add{background:transparent;color:var(--fx2);border-color:rgba(176,124,255,.45);box-shadow:none}
+body.server-mode.halloween .rail-trow{
+background:linear-gradient(180deg,rgba(255,117,24,.1),rgba(18,12,21,0) 75%),#120C15;
+border-color:rgba(176,124,255,.45);box-shadow:0 -6px 18px -12px rgba(176,124,255,.7);
+}
+body.server-mode.halloween .rail-stack.band-tinted .rail-trow{background:linear-gradient(rgba(10,7,11,.66),rgba(10,7,11,.66)),var(--fband)}
+body.server-mode.halloween .rail-stack.band-tinted .ftab[aria-selected="true"]{background:linear-gradient(rgba(10,7,11,.66),rgba(10,7,11,.66)),var(--fband);color:#FFFFFF}
+body.server-mode.halloween .rail-stack.band-tinted .rail-trow .tab:not(.tinted):not([aria-selected="true"]){background:rgba(10,7,11,.72);color:#EAD4F4}
+body.server-mode.halloween .rail-arrow{background:#140E17;border-color:rgba(176,124,255,.5);color:var(--fx2)}
+body.server-mode.halloween .rail-arrow:hover{color:#FFFFFF;border-color:var(--fx2);box-shadow:0 0 8px rgba(176,124,255,.5)}
+body.server-mode.halloween .rail .status{color:#846E8E}
+body.server-mode.halloween .rail .status.on{color:var(--fxg);text-shadow:0 0 6px rgba(155,225,93,.7)}
+body.server-mode.halloween .rail .status.bad{color:var(--fxr)}
+body.server-mode.halloween .tab-tip{border:1px solid rgba(255,117,24,.55);box-shadow:0 0 16px -3px rgba(255,117,24,.55)}
+body.server-mode.halloween .tab-help-btn{
+background:#140E17;border:1.5px solid var(--fx2);color:var(--fx2);
+box-shadow:0 0 10px rgba(176,124,255,.45),inset 0 0 6px rgba(176,124,255,.25);text-shadow:0 0 6px rgba(176,124,255,.8);
+}
+body.server-mode.halloween .tab-help-btn:hover{background:rgba(176,124,255,.16);color:#FFFFFF;border-color:var(--fx2)}
+
+/* ---- the card ---- */
+body.server-mode.halloween .card:not(.ico){
+background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 150'%3E%3Cpath d='M150 0 L0 0 M150 0 L12 46 M150 0 L34 96 M150 0 L72 136 M150 0 L112 150 M150 0 L150 150' stroke='rgba(243,233,210,.26)' stroke-width='.8' fill='none' stroke-linecap='round'/%3E%3Cpath d='M123.0 0.0 Q128.2 3.5 125.2 8.3 Q130.8 10.7 129.1 17.3 Q135.3 17.5 136.0 24.5 Q141.2 21.6 143.2 27.0 Q147.1 22.7 150.0 27.0' stroke='rgba(243,233,210,.26)' stroke-width='.8' fill='none' stroke-linecap='round'/%3E%3Cpath d='M99.0 0.0 Q108.9 6.6 103.1 15.6 Q113.7 20.3 110.6 32.6 Q122.3 33.1 123.5 46.2 Q133.4 40.8 137.1 51.0 Q144.6 42.8 150.0 51.0' stroke='rgba(243,233,210,.26)' stroke-width='.8' fill='none' stroke-linecap='round'/%3E%3Cpath d='M75.0 0.0 Q89.5 9.7 81.0 23.0 Q96.7 29.8 92.0 48.0 Q109.3 48.7 111.0 68.0 Q125.6 60.1 131.0 75.0 Q142.0 63.0 150.0 75.0' stroke='rgba(243,233,210,.26)' stroke-width='.8' fill='none' stroke-linecap='round'/%3E%3Cpath d='M51.0 0.0 Q70.2 12.8 58.9 30.4 Q79.6 39.4 73.4 63.4 Q96.2 64.3 98.5 89.8 Q117.8 79.3 124.9 99.0 Q139.5 83.2 150.0 99.0' stroke='rgba(243,233,210,.26)' stroke-width='.8' fill='none' stroke-linecap='round'/%3E%3Cpath d='M27.0 0.0 Q50.8 15.8 36.8 37.7 Q62.5 48.9 54.9 78.7 Q83.2 79.9 86.0 111.5 Q110.0 98.5 118.8 123.0 Q136.9 103.3 150.0 123.0' stroke='rgba(243,233,210,.26)' stroke-width='.8' fill='none' stroke-linecap='round'/%3E%3Cpath d='M4.5 0.0 Q32.7 18.7 16.1 44.6 Q46.5 57.9 37.5 93.1 Q71.0 94.5 74.3 131.9 Q102.7 116.5 113.1 145.5 Q134.5 122.2 150.0 145.5' stroke='rgba(243,233,210,.26)' stroke-width='.8' fill='none' stroke-linecap='round'/%3E%3Cpath d='M104 0 V63' stroke='rgba(243,233,210,.35)' stroke-width='.7'/%3E%3Cpath d='M104 70 q-4 -6 -7 -5 M104 70 q4 -6 7 -5 M104 70 q-4 -3 -8 -1 M104 70 q4 -3 8 -1 M104 70 q-4 -1 -8 3 M104 70 q4 -1 8 3 M104 70 q-3 1 -6 7 M104 70 q3 1 6 7 ' stroke='rgba(255,150,70,.7)' stroke-width='.9' fill='none'/%3E%3Cellipse cx='104' cy='71' rx='3.6' ry='4.6' fill='%23140C1A' stroke='rgba(255,150,70,.8)' stroke-width='.8'/%3E%3Ccircle cx='104' cy='65.4' r='2.3' fill='%23140C1A' stroke='rgba(255,150,70,.8)' stroke-width='.7'/%3E%3C/svg%3E") right top/150px 150px no-repeat,
+linear-gradient(180deg,rgba(29,19,40,.96),rgba(14,10,20,.98));
+border:1px solid rgba(255,117,24,.3);border-radius:0 10px 10px 10px;
+box-shadow:0 0 0 1px rgba(176,124,255,.08),0 0 30px -8px rgba(255,117,24,.3),0 30px 60px -30px rgba(0,0,0,.95);
+}
+body.server-mode.halloween .card > .head{background:linear-gradient(90deg,var(--fx1),var(--fx2) 45%,transparent 85%) left bottom/100% 1px no-repeat;border-bottom:0}
+body.server-mode.halloween .card > .head .eyebrow{color:var(--fx2);text-shadow:0 0 6px rgba(176,124,255,.6)}
+body.server-mode.halloween .card > .head .note-btn{color:#CDB3D9}
+body.server-mode.halloween #title{color:var(--fest-c);font-family:var(--f-fest);font-weight:var(--fest-w);letter-spacing:var(--fest-ls);
+text-shadow:0 0 12px rgba(255,117,24,.6),0 0 30px rgba(255,117,24,.22),0 2px 0 rgba(0,0,0,.65)}
+body.server-mode.halloween #title::placeholder{color:#846E8E;text-shadow:none}
+body.server-mode.halloween #title:hover{border-bottom-color:rgba(176,124,255,.25)}
+body.server-mode.halloween #title:focus{border-bottom-color:var(--fx1)}
+body.server-mode.halloween .head-tool{background:transparent;border-color:rgba(176,124,255,.45);color:var(--fx2)}
+body.server-mode.halloween .head-tool:hover{border-color:var(--fx2);color:#FFFFFF;box-shadow:0 0 8px rgba(176,124,255,.5)}
+body.server-mode.halloween .head-tool.on{background:rgba(255,117,24,.18);border-color:var(--fx1);color:#FFFFFF;box-shadow:0 0 10px rgba(255,117,24,.55)}
+body.server-mode.halloween.head-shut .head-peek{color:#FFFFFF;text-shadow:0 0 8px rgba(176,124,255,.55)}
+body.server-mode.halloween .card > .scroll{background:rgba(9,6,10,.35)}
+body.server-mode.halloween #sheetTable,body.server-mode.halloween #summaryCard .sum-table{
+box-shadow:0 0 0 1px rgba(176,124,255,.22),0 0 22px -6px rgba(176,124,255,.35),0 16px 34px -20px rgba(0,0,0,.9);
+}
+body.server-mode.halloween .card > .bar{background:transparent;border-top:1px solid rgba(176,124,255,.16)}
+
+/* ---- buttons ---- */
+body.server-mode.halloween .btn,body.server-mode.halloween .bar .btn.alt.on,body.server-mode.halloween .btn.alt.on{
+background:linear-gradient(180deg,rgba(255,117,24,.3),rgba(255,117,24,.12));border:1px solid var(--fx1);color:#FFEADC;
+text-shadow:0 0 6px rgba(255,117,24,.8);border-radius:4px;
+box-shadow:0 0 10px -2px rgba(255,117,24,.6),inset 0 0 8px rgba(255,117,24,.18);
+}
+body.server-mode.halloween .btn:hover{background:linear-gradient(180deg,rgba(255,117,24,.48),rgba(255,117,24,.2));color:#FFFFFF;border-color:#FF9E5D;
+box-shadow:0 0 16px -1px rgba(255,117,24,.85),inset 0 0 10px rgba(255,117,24,.25)}
+body.server-mode.halloween .btn.alt,body.server-mode.halloween .bar .btn.alt{
+background:rgba(176,124,255,.06);border:1px solid rgba(176,124,255,.7);color:var(--fx2);
+text-shadow:0 0 6px rgba(176,124,255,.55);box-shadow:0 0 8px -2px rgba(176,124,255,.5);
+}
+body.server-mode.halloween .btn.alt:hover,body.server-mode.halloween .bar .btn.alt:hover{background:rgba(176,124,255,.16);color:#FFFFFF;border-color:var(--fx2);box-shadow:0 0 14px -1px rgba(176,124,255,.8)}
+body.server-mode.halloween .btn.ghost,body.server-mode.halloween .bar .btn.ghost{background:transparent;border:1px solid #745781;color:#DBC5E4;text-shadow:none;box-shadow:none}
+body.server-mode.halloween .btn.ghost:hover,body.server-mode.halloween .bar .btn.ghost:hover{border-color:var(--fx2);color:#FFFFFF;background:rgba(176,124,255,.08)}
+body.server-mode.halloween .btn.ghost.on{background:rgba(176,124,255,.18);border-color:var(--fx2);color:#FFFFFF;box-shadow:0 0 10px rgba(176,124,255,.5)}
+body.server-mode.halloween .bar #deleteSheet,body.server-mode.halloween .bar #reset,body.server-mode.halloween .btn.danger,body.server-mode.halloween .btn.tiny.danger{
+background:rgba(229,56,59,.12);border:1px solid var(--fxr);color:#F7C3C4;
+text-shadow:0 0 6px rgba(229,56,59,.7);box-shadow:0 0 10px -2px rgba(229,56,59,.6);
+}
+body.server-mode.halloween .bar #deleteSheet:hover,body.server-mode.halloween .bar #reset:hover,body.server-mode.halloween .btn.danger:hover{background:rgba(229,56,59,.26);color:#FFFFFF}
+body.server-mode.halloween .btn:focus-visible{outline:1px solid var(--fx2);outline-offset:2px}
+body.server-mode.halloween .h-add{border-color:rgba(176,124,255,.55);background:rgba(176,124,255,.08);color:var(--fx2)}
+body.server-mode.halloween .h-add:hover{background:rgba(176,124,255,.2);color:#FFFFFF;box-shadow:0 0 8px rgba(176,124,255,.5)}
+body.server-mode.halloween .sec-add{background:rgba(10,7,11,.55);border-color:rgba(176,124,255,.6);color:var(--fx2)}
+body.server-mode.halloween .sec-add:hover{background:rgba(176,124,255,.18);color:#FFFFFF;box-shadow:0 0 8px rgba(176,124,255,.5)}
+body.server-mode.halloween .pic-pair{background:#140E17;border-color:rgba(176,124,255,.45)}
+body.server-mode.halloween .pic-lab{background:#1E1423;border-right-color:rgba(176,124,255,.3);color:#AE96B8}
+body.server-mode.halloween .pic-pair button{color:#DBC5E4}
+body.server-mode.halloween .pic-pair button + button{border-left-color:rgba(176,124,255,.3)}
+body.server-mode.halloween .pic-pair button:hover{background:rgba(176,124,255,.12);color:#FFFFFF}
+body.server-mode.halloween .pic-pair button.on{background:rgba(176,124,255,.2);color:#FFFFFF;box-shadow:inset 0 -2px 0 var(--fx2);text-shadow:0 0 6px rgba(176,124,255,.8)}
+body.server-mode.halloween select{background-color:#130B16;color:#F7EEFA;border-color:rgba(176,124,255,.35)}
+body.server-mode.halloween :is(.lib,.proj,.side,.ed,.cz-win,.confirm-pop,.tab-opts,.folder-pop,.sum-notes) :is(input[type="text"],input[type="search"],input[type="number"],input[type="email"],input[type="password"],input:not([type]),textarea):not(table *){
+background-color:#130B16;color:#F7EEFA;border-color:rgba(176,124,255,.32);
+}
+body.server-mode.halloween :is(.lib,.proj,.side,.ed,.cz-win,.confirm-pop,.tab-opts,.folder-pop,.sum-notes) :is(input,textarea,select):not(table *):focus{
+border-color:var(--fx1);box-shadow:0 0 10px rgba(255,117,24,.45);outline:none;
+}
+
+/* ---- edge tabs and drawers ---- */
+body.server-mode.halloween .lib-tab,body.server-mode.halloween .proj-tab{
+background:rgba(20,14,23,.94);color:var(--fx2);border:1px solid rgba(176,124,255,.45);
+text-shadow:0 0 6px rgba(176,124,255,.7);box-shadow:0 0 12px -3px rgba(176,124,255,.5);
+}
+body.server-mode.halloween .lib-tab{border-right:0}
+body.server-mode.halloween .proj-tab{border-left:0}
+body.server-mode.halloween .lib-tab:hover,body.server-mode.halloween .proj-tab:hover{background:#26192B;color:#FFFFFF;box-shadow:0 0 16px -2px rgba(176,124,255,.75)}
+body.server-mode.halloween.lib-open #libToggle,body.server-mode.halloween.cat-open #catToggle,body.server-mode.halloween.notes-open #notesToggle,
+body.server-mode.halloween.hist-open #histToggle,body.server-mode.halloween.wage-open #wageToggle,body.server-mode.halloween.load-open #loadToggle,
+body.server-mode.halloween.review-open #reviewToggle,body.server-mode.halloween.link-open #linkToggle,body.server-mode.halloween.sov-open #sovToggle,body.server-mode.halloween.proj-open #projToggle,
+body.server-mode.halloween.file-open #fileToggle,body.server-mode.halloween.page-open #pageToggle,body.server-mode.halloween.pref-open #prefToggle,
+body.server-mode.halloween.ai-open #aiToggle,
+body.server-mode.halloween.lib-open #libToggle:hover,body.server-mode.halloween.cat-open #catToggle:hover,body.server-mode.halloween.notes-open #notesToggle:hover,
+body.server-mode.halloween.hist-open #histToggle:hover,body.server-mode.halloween.wage-open #wageToggle:hover,body.server-mode.halloween.load-open #loadToggle:hover,
+body.server-mode.halloween.review-open #reviewToggle:hover,body.server-mode.halloween.link-open #linkToggle:hover,body.server-mode.halloween.sov-open #sovToggle:hover,body.server-mode.halloween.proj-open #projToggle:hover,
+body.server-mode.halloween.file-open #fileToggle:hover,body.server-mode.halloween.page-open #pageToggle:hover,body.server-mode.halloween.pref-open #prefToggle:hover,
+body.server-mode.halloween.ai-open #aiToggle:hover{
+background:linear-gradient(180deg,#FF7518,#B8410E);color:#FFFFFF;border-color:var(--fx1);
+text-shadow:0 0 6px rgba(255,255,255,.6);box-shadow:0 0 18px rgba(255,117,24,.8);
+}
+body.server-mode.halloween .lib,body.server-mode.halloween .proj,body.server-mode.halloween .side,body.server-mode.halloween .ed{
+background:linear-gradient(180deg,#1B111F,#130B16);border-color:rgba(176,124,255,.3);
+box-shadow:0 0 34px -10px rgba(176,124,255,.4);
+}
+body.server-mode.halloween .lib-head,body.server-mode.halloween .ed-head{
+background:linear-gradient(90deg,rgba(255,117,24,.22),rgba(176,124,255,.05) 70%),#180F1C;
+border-bottom:1px solid rgba(255,117,24,.55);
+}
+body.server-mode.halloween .lib-head .eyebrow,body.server-mode.halloween .ed-head .eyebrow{color:#FFFFFF;text-shadow:0 0 8px rgba(255,117,24,.9)}
+body.server-mode.halloween .lib-close{color:var(--fx2)}
+body.server-mode.halloween .lib-close:hover{background:rgba(255,117,24,.2);color:#FFFFFF}
+body.server-mode.halloween .lib-foot,body.server-mode.halloween .ed-foot{background:#120B15;border-top-color:rgba(176,124,255,.22)}
+body.server-mode.halloween .lib-title{color:var(--fx2);text-shadow:0 0 6px rgba(176,124,255,.5)}
+body.server-mode.halloween .side-group{color:#FFAC74;text-shadow:0 0 6px rgba(255,117,24,.5)}
+body.server-mode.halloween .tpl{background:#1B121F;border-color:#46324E}
+body.server-mode.halloween .pref-theme{background:#140E17;border-color:#46324E;color:#F7EEFA}
+body.server-mode.halloween .pref-theme:hover{border-color:var(--fx2)}
+body.server-mode.halloween .pref-theme.on{border-color:var(--fx1);box-shadow:0 0 0 1px var(--fx1),0 0 14px rgba(255,117,24,.6)}
+
+/* ---- menus and windows ---- */
+body.server-mode.halloween .confirm-pop,body.server-mode.halloween .tab-opts,body.server-mode.halloween .folder-pop,body.server-mode.halloween .print-menu{
+background:#150E18;border-color:rgba(176,124,255,.5);
+box-shadow:0 0 24px -6px rgba(176,124,255,.55),0 18px 40px -18px rgba(0,0,0,.9);
+}
+body.server-mode.halloween .pm-opt:hover{background:rgba(176,124,255,.12);color:#FFFFFF}
+body.server-mode.halloween .pm-rule{background:rgba(176,124,255,.22)}
+body.server-mode.halloween .cz-win{background:linear-gradient(180deg,#1B111F,#130B16);border-color:rgba(176,124,255,.4);box-shadow:0 0 34px -8px rgba(176,124,255,.5)}
+body.server-mode.halloween .cz-head{background:linear-gradient(90deg,rgba(255,117,24,.22),transparent 70%);border-bottom-color:rgba(255,117,24,.55)}
+body.server-mode.halloween .cz-foot{background:#120B15;border-top-color:rgba(176,124,255,.22)}
+body.server-mode.halloween .cz-row{background:#1B121F;border-color:#46324E}
+body.server-mode.halloween .cz-row:hover,body.server-mode.halloween .cz-row:focus-visible{border-color:var(--fx2);box-shadow:0 0 10px -2px rgba(176,124,255,.55)}
+body.server-mode.halloween .cz-sw:checked{background:linear-gradient(90deg,var(--fx1),var(--fx2))}
+body.server-mode.halloween .tip{color:#F7EEFA;border:1px solid rgba(255,117,24,.6);box-shadow:0 0 14px -2px rgba(255,117,24,.55)}
+
+/* ---- the pricing sheet ---- */
+body.server-mode.halloween #sheetTable tbody,body.server-mode.halloween #sheetTable tfoot,
+body.server-mode.halloween .sum-table tbody,body.server-mode.halloween .sum-table tfoot,body.server-mode.halloween .calc-table{
+--rule-hair:rgba(176,124,255,.09);--rule:rgba(176,124,255,.2);--rule-strong:rgba(176,124,255,.38);
+}
+body.server-mode.halloween #sheetTable thead th,body.server-mode.halloween .sum-table thead th,body.server-mode.halloween .calc-table th{
+background:linear-gradient(180deg,#3B2245,#24152B);color:#D8BEFF;
+border-right:1px solid rgba(176,124,255,.12);
+box-shadow:inset 0 -2px 0 rgba(255,117,24,.8);
+text-shadow:0 0 6px rgba(176,124,255,.45);
+}
+body.server-mode.halloween #sheetTable thead th.drop-before{box-shadow:inset 4px 0 0 var(--fx1),inset 0 -2px 0 rgba(255,117,24,.8)}
+body.server-mode.halloween #sheetTable thead th.drop-after{box-shadow:inset -4px 0 0 var(--fx1),inset 0 -2px 0 rgba(255,117,24,.8)}
+body.server-mode.halloween .h-lab{border-bottom-color:rgba(176,124,255,.3)}
+body.server-mode.halloween thead th:hover .h-lab{border-bottom-color:rgba(176,124,255,.8)}
+body.server-mode.halloween .h-sym{color:rgba(176,124,255,.7)}
+body.server-mode.halloween .h-input{color:var(--fx3);border-bottom-color:rgba(255,201,60,.5);text-shadow:0 0 6px rgba(255,201,60,.5)}
+body.server-mode.halloween .h-input:focus{background:rgba(255,201,60,.12)}
+body.server-mode.halloween .h-lab-in{color:#D8BEFF}
+body.server-mode.halloween #sheetTable thead th.col-grand,body.server-mode.halloween .sum-table thead th.col-grand{
+background:linear-gradient(180deg,#3B2F19,#211B10);color:var(--fx3);
+border-top-color:var(--fx3);border-left-color:var(--fx3);border-right-color:var(--fx3);
+box-shadow:inset 0 2px 0 #FFF4DC,inset 0 4px 0 #FF7518,inset 0 6px 0 #FFC93C,inset 0 -2px 0 var(--fx3),0 0 16px -4px rgba(255,201,60,.6);
+text-shadow:0 0 7px rgba(255,201,60,.75);
+}
+body.server-mode.halloween thead th.col-grand .h-lab{border-bottom-color:rgba(255,201,60,.5)}
+@media (hover:hover){
+body.server-mode.halloween #sheetTable tbody tr:hover td{background-color:#2C1B33}
+body.server-mode.halloween #sheetTable tbody tr:hover td.calc{background-color:#24162A}
+body.server-mode.halloween #sheetTable tbody tr:hover td.calc.grand{background-color:rgba(255,201,60,.13)}
+}
+body.server-mode.halloween #sheetTable td.fill:focus-within{background:#412320}
+body.server-mode.halloween .cell-in:focus{outline:1px solid var(--fx1);outline-offset:-1px;box-shadow:inset 0 0 12px rgba(255,117,24,.4)}
+body.server-mode.halloween .name-in:focus{outline:1px solid var(--fx1);box-shadow:0 0 10px rgba(255,117,24,.4)}
+body.server-mode.halloween #sheetTable td.calc.grand{background:rgba(255,201,60,.07);border-left-color:rgba(255,201,60,.75);border-right-color:rgba(255,201,60,.75)}
+body.server-mode.halloween #sheetTable td.calc.grand .money{color:var(--fx3);text-shadow:0 0 7px rgba(255,201,60,.55)}
+
+/* the card deck. These sit before the section rules, which carry the same weight */
+body.server-mode.halloween.cards #sheetTable tbody tr{
+background:linear-gradient(180deg,#201524,#150E18);border-color:rgba(176,124,255,.24);border-radius:6px;
+box-shadow:0 0 14px -6px rgba(176,124,255,.5);
+}
+body.server-mode.halloween.cards #sheetTable tbody tr[data-type="item"]::before{box-shadow:0 0 8px var(--row-kind,#745781)}
+body.server-mode.halloween.cards #sheetTable td.fill:not(.c-item) .cell-in,
+body.server-mode.halloween.cards #sheetTable td.mk .cell-in{background:#130B16;border-color:rgba(176,124,255,.3)}
+body.server-mode.halloween.cards #sheetTable tbody td.calc.grand{background:none}
+body.server-mode.halloween.cards .deck-caret{background:#140E17;border-color:rgba(176,124,255,.5);color:var(--fx2)}
+body.server-mode.halloween.cards #sheetTable tbody tr.press-arm{background:#442629;box-shadow:inset 0 0 0 2px var(--fx1),0 0 18px rgba(255,117,24,.6)}
+body.server-mode.halloween.cards #sheetTable tbody tr.dragging{background:transparent;box-shadow:none;border-style:dashed;border-color:var(--fx1)}
+body.server-mode.halloween.cards #sheetTable tbody tr.divider{background:none;box-shadow:none;border-style:dashed}
+body.server-mode.halloween.cards #sheetTable tfoot tr{background:#150F18;border-color:var(--fx2);border-radius:6px;box-shadow:0 0 18px -4px rgba(176,124,255,.6)}
+body.server-mode.halloween.cards #sheetTable tfoot td.grand .money{color:var(--fx3);text-shadow:0 0 10px rgba(255,201,60,.7)}
+body.server-mode.halloween.cards .deck-hint{color:#AE96B8}
+
+/* section heads: a band in the theme's main colour at the top level, then three level colours */
+body.server-mode.halloween #sheetTable tr.section-head{--ink:#FFFFFF;--muted:#FFDCC5;--faint:#FFBA8C;--slate:#FFFFFF}
+body.server-mode.halloween #sheetTable tbody tr.section-head{
+background:linear-gradient(90deg,rgba(255,117,24,.5) 58%,rgba(166,107,255,.2) 80%,rgba(176,124,255,.05)),#1E0F12;
+}
+body.server-mode.dark.halloween #sheetTable tbody tr.section-head[data-lvl] td,
+body.server-mode.dark.halloween #sheetTable tbody tr.section-head[data-lvl]:hover td{
+background:transparent;border-top-color:rgba(255,117,24,.65);border-bottom-color:rgba(255,117,24,.65);border-right-color:transparent;
+}
+body.server-mode.halloween #sheetTable tbody tr.section-head td.c-item{background-color:#8E4215;border-left-color:var(--fx1)}
+body.server-mode.dark.halloween #sheetTable tbody tr.section-head[data-lvl] .name-in{
+color:#FFFFFF;text-shadow:0 0 8px rgba(255,117,24,.95),0 0 2px rgba(255,255,255,.5);
+}
+body.server-mode.halloween #sheetTable tr.section-head .name-in::placeholder{color:#FFC8A3;text-shadow:none}
+body.server-mode.halloween #sheetTable tr.section-head .caret{color:#FFFFFF}
+body.server-mode.halloween #sheetTable tr.section-head .caret:hover{background:rgba(255,255,255,.14)}
+body.server-mode.halloween #sheetTable tr.section-head .grip{color:#FFDCC5!important}
+body.server-mode.halloween #sheetTable tr.section-head .del{color:#FFE1CC}
+body.server-mode.halloween #sheetTable tr.section-head .money{color:#FFFFFF;text-shadow:0 0 6px rgba(255,117,24,.7)}
+body.server-mode.halloween #sheetTable tbody tr.section-head td.calc.grand{background:rgba(0,0,0,.2)}
+body.server-mode.halloween #sheetTable tr.section-head td.calc.grand .money{color:var(--fx3);text-shadow:0 0 7px rgba(255,201,60,.7)}
+body.server-mode.halloween .sec-unit input{background:rgba(10,7,11,.6);border-color:rgba(176,124,255,.4);color:#FFFFFF}
+body.server-mode.halloween .sec-unit input.lab{background:transparent;border-color:rgba(255,255,255,.2);color:#FFD8BE}
+body.server-mode.halloween #sheetTable tbody tr.section-head.nested[data-lvl="1"]{background:linear-gradient(90deg,rgba(176,124,255,.32) 58%,rgba(176,124,255,.08) 82%,transparent),#1B1422}
+body.server-mode.halloween #sheetTable tbody tr.section-head.nested[data-lvl="1"] td.c-item{background-color:#4B3569}
+body.server-mode.halloween #sheetTable tbody tr.section-head.nested[data-lvl="2"]{background:linear-gradient(90deg,rgba(155,225,93,.32) 58%,rgba(155,225,93,.08) 82%,transparent),#1A1B17}
+body.server-mode.halloween #sheetTable tbody tr.section-head.nested[data-lvl="2"] td.c-item{background-color:#435A2D}
+body.server-mode.halloween #sheetTable tbody tr.section-head.nested[data-lvl="3"]{background:linear-gradient(90deg,rgba(232,220,192,.32) 58%,rgba(232,220,192,.08) 82%,transparent),#1F1B1E}
+body.server-mode.halloween #sheetTable tbody tr.section-head.nested[data-lvl="3"] td.c-item{background-color:#5F5952}
+body.server-mode.dark.halloween #sheetTable tbody tr.section-head.nested[data-lvl="1"] .name-in{text-shadow:0 0 8px rgba(176,124,255,.85)}
+body.server-mode.dark.halloween #sheetTable tbody tr.section-head.nested[data-lvl="2"] .name-in{text-shadow:0 0 8px rgba(155,225,93,.85)}
+body.server-mode.dark.halloween #sheetTable tbody tr.section-head.nested[data-lvl="3"] .name-in{text-shadow:0 0 8px rgba(232,220,192,.85)}
+body.server-mode.dark.halloween #sheetTable tbody tr.section-head.nested[data-lvl="1"] td,
+body.server-mode.dark.halloween #sheetTable tbody tr.section-head.nested[data-lvl="1"]:hover td{border-top-color:rgba(176,124,255,.5);border-bottom-color:rgba(176,124,255,.5)}
+body.server-mode.dark.halloween #sheetTable tbody tr.section-head.nested[data-lvl="2"] td,
+body.server-mode.dark.halloween #sheetTable tbody tr.section-head.nested[data-lvl="2"]:hover td{border-top-color:rgba(155,225,93,.5);border-bottom-color:rgba(155,225,93,.5)}
+body.server-mode.dark.halloween #sheetTable tbody tr.section-head.nested[data-lvl="3"] td,
+body.server-mode.dark.halloween #sheetTable tbody tr.section-head.nested[data-lvl="3"]:hover td{border-top-color:rgba(232,220,192,.55);border-bottom-color:rgba(232,220,192,.55)}
+body.server-mode.halloween #sheetTable tbody tr.section-head.nested[data-lvl] td.c-item{border-left:4px solid var(--lv1)}
+body.server-mode.halloween #sheetTable tbody tr.section-head.nested[data-lvl="2"] td.c-item{border-left-color:var(--lv2)}
+body.server-mode.halloween #sheetTable tbody tr.section-head.nested[data-lvl="3"] td.c-item{border-left-color:var(--lv3)}
+body.server-mode.halloween.cards #sheetTable tbody tr.section-head{border-color:rgba(255,117,24,.6);box-shadow:0 0 16px -6px rgba(255,117,24,.7)}
+body.server-mode.halloween.cards #sheetTable tbody tr.section-head[data-lvl] td.c-item{background-color:transparent}
+
+/* subtotals */
+body.server-mode.dark.halloween #sheetTable tbody tr.section-foot[data-lvl] td,
+body.server-mode.dark.halloween #sheetTable tbody tr.section-foot[data-lvl]:hover td{background:#1B111F}
+body.server-mode.dark.halloween #sheetTable tbody tr.section-foot[data-lvl] td.calc.grand{background:rgba(255,201,60,.08)}
+body.server-mode.halloween #sheetTable tr.section-foot td{border-bottom-color:rgba(255,117,24,.45)}
+body.server-mode.halloween #sheetTable tr.section-foot .sec-label{color:#FFAC74;text-shadow:0 0 6px rgba(255,117,24,.5)}
+body.server-mode.halloween #sheetTable tr.section-foot .money{color:#FFFFFF}
+body.server-mode.halloween.cards #sheetTable tbody tr[data-type="sectionEnd"]{background:#1B111F;border-color:rgba(255,117,24,.4)}
+
+/* totals: the answer in the third colour */
+body.server-mode.halloween #sheetTable tfoot td{background:#130C16;border-top-color:var(--fx2)}
+body.server-mode.halloween #sheetTable tfoot .tot-label{color:var(--fx2);text-shadow:0 0 8px rgba(176,124,255,.65)}
+body.server-mode.halloween:not(.cards) #sheetTable tfoot td.grand{
+background:#2F231A;border-left-color:var(--fx3);border-right-color:var(--fx3);border-bottom-color:var(--fx3);
+box-shadow:inset 0 0 16px rgba(255,201,60,.2);
+}
+body.server-mode.halloween #sheetTable tfoot .grand .money{color:var(--fx3);text-shadow:0 0 10px rgba(255,201,60,.75)}
+body.server-mode.halloween .grand-lip{background:#140E17;border-color:var(--fx3);box-shadow:0 0 14px -2px rgba(255,201,60,.55)}
+body.server-mode.halloween .grand-lip .lip-money{color:var(--fx3)}
+
+/* summary, calculators and the rest of the paper */
+body.server-mode.halloween .sum-table tr.s-sec td{background:#211526}
+body.server-mode.halloween .sum-table tr.s-folder:not(.colored) td{background:#23182D;--ink:#F6EFFF}
+body.server-mode.halloween .sum-table td.s-grand,body.server-mode.halloween .sum-table tr.s-sec td.s-grand{background:rgba(255,201,60,.07);border-left-color:rgba(255,201,60,.6);border-right-color:rgba(255,201,60,.6)}
+body.server-mode.halloween .sum-table td.s-grand .money{color:var(--fx3)}
+body.server-mode.halloween .sum-table tfoot td{background:#130C16;border-top-color:var(--fx2)}
+body.server-mode.halloween .sum-table tfoot td.grand{background:#2F231A;border-color:var(--fx3)}
+body.server-mode.halloween .sum-table tfoot td.grand .money{color:var(--fx3)}
+body.server-mode.halloween .calc-table td{background-color:#140E17}
+body.server-mode.halloween .calc-table input{background:#130B16;border-color:rgba(176,124,255,.3);color:#F7EEFA}
+body.server-mode.halloween .load-block-head{background:linear-gradient(90deg,rgba(255,117,24,.22),transparent 70%),#180F1C}
+body.server-mode.halloween .lb-sum{color:var(--fx3)}
+body.server-mode.halloween .wage-table tr.wage-sec td{background:linear-gradient(90deg,rgba(255,117,24,.3),rgba(255,117,24,.06) 60%),#1E0F12;color:#FFFFFF}
+body.server-mode.halloween .wage-table tr.wage-grand td{color:var(--fx3);text-shadow:0 0 8px rgba(255,201,60,.6);border-top-color:var(--fx3)}
+body.server-mode.halloween .cb-pie{box-shadow:0 0 0 2px var(--paper),0 0 22px rgba(176,124,255,.45)}
+body.server-mode.halloween .sum-block,body.server-mode.halloween .cb-cards{border-color:rgba(176,124,255,.28);border-radius:6px;box-shadow:0 0 14px -8px rgba(176,124,255,.5)}
+body.server-mode.halloween .sum-notes textarea{background:#130B16;border-color:rgba(176,124,255,.3);color:#F7EEFA}
+
+/* scroll bars */
+body.server-mode.halloween ::-webkit-scrollbar{width:10px;height:10px}
+body.server-mode.halloween ::-webkit-scrollbar-track{background:#130B16}
+body.server-mode.halloween ::-webkit-scrollbar-thumb{background:linear-gradient(180deg,var(--fx1),var(--fx2));border-radius:6px;border:2px solid #130B16}
+body.server-mode.halloween ::-webkit-scrollbar-thumb:horizontal{background:linear-gradient(90deg,var(--fx1),var(--fx2))}
+body.server-mode.halloween ::-webkit-scrollbar-corner{background:#130B16}
+
+/* the extras: bats crossing the top, now and then */
+body.server-mode.halloween::after{
+content:"";position:fixed;left:0;top:0;width:132px;height:54px;z-index:185;pointer-events:none;
+background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 132 54'%3E%3Cg transform='translate(0 18) scale(1.15)'%3E%3Cpath d='M24 9 C22 6 19 4 15 4 C12 4 7 3 2 6 C5 7 7 9 7 12 C9 10 12 10 14 13 C16 11 19 11 21 14 L24 17 L27 14 C29 11 32 11 34 13 C36 10 39 10 41 12 C41 9 43 7 46 6 C41 3 36 4 33 4 C29 4 26 6 24 9 Z M22.4 8.2 L21.8 5.2 L23.6 7.4 Z M25.6 8.2 L26.2 5.2 L24.4 7.4 Z' fill='%232B1838' stroke='rgba(255,140,60,.75)' stroke-width='.9' stroke-linejoin='round'/%3E%3C/g%3E%3Cg transform='translate(56 2) scale(0.8)'%3E%3Cpath d='M24 9 C22 6 19 4 15 4 C12 4 7 3 2 6 C5 7 7 9 7 12 C9 10 12 10 14 13 C16 11 19 11 21 14 L24 17 L27 14 C29 11 32 11 34 13 C36 10 39 10 41 12 C41 9 43 7 46 6 C41 3 36 4 33 4 C29 4 26 6 24 9 Z M22.4 8.2 L21.8 5.2 L23.6 7.4 Z M25.6 8.2 L26.2 5.2 L24.4 7.4 Z' fill='%232B1838' stroke='rgba(255,140,60,.7)' stroke-width='.9' stroke-linejoin='round'/%3E%3C/g%3E%3Cg transform='translate(92 26) scale(0.62)'%3E%3Cpath d='M24 9 C22 6 19 4 15 4 C12 4 7 3 2 6 C5 7 7 9 7 12 C9 10 12 10 14 13 C16 11 19 11 21 14 L24 17 L27 14 C29 11 32 11 34 13 C36 10 39 10 41 12 C41 9 43 7 46 6 C41 3 36 4 33 4 C29 4 26 6 24 9 Z M22.4 8.2 L21.8 5.2 L23.6 7.4 Z M25.6 8.2 L26.2 5.2 L24.4 7.4 Z' fill='%232B1838' stroke='rgba(255,140,60,.65)' stroke-width='.9' stroke-linejoin='round'/%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat;
+translate:-40vw 0;
+animation:hw-bats 27s linear 4s infinite,hw-flap .17s ease-in-out infinite alternate;
+}
+@keyframes hw-bats{
+0%{translate:-30vw 26px}
+10%{translate:12vw 6px}
+20%{translate:46vw 30px}
+30%{translate:80vw 4px}
+40%,100%{translate:120vw 22px}
+}
+@keyframes hw-flap{from{scale:1 1}to{scale:1 .6}}
+@media (prefers-reduced-motion:reduce){body.server-mode.halloween::after{display:none}}
+
+/* ---------- Christmas theme ----------
+Rides on body.dark like Neon. Evergreen night with snow falling, cranberry red
+for whatever is open or active, holly green for edges, gold for the answers.
+A string of lights runs along the top of the card with a sprig of holly in its
+corner, section heads carry a cap of snow, and the Grand column has a candy-cane
+top. The snow sits under the drawers and windows and never takes a click. The
+title lettering (Mountains of Christmas) is bundled locally. */
+body.server-mode.christmas{
+--f-fest:"Mountains of Christmas",var(--f-cond);--fest-w:700;--fest-ls:.01em;--fest-c:#FFF6F2;
+--fx1:#E8344A;--fx2:#5BD69A;--fx3:#F5C451;--fxr:#FF8A4C;--fxg:#7CF0A8;
+--paper:#060D0A;
+--card:#0D1A14;
+--ink:#F3F7F2;
+--muted:#B8CEC1;
+--faint:#709B86;
+--rule:#2F5844;
+--rule-hair:#214030;
+--rule-strong:#549172;
+--fill:#11251B;
+--calc:#0B1811;
+--slate:#86E3B6;
+--slate-2:#C6F3DC;
+--slate-bg:#14402F;
+--amber:var(--fx1);
+--tip-bg:#18452E;
+--labor:#7FD3FF;
+--equip:#F5C451;
+--material:#7CF0A8;
+--tool:#FF9F6B;
+--part:#FFB38A;
+--service:#7FFFD4;
+--construct:#D6C6FF;
+--hybrid:#FF8FB8;
+--none:#709B86;
+--lv1:#5BD69A;--lv2:#F5C451;--lv3:#9FD8F0;
+--s1:#12261C;--s2:#183326;--s3:#162C21;--s4:#2A0D11;--s5:#321115;--s6:#152A1F;--s7:#14291E;--s8:#14262F;
+--s9:#11222A;--s10:#152B36;--s11:#162B20;--s12:#202F27;--s13:#0F1F17;--s14:#112631;--s15:#11241B;--s16:#102219;
+--s17:#193627;--s18:#162B35;--s19:#132A1E;--s20:#11261C;--s21:#122630;--s22:#2A4B5B;--s23:#310F13;--s24:#1B3829;
+--s25:#162A34;--s26:#142A1F;--s27:#162E22;--s28:#2A0D11;--s29:#152B20;--s30:#172F23;--s31:#152B20;--s32:#162D21;
+--s33:#14291E;--s34:#152A1F;--s35:#14291E;--s36:#152730;--s37:#2A2410;--s38:#2C2612;--s39:#152A1F;--s40:#12271D;
+--s41:#142A1F;--s42:#2B2810;--s43:#2A2610;--s44:#152B20;--s45:#0F1C22;--s46:#0E302F;--s47:#142A1F;--s48:#1E2D26;
+--s49:#1D2C25;--s50:#1A333F;--s51:#2D2812;--s52:#142A1F;--s53:#0F2418;--s54:#12301C;--s55:#121F26;--s56:#112219;
+--s57:#204432;--s58:#13281D;--s59:#0A1811;
+background:
+radial-gradient(circle,rgba(255,255,255,.5) 0 1.1px,transparent 1.8px) 0 0/96px 96px,
+radial-gradient(circle,rgba(255,255,255,.3) 0 .9px,transparent 1.5px) 48px 30px/140px 140px,
+radial-gradient(1100px 620px at 10% -10%,rgba(232,52,74,.16),transparent 62%),
+radial-gradient(900px 520px at 108% 112%,rgba(245,196,81,.12),transparent 60%),
+linear-gradient(180deg,#0B1D14,#06110C 70%);
+}
+body.server-mode.christmas ::selection{background:rgba(232,52,74,.5);color:#FFFFFF}
+body.server-mode.christmas .cell-in,body.server-mode.christmas .money,body.server-mode.christmas .rownum,
+body.server-mode.christmas .pct,body.server-mode.christmas .mk-cash,body.server-mode.christmas .up-chip{font-variant-numeric:tabular-nums}
+
+/* ---- tabs ---- */
+body.server-mode.christmas .rail .tab{background:rgba(13,26,20,.9);color:#BEE6D2;border:1px solid #2F5844;border-bottom:none;text-shadow:none}
+body.server-mode.christmas .rail .tab:hover{background:#163224;color:var(--fx2);border-color:rgba(91,214,154,.55);text-shadow:0 0 6px rgba(91,214,154,.6)}
+body.server-mode.christmas .rail .tab[aria-selected="true"]{
+background:#152F22;color:#FFFFFF;border-color:var(--fx1);
+box-shadow:inset 0 2px 0 var(--fx1),0 -3px 14px -3px rgba(232,52,74,.6);
+text-shadow:0 0 7px rgba(232,52,74,.9);
+}
+body.server-mode.christmas .rail .tab-add{color:var(--fx2)}
+body.server-mode.christmas .rail .ftab{background:rgba(13,26,20,.9);color:#BEE6D2;border-color:#2F5844;text-shadow:none}
+body.server-mode.christmas .rail .ftab:hover{background:#163224;color:var(--fx2);border-color:rgba(91,214,154,.55)}
+body.server-mode.christmas .rail .ftab.colored{background:color-mix(in srgb,var(--fc) 32%,#0D1A14);color:#FFFFFF;border-color:var(--fc);box-shadow:0 0 10px -3px var(--fc)}
+body.server-mode.christmas .rail .ftab[aria-selected="true"]{
+background:#0B1811;color:#FFFFFF;border-color:rgba(91,214,154,.6);
+box-shadow:inset 0 2px 0 var(--fx2),0 -3px 14px -4px rgba(91,214,154,.55);text-shadow:0 0 7px rgba(91,214,154,.8);
+}
+body.server-mode.christmas .rail .ftab.ftab-add{background:transparent;color:var(--fx2);border-color:rgba(91,214,154,.45);box-shadow:none}
+body.server-mode.christmas .rail-trow{
+background:linear-gradient(180deg,rgba(232,52,74,.1),rgba(11,24,17,0) 75%),#0B1811;
+border-color:rgba(91,214,154,.45);box-shadow:0 -6px 18px -12px rgba(91,214,154,.7);
+}
+body.server-mode.christmas .rail-stack.band-tinted .rail-trow{background:linear-gradient(rgba(6,13,10,.66),rgba(6,13,10,.66)),var(--fband)}
+body.server-mode.christmas .rail-stack.band-tinted .ftab[aria-selected="true"]{background:linear-gradient(rgba(6,13,10,.66),rgba(6,13,10,.66)),var(--fband);color:#FFFFFF}
+body.server-mode.christmas .rail-stack.band-tinted .rail-trow .tab:not(.tinted):not([aria-selected="true"]){background:rgba(6,13,10,.72);color:#E7FCF2}
+body.server-mode.christmas .rail-arrow{background:#0D1A14;border-color:rgba(91,214,154,.5);color:var(--fx2)}
+body.server-mode.christmas .rail-arrow:hover{color:#FFFFFF;border-color:var(--fx2);box-shadow:0 0 8px rgba(91,214,154,.5)}
+body.server-mode.christmas .rail .status{color:#709B86}
+body.server-mode.christmas .rail .status.on{color:var(--fxg);text-shadow:0 0 6px rgba(124,240,168,.7)}
+body.server-mode.christmas .rail .status.bad{color:var(--fxr)}
+body.server-mode.christmas .tab-tip{border:1px solid rgba(232,52,74,.55);box-shadow:0 0 16px -3px rgba(232,52,74,.55)}
+body.server-mode.christmas .tab-help-btn{
+background:#0D1A14;border:1.5px solid var(--fx2);color:var(--fx2);
+box-shadow:0 0 10px rgba(91,214,154,.45),inset 0 0 6px rgba(91,214,154,.25);text-shadow:0 0 6px rgba(91,214,154,.8);
+}
+body.server-mode.christmas .tab-help-btn:hover{background:rgba(91,214,154,.16);color:#FFFFFF;border-color:var(--fx2)}
+
+/* ---- the card ---- */
+body.server-mode.christmas .card:not(.ico){
+background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 32'%3E %3Cpath d='M24 15 C20 10 14 8 6 10 L9 12.5 L3 14.5 L8 16 L5 20.5 L11 19.5 L11 23.5 C17 22 21 19 24 15 Z' fill='%232E9E5B' stroke='%2317663A' stroke-width='.8' stroke-linejoin='round'/%3E %3Cpath d='M24 15 C28 10 34 8 42 10 L39 12.5 L45 14.5 L40 16 L43 20.5 L37 19.5 L37 23.5 C31 22 27 19 24 15 Z' fill='%2336AE66' stroke='%2317663A' stroke-width='.8' stroke-linejoin='round'/%3E %3Cpath d='M23 15 Q15 13 8 14 M25 15 Q33 13 40 14' stroke='%2317663A' stroke-width='.7' fill='none'/%3E %3Ccircle cx='20.5' cy='14' r='3.4' fill='%23E3263A'/%3E%3Ccircle cx='27.5' cy='13' r='3.4' fill='%23D11F33'/%3E%3Ccircle cx='24' cy='18.5' r='3.4' fill='%23EA3346'/%3E %3Ccircle cx='19.5' cy='12.9' r='.9' fill='%23FFFFFF' opacity='.7'/%3E%3Ccircle cx='26.5' cy='11.9' r='.9' fill='%23FFFFFF' opacity='.7'/%3E%3Ccircle cx='23' cy='17.4' r='.9' fill='%23FFFFFF' opacity='.7'/%3E %3C/svg%3E") right 8px top 1px/36px 24px no-repeat,
+url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 112 20'%3E%3Cpath d='M0 2 Q28 10 56 2 Q84 10 112 2' stroke='%231E3A2C' stroke-width='1.3' fill='none'/%3E%3Ccircle cx='14' cy='12' r='7' fill='%23FF4D5E' opacity='.16'/%3E%3Ccircle cx='14' cy='12' r='4.6' fill='%23FF4D5E' opacity='.28'/%3E%3Crect x='12.5' y='5' width='3' height='3' rx='.6' fill='%232C4A3A'/%3E%3Cellipse cx='14' cy='12.0' rx='2.8' ry='4' fill='%23FF4D5E'/%3E%3Cellipse cx='13.0' cy='10.6' rx='.9' ry='1.5' fill='%23FFFFFF' opacity='.65'/%3E%3Ccircle cx='42' cy='12' r='7' fill='%23FFD25A' opacity='.16'/%3E%3Ccircle cx='42' cy='12' r='4.6' fill='%23FFD25A' opacity='.28'/%3E%3Crect x='40.5' y='5' width='3' height='3' rx='.6' fill='%232C4A3A'/%3E%3Cellipse cx='42' cy='12.0' rx='2.8' ry='4' fill='%23FFD25A'/%3E%3Cellipse cx='41.0' cy='10.6' rx='.9' ry='1.5' fill='%23FFFFFF' opacity='.65'/%3E%3Ccircle cx='70' cy='12' r='7' fill='%234DDB8A' opacity='.16'/%3E%3Ccircle cx='70' cy='12' r='4.6' fill='%234DDB8A' opacity='.28'/%3E%3Crect x='68.5' y='5' width='3' height='3' rx='.6' fill='%232C4A3A'/%3E%3Cellipse cx='70' cy='12.0' rx='2.8' ry='4' fill='%234DDB8A'/%3E%3Cellipse cx='69.0' cy='10.6' rx='.9' ry='1.5' fill='%23FFFFFF' opacity='.65'/%3E%3Ccircle cx='98' cy='12' r='7' fill='%236CC8FF' opacity='.16'/%3E%3Ccircle cx='98' cy='12' r='4.6' fill='%236CC8FF' opacity='.28'/%3E%3Crect x='96.5' y='5' width='3' height='3' rx='.6' fill='%232C4A3A'/%3E%3Cellipse cx='98' cy='12.0' rx='2.8' ry='4' fill='%236CC8FF'/%3E%3Cellipse cx='97.0' cy='10.6' rx='.9' ry='1.5' fill='%23FFFFFF' opacity='.65'/%3E%3C/svg%3E") left -6px top -3px/112px 20px repeat-x,
+linear-gradient(180deg,rgba(17,40,29,.96),rgba(9,22,16,.98));
+border:1px solid rgba(232,52,74,.3);border-radius:0 10px 10px 10px;
+box-shadow:0 0 0 1px rgba(91,214,154,.08),0 0 30px -8px rgba(232,52,74,.3),0 30px 60px -30px rgba(0,0,0,.95);
+}
+body.server-mode.christmas .card > .head{background:linear-gradient(90deg,var(--fx1),var(--fx2) 45%,transparent 85%) left bottom/100% 1px no-repeat;border-bottom:0}
+body.server-mode.christmas .card > .head .eyebrow{color:var(--fx2);text-shadow:0 0 6px rgba(91,214,154,.6)}
+body.server-mode.christmas .card > .head .note-btn{color:#BEE6D2}
+body.server-mode.christmas #title{color:var(--fest-c);font-family:var(--f-fest);font-weight:var(--fest-w);letter-spacing:var(--fest-ls);
+text-shadow:0 0 12px rgba(232,52,74,.55),0 0 28px rgba(245,196,81,.2),0 2px 0 rgba(0,0,0,.6)}
+body.server-mode.christmas #title::placeholder{color:#709B86;text-shadow:none}
+body.server-mode.christmas #title:hover{border-bottom-color:rgba(91,214,154,.25)}
+body.server-mode.christmas #title:focus{border-bottom-color:var(--fx1)}
+body.server-mode.christmas .head-tool{background:transparent;border-color:rgba(91,214,154,.45);color:var(--fx2)}
+body.server-mode.christmas .head-tool:hover{border-color:var(--fx2);color:#FFFFFF;box-shadow:0 0 8px rgba(91,214,154,.5)}
+body.server-mode.christmas .head-tool.on{background:rgba(232,52,74,.18);border-color:var(--fx1);color:#FFFFFF;box-shadow:0 0 10px rgba(232,52,74,.55)}
+body.server-mode.christmas.head-shut .head-peek{color:#FFFFFF;text-shadow:0 0 8px rgba(91,214,154,.55)}
+body.server-mode.christmas .card > .scroll{background:rgba(5,12,8,.35)}
+body.server-mode.christmas #sheetTable,body.server-mode.christmas #summaryCard .sum-table{
+box-shadow:0 0 0 1px rgba(91,214,154,.22),0 0 22px -6px rgba(91,214,154,.35),0 16px 34px -20px rgba(0,0,0,.9);
+}
+body.server-mode.christmas .card > .bar{background:transparent;border-top:1px solid rgba(91,214,154,.16)}
+
+/* ---- buttons ---- */
+body.server-mode.christmas .btn,body.server-mode.christmas .bar .btn.alt.on,body.server-mode.christmas .btn.alt.on{
+background:linear-gradient(180deg,rgba(232,52,74,.3),rgba(232,52,74,.12));border:1px solid var(--fx1);color:#FCE1E4;
+text-shadow:0 0 6px rgba(232,52,74,.8);border-radius:4px;
+box-shadow:0 0 10px -2px rgba(232,52,74,.6),inset 0 0 8px rgba(232,52,74,.18);
+}
+body.server-mode.christmas .btn:hover{background:linear-gradient(180deg,rgba(232,52,74,.48),rgba(232,52,74,.2));color:#FFFFFF;border-color:#EF7180;
+box-shadow:0 0 16px -1px rgba(232,52,74,.85),inset 0 0 10px rgba(232,52,74,.25)}
+body.server-mode.christmas .btn.alt,body.server-mode.christmas .bar .btn.alt{
+background:rgba(91,214,154,.06);border:1px solid rgba(91,214,154,.7);color:var(--fx2);
+text-shadow:0 0 6px rgba(91,214,154,.55);box-shadow:0 0 8px -2px rgba(91,214,154,.5);
+}
+body.server-mode.christmas .btn.alt:hover,body.server-mode.christmas .bar .btn.alt:hover{background:rgba(91,214,154,.16);color:#FFFFFF;border-color:var(--fx2);box-shadow:0 0 14px -1px rgba(91,214,154,.8)}
+body.server-mode.christmas .btn.ghost,body.server-mode.christmas .bar .btn.ghost{background:transparent;border:1px solid #549172;color:#D2F1E1;text-shadow:none;box-shadow:none}
+body.server-mode.christmas .btn.ghost:hover,body.server-mode.christmas .bar .btn.ghost:hover{border-color:var(--fx2);color:#FFFFFF;background:rgba(91,214,154,.08)}
+body.server-mode.christmas .btn.ghost.on{background:rgba(91,214,154,.18);border-color:var(--fx2);color:#FFFFFF;box-shadow:0 0 10px rgba(91,214,154,.5)}
+body.server-mode.christmas .bar #deleteSheet,body.server-mode.christmas .bar #reset,body.server-mode.christmas .btn.danger,body.server-mode.christmas .btn.tiny.danger{
+background:rgba(255,138,76,.12);border:1px solid var(--fxr);color:#FFDCC9;
+text-shadow:0 0 6px rgba(255,138,76,.7);box-shadow:0 0 10px -2px rgba(255,138,76,.6);
+}
+body.server-mode.christmas .bar #deleteSheet:hover,body.server-mode.christmas .bar #reset:hover,body.server-mode.christmas .btn.danger:hover{background:rgba(255,138,76,.26);color:#FFFFFF}
+body.server-mode.christmas .btn:focus-visible{outline:1px solid var(--fx2);outline-offset:2px}
+body.server-mode.christmas .h-add{border-color:rgba(91,214,154,.55);background:rgba(91,214,154,.08);color:var(--fx2)}
+body.server-mode.christmas .h-add:hover{background:rgba(91,214,154,.2);color:#FFFFFF;box-shadow:0 0 8px rgba(91,214,154,.5)}
+body.server-mode.christmas .sec-add{background:rgba(6,13,10,.55);border-color:rgba(91,214,154,.6);color:var(--fx2)}
+body.server-mode.christmas .sec-add:hover{background:rgba(91,214,154,.18);color:#FFFFFF;box-shadow:0 0 8px rgba(91,214,154,.5)}
+body.server-mode.christmas .pic-pair{background:#0D1A14;border-color:rgba(91,214,154,.45)}
+body.server-mode.christmas .pic-lab{background:#13281D;border-right-color:rgba(91,214,154,.3);color:#9CC6B1}
+body.server-mode.christmas .pic-pair button{color:#D2F1E1}
+body.server-mode.christmas .pic-pair button + button{border-left-color:rgba(91,214,154,.3)}
+body.server-mode.christmas .pic-pair button:hover{background:rgba(91,214,154,.12);color:#FFFFFF}
+body.server-mode.christmas .pic-pair button.on{background:rgba(91,214,154,.2);color:#FFFFFF;box-shadow:inset 0 -2px 0 var(--fx2);text-shadow:0 0 6px rgba(91,214,154,.8)}
+body.server-mode.christmas select{background-color:#091A11;color:#FFFFFF;border-color:rgba(91,214,154,.35)}
+body.server-mode.christmas :is(.lib,.proj,.side,.ed,.cz-win,.confirm-pop,.tab-opts,.folder-pop,.sum-notes) :is(input[type="text"],input[type="search"],input[type="number"],input[type="email"],input[type="password"],input:not([type]),textarea):not(table *){
+background-color:#091A11;color:#FFFFFF;border-color:rgba(91,214,154,.32);
+}
+body.server-mode.christmas :is(.lib,.proj,.side,.ed,.cz-win,.confirm-pop,.tab-opts,.folder-pop,.sum-notes) :is(input,textarea,select):not(table *):focus{
+border-color:var(--fx1);box-shadow:0 0 10px rgba(232,52,74,.45);outline:none;
+}
+
+/* ---- edge tabs and drawers ---- */
+body.server-mode.christmas .lib-tab,body.server-mode.christmas .proj-tab{
+background:rgba(13,26,20,.94);color:var(--fx2);border:1px solid rgba(91,214,154,.45);
+text-shadow:0 0 6px rgba(91,214,154,.7);box-shadow:0 0 12px -3px rgba(91,214,154,.5);
+}
+body.server-mode.christmas .lib-tab{border-right:0}
+body.server-mode.christmas .proj-tab{border-left:0}
+body.server-mode.christmas .lib-tab:hover,body.server-mode.christmas .proj-tab:hover{background:#163224;color:#FFFFFF;box-shadow:0 0 16px -2px rgba(91,214,154,.75)}
+body.server-mode.christmas.lib-open #libToggle,body.server-mode.christmas.cat-open #catToggle,body.server-mode.christmas.notes-open #notesToggle,
+body.server-mode.christmas.hist-open #histToggle,body.server-mode.christmas.wage-open #wageToggle,body.server-mode.christmas.load-open #loadToggle,
+body.server-mode.christmas.review-open #reviewToggle,body.server-mode.christmas.link-open #linkToggle,body.server-mode.christmas.sov-open #sovToggle,body.server-mode.christmas.proj-open #projToggle,
+body.server-mode.christmas.file-open #fileToggle,body.server-mode.christmas.page-open #pageToggle,body.server-mode.christmas.pref-open #prefToggle,
+body.server-mode.christmas.ai-open #aiToggle,
+body.server-mode.christmas.lib-open #libToggle:hover,body.server-mode.christmas.cat-open #catToggle:hover,body.server-mode.christmas.notes-open #notesToggle:hover,
+body.server-mode.christmas.hist-open #histToggle:hover,body.server-mode.christmas.wage-open #wageToggle:hover,body.server-mode.christmas.load-open #loadToggle:hover,
+body.server-mode.christmas.review-open #reviewToggle:hover,body.server-mode.christmas.link-open #linkToggle:hover,body.server-mode.christmas.sov-open #sovToggle:hover,body.server-mode.christmas.proj-open #projToggle:hover,
+body.server-mode.christmas.file-open #fileToggle:hover,body.server-mode.christmas.page-open #pageToggle:hover,body.server-mode.christmas.pref-open #prefToggle:hover,
+body.server-mode.christmas.ai-open #aiToggle:hover{
+background:linear-gradient(180deg,#E8344A,#9E1428);color:#FFFFFF;border-color:var(--fx1);
+text-shadow:0 0 6px rgba(255,255,255,.6);box-shadow:0 0 18px rgba(232,52,74,.8);
+}
+body.server-mode.christmas .lib,body.server-mode.christmas .proj,body.server-mode.christmas .side,body.server-mode.christmas .ed{
+background:linear-gradient(180deg,#0F2419,#091A11);border-color:rgba(91,214,154,.3);
+box-shadow:0 0 34px -10px rgba(91,214,154,.4);
+}
+body.server-mode.christmas .lib-head,body.server-mode.christmas .ed-head{
+background:linear-gradient(90deg,rgba(232,52,74,.22),rgba(91,214,154,.05) 70%),#0E2017;
+border-bottom:1px solid rgba(232,52,74,.55);
+}
+body.server-mode.christmas .lib-head .eyebrow,body.server-mode.christmas .ed-head .eyebrow{color:#FFFFFF;text-shadow:0 0 8px rgba(232,52,74,.9)}
+body.server-mode.christmas .lib-close{color:var(--fx2)}
+body.server-mode.christmas .lib-close:hover{background:rgba(232,52,74,.2);color:#FFFFFF}
+body.server-mode.christmas .lib-foot,body.server-mode.christmas .ed-foot{background:#0A1811;border-top-color:rgba(91,214,154,.22)}
+body.server-mode.christmas .lib-title{color:var(--fx2);text-shadow:0 0 6px rgba(91,214,154,.5)}
+body.server-mode.christmas .side-group{color:#F18592;text-shadow:0 0 6px rgba(232,52,74,.5)}
+body.server-mode.christmas .tpl{background:#10241A;border-color:#2F5844}
+body.server-mode.christmas .pref-theme{background:#0D1A14;border-color:#2F5844;color:#FFFFFF}
+body.server-mode.christmas .pref-theme:hover{border-color:var(--fx2)}
+body.server-mode.christmas .pref-theme.on{border-color:var(--fx1);box-shadow:0 0 0 1px var(--fx1),0 0 14px rgba(232,52,74,.6)}
+
+/* ---- menus and windows ---- */
+body.server-mode.christmas .confirm-pop,body.server-mode.christmas .tab-opts,body.server-mode.christmas .folder-pop,body.server-mode.christmas .print-menu{
+background:#0D1C14;border-color:rgba(91,214,154,.5);
+box-shadow:0 0 24px -6px rgba(91,214,154,.55),0 18px 40px -18px rgba(0,0,0,.9);
+}
+body.server-mode.christmas .pm-opt:hover{background:rgba(91,214,154,.12);color:#FFFFFF}
+body.server-mode.christmas .pm-rule{background:rgba(91,214,154,.22)}
+body.server-mode.christmas .cz-win{background:linear-gradient(180deg,#0F2419,#091A11);border-color:rgba(91,214,154,.4);box-shadow:0 0 34px -8px rgba(91,214,154,.5)}
+body.server-mode.christmas .cz-head{background:linear-gradient(90deg,rgba(232,52,74,.22),transparent 70%);border-bottom-color:rgba(232,52,74,.55)}
+body.server-mode.christmas .cz-foot{background:#0A1811;border-top-color:rgba(91,214,154,.22)}
+body.server-mode.christmas .cz-row{background:#10241A;border-color:#2F5844}
+body.server-mode.christmas .cz-row:hover,body.server-mode.christmas .cz-row:focus-visible{border-color:var(--fx2);box-shadow:0 0 10px -2px rgba(91,214,154,.55)}
+body.server-mode.christmas .cz-sw:checked{background:linear-gradient(90deg,var(--fx1),var(--fx2))}
+body.server-mode.christmas .tip{color:#FFFFFF;border:1px solid rgba(232,52,74,.6);box-shadow:0 0 14px -2px rgba(232,52,74,.55)}
+
+/* ---- the pricing sheet ---- */
+body.server-mode.christmas #sheetTable tbody,body.server-mode.christmas #sheetTable tfoot,
+body.server-mode.christmas .sum-table tbody,body.server-mode.christmas .sum-table tfoot,body.server-mode.christmas .calc-table{
+--rule-hair:rgba(91,214,154,.09);--rule:rgba(91,214,154,.2);--rule-strong:rgba(91,214,154,.38);
+}
+body.server-mode.christmas #sheetTable thead th,body.server-mode.christmas .sum-table thead th,body.server-mode.christmas .calc-table th{
+background:linear-gradient(180deg,#1D5037,#123222);color:#ADEACC;
+border-right:1px solid rgba(91,214,154,.12);
+box-shadow:inset 0 -2px 0 rgba(232,52,74,.8);
+text-shadow:0 0 6px rgba(91,214,154,.45);
+}
+body.server-mode.christmas #sheetTable thead th.drop-before{box-shadow:inset 4px 0 0 var(--fx1),inset 0 -2px 0 rgba(232,52,74,.8)}
+body.server-mode.christmas #sheetTable thead th.drop-after{box-shadow:inset -4px 0 0 var(--fx1),inset 0 -2px 0 rgba(232,52,74,.8)}
+body.server-mode.christmas .h-lab{border-bottom-color:rgba(91,214,154,.3)}
+body.server-mode.christmas thead th:hover .h-lab{border-bottom-color:rgba(91,214,154,.8)}
+body.server-mode.christmas .h-sym{color:rgba(91,214,154,.7)}
+body.server-mode.christmas .h-input{color:var(--fx3);border-bottom-color:rgba(245,196,81,.5);text-shadow:0 0 6px rgba(245,196,81,.5)}
+body.server-mode.christmas .h-input:focus{background:rgba(245,196,81,.12)}
+body.server-mode.christmas .h-lab-in{color:#ADEACC}
+body.server-mode.christmas #sheetTable thead th.col-grand,body.server-mode.christmas .sum-table thead th.col-grand{
+background:linear-gradient(180deg,#37321C,#1F1E12);color:var(--fx3);
+border-top-color:var(--fx3);border-left-color:var(--fx3);border-right-color:var(--fx3);
+box-shadow:inset 0 -2px 0 var(--fx3),0 0 16px -4px rgba(245,196,81,.6);
+text-shadow:0 0 7px rgba(245,196,81,.75);
+}
+body.server-mode.christmas thead th.col-grand .h-lab{border-bottom-color:rgba(245,196,81,.5)}
+@media (hover:hover){
+body.server-mode.christmas #sheetTable tbody tr:hover td{background-color:#183A29}
+body.server-mode.christmas #sheetTable tbody tr:hover td.calc{background-color:#143022}
+body.server-mode.christmas #sheetTable tbody tr:hover td.calc.grand{background-color:rgba(245,196,81,.13)}
+}
+body.server-mode.christmas #sheetTable td.fill:focus-within{background:#352823}
+body.server-mode.christmas .cell-in:focus{outline:1px solid var(--fx1);outline-offset:-1px;box-shadow:inset 0 0 12px rgba(232,52,74,.4)}
+body.server-mode.christmas .name-in:focus{outline:1px solid var(--fx1);box-shadow:0 0 10px rgba(232,52,74,.4)}
+body.server-mode.christmas #sheetTable td.calc.grand{background:rgba(245,196,81,.07);border-left-color:rgba(245,196,81,.75);border-right-color:rgba(245,196,81,.75)}
+body.server-mode.christmas #sheetTable td.calc.grand .money{color:var(--fx3);text-shadow:0 0 7px rgba(245,196,81,.55)}
+
+/* the card deck. These sit before the section rules, which carry the same weight */
+body.server-mode.christmas.cards #sheetTable tbody tr{
+background:linear-gradient(180deg,#132A1E,#0D1C14);border-color:rgba(91,214,154,.24);border-radius:6px;
+box-shadow:0 0 14px -6px rgba(91,214,154,.5);
+}
+body.server-mode.christmas.cards #sheetTable tbody tr[data-type="item"]::before{box-shadow:0 0 8px var(--row-kind,#549172)}
+body.server-mode.christmas.cards #sheetTable td.fill:not(.c-item) .cell-in,
+body.server-mode.christmas.cards #sheetTable td.mk .cell-in{background:#091A11;border-color:rgba(91,214,154,.3)}
+body.server-mode.christmas.cards #sheetTable tbody td.calc.grand{background:none}
+body.server-mode.christmas.cards .deck-caret{background:#0D1A14;border-color:rgba(91,214,154,.5);color:var(--fx2)}
+body.server-mode.christmas.cards #sheetTable tbody tr.press-arm{background:#343229;box-shadow:inset 0 0 0 2px var(--fx1),0 0 18px rgba(232,52,74,.6)}
+body.server-mode.christmas.cards #sheetTable tbody tr.dragging{background:transparent;box-shadow:none;border-style:dashed;border-color:var(--fx1)}
+body.server-mode.christmas.cards #sheetTable tbody tr.divider{background:none;box-shadow:none;border-style:dashed}
+body.server-mode.christmas.cards #sheetTable tfoot tr{background:#0D1C15;border-color:var(--fx2);border-radius:6px;box-shadow:0 0 18px -4px rgba(91,214,154,.6)}
+body.server-mode.christmas.cards #sheetTable tfoot td.grand .money{color:var(--fx3);text-shadow:0 0 10px rgba(245,196,81,.7)}
+body.server-mode.christmas.cards .deck-hint{color:#9CC6B1}
+
+/* section heads: a band in the theme's main colour at the top level, then three level colours */
+body.server-mode.christmas #sheetTable tr.section-head{--ink:#FFFFFF;--muted:#F9CCD2;--faint:#F49AA4;--slate:#FFFFFF}
+body.server-mode.christmas #sheetTable tbody tr.section-head{
+background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 6' preserveAspectRatio='none'%3E%3Cpath d='M0 0 H80 V2.4 C75 5 71 3.2 66 4.2 C60 6 56 3 50 4 C44 5.8 40 2.6 34 3.8 C28 5.6 24 3 18 4 C12 5.8 6 3.2 0 4.2 Z' fill='%23F4F8FB' opacity='.88'/%3E%3C/svg%3E") left top/80px 6px repeat-x,linear-gradient(90deg,rgba(232,52,74,.5) 58%,rgba(245,196,81,.2) 80%,rgba(91,214,154,.05)),#2E0A12;
+}
+body.server-mode.dark.christmas #sheetTable tbody tr.section-head[data-lvl] td,
+body.server-mode.dark.christmas #sheetTable tbody tr.section-head[data-lvl]:hover td{
+background:transparent;border-top-color:rgba(232,52,74,.65);border-bottom-color:rgba(232,52,74,.65);border-right-color:transparent;
+}
+body.server-mode.christmas #sheetTable tbody tr.section-head td.c-item{background-color:#8B1F2E;border-left-color:var(--fx1)}
+body.server-mode.dark.christmas #sheetTable tbody tr.section-head[data-lvl] .name-in{
+color:#FFFFFF;text-shadow:0 0 8px rgba(232,52,74,.95),0 0 2px rgba(255,255,255,.5);
+}
+body.server-mode.christmas #sheetTable tr.section-head .name-in::placeholder{color:#F6AEB7;text-shadow:none}
+body.server-mode.christmas #sheetTable tr.section-head .caret{color:#FFFFFF}
+body.server-mode.christmas #sheetTable tr.section-head .caret:hover{background:rgba(255,255,255,.14)}
+body.server-mode.christmas #sheetTable tr.section-head .grip{color:#F9CCD2!important}
+body.server-mode.christmas #sheetTable tr.section-head .del{color:#FAD2D7}
+body.server-mode.christmas #sheetTable tr.section-head .money{color:#FFFFFF;text-shadow:0 0 6px rgba(232,52,74,.7)}
+body.server-mode.christmas #sheetTable tbody tr.section-head td.calc.grand{background:rgba(0,0,0,.2)}
+body.server-mode.christmas #sheetTable tr.section-head td.calc.grand .money{color:var(--fx3);text-shadow:0 0 7px rgba(245,196,81,.7)}
+body.server-mode.christmas .sec-unit input{background:rgba(6,13,10,.6);border-color:rgba(91,214,154,.4);color:#FFFFFF}
+body.server-mode.christmas .sec-unit input.lab{background:transparent;border-color:rgba(255,255,255,.2);color:#F9C6CC}
+body.server-mode.christmas #sheetTable tbody tr.section-head.nested[data-lvl="1"]{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 6' preserveAspectRatio='none'%3E%3Cpath d='M0 0 H80 V2.4 C75 5 71 3.2 66 4.2 C60 6 56 3 50 4 C44 5.8 40 2.6 34 3.8 C28 5.6 24 3 18 4 C12 5.8 6 3.2 0 4.2 Z' fill='%23F4F8FB' opacity='.88'/%3E%3C/svg%3E") left top/80px 6px repeat-x,linear-gradient(90deg,rgba(91,214,154,.32) 58%,rgba(91,214,154,.08) 82%,transparent),#11221A}
+body.server-mode.christmas #sheetTable tbody tr.section-head.nested[data-lvl="1"] td.c-item{background-color:#295C43}
+body.server-mode.christmas #sheetTable tbody tr.section-head.nested[data-lvl="2"]{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 6' preserveAspectRatio='none'%3E%3Cpath d='M0 0 H80 V2.4 C75 5 71 3.2 66 4.2 C60 6 56 3 50 4 C44 5.8 40 2.6 34 3.8 C28 5.6 24 3 18 4 C12 5.8 6 3.2 0 4.2 Z' fill='%23F4F8FB' opacity='.88'/%3E%3C/svg%3E") left top/80px 6px repeat-x,linear-gradient(90deg,rgba(245,196,81,.32) 58%,rgba(245,196,81,.08) 82%,transparent),#1C2014}
+body.server-mode.christmas #sheetTable tbody tr.section-head.nested[data-lvl="2"] td.c-item{background-color:#615428}
+body.server-mode.christmas #sheetTable tbody tr.section-head.nested[data-lvl="3"]{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 6' preserveAspectRatio='none'%3E%3Cpath d='M0 0 H80 V2.4 C75 5 71 3.2 66 4.2 C60 6 56 3 50 4 C44 5.8 40 2.6 34 3.8 C28 5.6 24 3 18 4 C12 5.8 6 3.2 0 4.2 Z' fill='%23F4F8FB' opacity='.88'/%3E%3C/svg%3E") left top/80px 6px repeat-x,linear-gradient(90deg,rgba(159,216,240,.32) 58%,rgba(159,216,240,.08) 82%,transparent),#162220}
+body.server-mode.christmas #sheetTable tbody tr.section-head.nested[data-lvl="3"] td.c-item{background-color:#425C63}
+body.server-mode.dark.christmas #sheetTable tbody tr.section-head.nested[data-lvl="1"] .name-in{text-shadow:0 0 8px rgba(91,214,154,.85)}
+body.server-mode.dark.christmas #sheetTable tbody tr.section-head.nested[data-lvl="2"] .name-in{text-shadow:0 0 8px rgba(245,196,81,.85)}
+body.server-mode.dark.christmas #sheetTable tbody tr.section-head.nested[data-lvl="3"] .name-in{text-shadow:0 0 8px rgba(159,216,240,.85)}
+body.server-mode.dark.christmas #sheetTable tbody tr.section-head.nested[data-lvl="1"] td,
+body.server-mode.dark.christmas #sheetTable tbody tr.section-head.nested[data-lvl="1"]:hover td{border-top-color:rgba(91,214,154,.5);border-bottom-color:rgba(91,214,154,.5)}
+body.server-mode.dark.christmas #sheetTable tbody tr.section-head.nested[data-lvl="2"] td,
+body.server-mode.dark.christmas #sheetTable tbody tr.section-head.nested[data-lvl="2"]:hover td{border-top-color:rgba(245,196,81,.5);border-bottom-color:rgba(245,196,81,.5)}
+body.server-mode.dark.christmas #sheetTable tbody tr.section-head.nested[data-lvl="3"] td,
+body.server-mode.dark.christmas #sheetTable tbody tr.section-head.nested[data-lvl="3"]:hover td{border-top-color:rgba(159,216,240,.55);border-bottom-color:rgba(159,216,240,.55)}
+body.server-mode.christmas #sheetTable tbody tr.section-head.nested[data-lvl] td.c-item{border-left:4px solid var(--lv1)}
+body.server-mode.christmas #sheetTable tbody tr.section-head.nested[data-lvl="2"] td.c-item{border-left-color:var(--lv2)}
+body.server-mode.christmas #sheetTable tbody tr.section-head.nested[data-lvl="3"] td.c-item{border-left-color:var(--lv3)}
+body.server-mode.christmas.cards #sheetTable tbody tr.section-head{border-color:rgba(232,52,74,.6);box-shadow:0 0 16px -6px rgba(232,52,74,.7)}
+body.server-mode.christmas.cards #sheetTable tbody tr.section-head[data-lvl] td.c-item{background-color:transparent}
+
+/* subtotals */
+body.server-mode.dark.christmas #sheetTable tbody tr.section-foot[data-lvl] td,
+body.server-mode.dark.christmas #sheetTable tbody tr.section-foot[data-lvl]:hover td{background:#0F2419}
+body.server-mode.dark.christmas #sheetTable tbody tr.section-foot[data-lvl] td.calc.grand{background:rgba(245,196,81,.08)}
+body.server-mode.christmas #sheetTable tr.section-foot td{border-bottom-color:rgba(232,52,74,.45)}
+body.server-mode.christmas #sheetTable tr.section-foot .sec-label{color:#F18592;text-shadow:0 0 6px rgba(232,52,74,.5)}
+body.server-mode.christmas #sheetTable tr.section-foot .money{color:#FFFFFF}
+body.server-mode.christmas.cards #sheetTable tbody tr[data-type="sectionEnd"]{background:#0F2419;border-color:rgba(232,52,74,.4)}
+
+/* totals: the answer in the third colour */
+body.server-mode.christmas #sheetTable tfoot td{background:#0B1912;border-top-color:var(--fx2)}
+body.server-mode.christmas #sheetTable tfoot .tot-label{color:var(--fx2);text-shadow:0 0 8px rgba(91,214,154,.65)}
+body.server-mode.christmas:not(.cards) #sheetTable tfoot td.grand{
+background:#272D1A;border-left-color:var(--fx3);border-right-color:var(--fx3);border-bottom-color:var(--fx3);
+box-shadow:inset 0 0 16px rgba(245,196,81,.2);
+}
+body.server-mode.christmas #sheetTable tfoot .grand .money{color:var(--fx3);text-shadow:0 0 10px rgba(245,196,81,.75)}
+body.server-mode.christmas .grand-lip{background:#0D1A14;border-color:var(--fx3);box-shadow:0 0 14px -2px rgba(245,196,81,.55)}
+body.server-mode.christmas .grand-lip .lip-money{color:var(--fx3)}
+
+/* summary, calculators and the rest of the paper */
+body.server-mode.christmas .sum-table tr.s-sec td{background:#132C1F}
+body.server-mode.christmas .sum-table tr.s-folder:not(.colored) td{background:#132C20;--ink:#EBFAF3}
+body.server-mode.christmas .sum-table td.s-grand,body.server-mode.christmas .sum-table tr.s-sec td.s-grand{background:rgba(245,196,81,.07);border-left-color:rgba(245,196,81,.6);border-right-color:rgba(245,196,81,.6)}
+body.server-mode.christmas .sum-table td.s-grand .money{color:var(--fx3)}
+body.server-mode.christmas .sum-table tfoot td{background:#0B1912;border-top-color:var(--fx2)}
+body.server-mode.christmas .sum-table tfoot td.grand{background:#272D1A;border-color:var(--fx3)}
+body.server-mode.christmas .sum-table tfoot td.grand .money{color:var(--fx3)}
+body.server-mode.christmas .calc-table td{background-color:#0D1A14}
+body.server-mode.christmas .calc-table input{background:#091A11;border-color:rgba(91,214,154,.3);color:#FFFFFF}
+body.server-mode.christmas .load-block-head{background:linear-gradient(90deg,rgba(232,52,74,.22),transparent 70%),#0E2017}
+body.server-mode.christmas .lb-sum{color:var(--fx3)}
+body.server-mode.christmas .wage-table tr.wage-sec td{background:linear-gradient(90deg,rgba(232,52,74,.3),rgba(232,52,74,.06) 60%),#2E0A12;color:#FFFFFF}
+body.server-mode.christmas .wage-table tr.wage-grand td{color:var(--fx3);text-shadow:0 0 8px rgba(245,196,81,.6);border-top-color:var(--fx3)}
+body.server-mode.christmas .cb-pie{box-shadow:0 0 0 2px var(--paper),0 0 22px rgba(91,214,154,.45)}
+body.server-mode.christmas .sum-block,body.server-mode.christmas .cb-cards{border-color:rgba(91,214,154,.28);border-radius:6px;box-shadow:0 0 14px -8px rgba(91,214,154,.5)}
+body.server-mode.christmas .sum-notes textarea{background:#091A11;border-color:rgba(91,214,154,.3);color:#FFFFFF}
+
+/* scroll bars */
+body.server-mode.christmas ::-webkit-scrollbar{width:10px;height:10px}
+body.server-mode.christmas ::-webkit-scrollbar-track{background:#091A11}
+body.server-mode.christmas ::-webkit-scrollbar-thumb{background:linear-gradient(180deg,var(--fx1),var(--fx2));border-radius:6px;border:2px solid #091A11}
+body.server-mode.christmas ::-webkit-scrollbar-thumb:horizontal{background:linear-gradient(90deg,var(--fx1),var(--fx2))}
+body.server-mode.christmas ::-webkit-scrollbar-corner{background:#091A11}
+
+/* the extras: snow caps on section heads, a candy-cane Grand head, falling snow */
+body.server-mode.dark.christmas #sheetTable tbody tr.section-head td.c-item{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 6' preserveAspectRatio='none'%3E%3Cpath d='M0 0 H80 V2.4 C75 5 71 3.2 66 4.2 C60 6 56 3 50 4 C44 5.8 40 2.6 34 3.8 C28 5.6 24 3 18 4 C12 5.8 6 3.2 0 4.2 Z' fill='%23F4F8FB' opacity='.88'/%3E%3C/svg%3E");background-size:80px 6px;background-repeat:repeat-x;background-position:left top}
+body.server-mode.christmas.cards #sheetTable tbody tr.section-head td.c-item{background-image:none}
+body.server-mode.christmas #sheetTable thead th.col-grand,body.server-mode.christmas .sum-table thead th.col-grand{
+background:repeating-linear-gradient(135deg,#E8344A 0 5px,#FFF6F0 5px 10px) left top/100% 4px no-repeat,linear-gradient(180deg,#3B1A16,#1D0D0C);
+}
+body.server-mode.christmas::before,body.server-mode.christmas::after{
+content:"";position:fixed;left:0;right:0;top:-600px;bottom:0;z-index:185;pointer-events:none;
+will-change:transform;
+}
+/* Compact leaves less room above the eyebrow, so the lights shrink and the head gains a little */
+body.server-mode.christmas.dense .card:not(.ico){background-size:32px 22px,96px 17px,auto;background-position:right 6px top 0,left -6px top -2px,0 0}
+body.server-mode.christmas.dense .card > .head{padding-top:14px}
+body.server-mode.christmas.head-shut #sheetCard .head{padding-top:13px}
+body.server-mode.christmas::before{opacity:.8;
+background-image:radial-gradient(circle at 10% 20%,rgba(255,255,255,0.7) 0 1.3px,transparent 2.1px),
+radial-gradient(circle at 62% 68%,rgba(255,255,255,0.6) 0 1.1px,transparent 1.9px),
+radial-gradient(circle at 36% 46%,rgba(255,255,255,0.55) 0 1.0px,transparent 1.8px),
+radial-gradient(circle at 86% 12%,rgba(255,255,255,0.65) 0 1.2px,transparent 2.0px),
+radial-gradient(circle at 74% 88%,rgba(255,255,255,0.5) 0 1.0px,transparent 1.8px),
+radial-gradient(circle at 22% 78%,rgba(255,255,255,0.55) 0 1.1px,transparent 1.9px);
+background-size:200px 200px,300px 300px,200px 200px,300px 300px,200px 200px,300px 300px;
+animation:xm-fall 46s linear infinite;
+}
+body.server-mode.christmas::after{opacity:.7;
+background-image:radial-gradient(circle at 18% 30%,rgba(255,255,255,0.85) 0 2.2px,transparent 3.0px),
+radial-gradient(circle at 70% 60%,rgba(255,255,255,0.8) 0 2.5px,transparent 3.3px),
+radial-gradient(circle at 48% 84%,rgba(255,255,255,0.75) 0 2.0px,transparent 2.8px),
+radial-gradient(circle at 88% 18%,rgba(255,255,255,0.8) 0 2.4px,transparent 3.2px);
+background-size:300px 300px,600px 600px,300px 300px,600px 600px;
+animation:xm-fall 25s linear infinite;
+}
+@keyframes xm-fall{from{transform:translateY(0)}to{transform:translateY(600px)}}
+/* the page-wide rule that stops animations does not reach pseudo-elements */
+@media (prefers-reduced-motion:reduce){body.server-mode.christmas::before,body.server-mode.christmas::after{animation:none}}

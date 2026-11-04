@@ -1,0 +1,386 @@
+/* ---------- Windows 98 theme ----------
+A light theme (no body.dark): silver windows with bevelled edges on a teal
+desktop, navy title bars, white sunken fields, grey push buttons that press in,
+yellow tooltips. Every bevel is an inset box-shadow, so nothing changes size.
+Table rules change border colours only, never widths, so the card deck keeps
+its own borders. Lettering is the system's: Tahoma where Windows has it. */
+body.server-mode.win98{
+--f-sans:Tahoma,"MS Sans Serif","Microsoft Sans Serif","Segoe UI",Geneva,Verdana,Arial,sans-serif;
+--f-cond:Tahoma,"MS Sans Serif","Microsoft Sans Serif","Segoe UI",Geneva,Verdana,Arial,sans-serif;
+--f-mono:Tahoma,"MS Sans Serif","Microsoft Sans Serif","Segoe UI",Geneva,Verdana,Arial,sans-serif;
+--w-raise:inset -1px -1px #0A0A0A,inset 1px 1px #FFFFFF,inset -2px -2px #808080,inset 2px 2px #DFDFDF;
+--w-win:inset -1px -1px #0A0A0A,inset 1px 1px #DFDFDF,inset -2px -2px #808080,inset 2px 2px #FFFFFF;
+--w-press:inset -1px -1px #FFFFFF,inset 1px 1px #0A0A0A,inset -2px -2px #DFDFDF,inset 2px 2px #808080;
+--w-sunk:inset -1px -1px #FFFFFF,inset 1px 1px #808080,inset -2px -2px #DFDFDF,inset 2px 2px #0A0A0A;
+--w-thin:inset -1px -1px #808080,inset 1px 1px #FFFFFF;
+--w-thinsunk:inset -1px -1px #FFFFFF,inset 1px 1px #808080;
+--w-tabedge:inset 1px 1px #FFFFFF,inset 2px 2px #DFDFDF,inset -1px 0 #0A0A0A,inset -2px 0 #808080;
+--w-title:linear-gradient(90deg,#000080,#1084D0);
+--w-dither:conic-gradient(#FFFFFF 25%,#C0C0C0 0 50%,#FFFFFF 0 75%,#C0C0C0 0) 0 0/2px 2px;
+--w-field:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Cpath d='M0 0h6v1H1v5H0z' fill='rgb(128,128,128)'/%3E%3Cpath d='M1 1h4v1H2v3H1z' fill='rgb(10,10,10)'/%3E%3Cpath d='M6 0v6H0V5h5V0z' fill='rgb(255,255,255)'/%3E%3Cpath d='M5 1v4H1V4h3V1z' fill='rgb(223,223,223)'/%3E%3C/svg%3E");
+--paper:#008080;
+--card:#C0C0C0;
+--ink:#000000;
+--muted:#3A3A3A;
+--faint:#808080;
+--slate:#000080;
+--slate-2:#1084D0;
+--slate-bg:#000080;
+--rule:#808080;
+--rule-hair:#A9A9A9;
+--rule-strong:#404040;
+--fill:#FFFFFF;
+--calc:#EBEBEB;
+--amber:#000080;
+--labor:#000080;
+--equip:#B06A00;
+--material:#007A00;
+--tool:#800000;
+--part:#8A4B00;
+--service:#008080;
+--construct:#46467E;
+--hybrid:#800080;
+--none:#808080;
+--lv1:#B07800;--lv2:#008080;--lv3:#800080;
+--s1:#C0C0C0;--s2:#C0C0C0;--s3:#F0F0F0;--s6:#E6E6E6;--s7:#DADADA;--s13:#C0C0C0;--s14:#000080;
+--s15:#F4F4F4;--s17:#E0E0E0;--s19:#D4D4D4;--s20:#D4D4D4;--s21:#D4D4D4;--s22:#808080;
+--s23:#FFFFE1;--s24:#DCDCE8;--s25:#C8D0F0;--s50:#FFFFE1;--s57:#DCDCE8;--s58:#C0C0C0;
+background:#008080;
+}
+body.server-mode.win98 ::selection{background:#000080;color:#FFFFFF}
+body.server-mode.win98 .cell-in,body.server-mode.win98 .money,body.server-mode.win98 .rownum,
+body.server-mode.win98 .pct,body.server-mode.win98 .mk-cash,body.server-mode.win98 .up-chip{font-variant-numeric:tabular-nums lining-nums}
+
+/* ---- the tab strip: silver tabs on the desktop, the open one joins the window ---- */
+body.server-mode.win98 .rail{margin-bottom:-2px}
+body.server-mode.win98 .rail .tab{
+background:#C0C0C0;color:#000;border:0;border-radius:3px 3px 0 0;
+box-shadow:var(--w-tabedge),inset 0 -1px #FFFFFF;
+font-family:var(--f-sans);letter-spacing:0;text-shadow:none;
+}
+body.server-mode.win98 .rail .tab:hover{background:#C0C0C0;color:#000080}
+body.server-mode.win98 .rail .tab[aria-selected="true"]{
+background:#C0C0C0;color:#000;font-weight:700;position:relative;z-index:2;
+box-shadow:var(--w-tabedge);
+}
+body.server-mode.win98 .rail .tab-add{color:#000}
+body.server-mode.win98 .rail .tab-x:hover{background:rgba(0,0,0,.12)}
+body.server-mode.win98 .rail .ftab{
+background:#C0C0C0;color:#000;border:0;border-radius:3px 3px 0 0;
+box-shadow:var(--w-tabedge);font-family:var(--f-sans);letter-spacing:0;
+}
+body.server-mode.win98 .rail .ftab:hover{background:#C0C0C0;color:#000080}
+body.server-mode.win98 .rail .ftab.colored{background:var(--fc);color:#FFFFFF;text-shadow:1px 1px 0 rgba(0,0,0,.55)}
+body.server-mode.win98 .rail .ftab[aria-selected="true"]{background:#C0C0C0;color:#000;text-shadow:none}
+body.server-mode.win98 .rail-stack.band-tinted .ftab[aria-selected="true"]{background:var(--fband);color:var(--fink)}
+body.server-mode.win98 .rail .ftab.ftab-add{background:transparent;color:#FFFFFF;box-shadow:none;border:1px dotted #FFFFFF;border-bottom:0}
+body.server-mode.win98 .ftab-in{background:#FFFFFF;color:#000;border:0;border-radius:0;box-shadow:var(--w-sunk)}
+body.server-mode.win98 .rail-trow{
+background:#C0C0C0;border:0;border-radius:0;
+box-shadow:inset 1px 1px #DFDFDF,inset 2px 2px #FFFFFF,inset -1px 0 #0A0A0A,inset -2px 0 #808080,inset 0 -1px #FFFFFF;
+}
+body.server-mode.win98 .rail-stack.band-tinted .rail-trow{background:var(--fband)}
+body.server-mode.win98 .rail-arrow{
+background:#C0C0C0;color:#000;border:0;border-radius:0;box-shadow:var(--w-raise);
+font-family:var(--f-sans);
+}
+body.server-mode.win98 .rail-arrow:hover{color:#000}
+body.server-mode.win98 .rail-arrow:active{box-shadow:var(--w-press)}
+body.server-mode.win98 .rail-arrow:disabled{color:#808080;text-shadow:1px 1px 0 #FFFFFF;opacity:1}
+body.server-mode.win98 .rail .status{color:#E8E8E8;font-family:var(--f-sans);letter-spacing:.04em}
+body.server-mode.win98 .rail .status.on{color:#FFFFFF}
+body.server-mode.win98 .rail .status.bad{color:#FFFF00}
+body.server-mode.win98 .tab-tip{background:#FFFFE1;color:#000;border:1px solid #000;border-radius:0;box-shadow:2px 2px 0 rgba(0,0,0,.25);padding:4px 7px}
+body.server-mode.win98 .tab-help-btn{
+background:#C0C0C0;color:#000;border:0;border-radius:0;box-shadow:var(--w-raise);
+font:700 13px/1 var(--f-sans);
+}
+body.server-mode.win98 .tab-help-btn:hover{background:#C0C0C0;color:#000;border:0}
+body.server-mode.win98 .tab-help-btn:active{box-shadow:var(--w-press)}
+
+/* ---- the window: frame, title bar, the scope of work ---- */
+body.server-mode.win98 .card{
+background:#C0C0C0;border:0;border-radius:0;padding:3px;box-shadow:var(--w-win);
+}
+body.server-mode.win98 .card > .head{background:transparent;border-bottom:0;padding:0 8px 8px!important}
+body.server-mode.win98.dense .card > .head{padding-bottom:5px!important}
+body.server-mode.win98.head-shut #sheetCard > .head{padding-bottom:0!important}
+body.server-mode.win98 .card > .head .eyebrow-row{
+margin:0 -8px 7px;padding:2px 2px 2px 6px;min-height:22px;gap:4px;
+background:var(--w-title);
+}
+body.server-mode.win98.dense .card > .head .eyebrow-row{margin-bottom:4px;min-height:20px}
+body.server-mode.win98 .card > .head .eyebrow{color:#FFFFFF;font:700 11.5px/1.2 var(--f-sans);letter-spacing:.01em;text-transform:none}
+body.server-mode.win98 .card > .head .note-btn{color:#FFFFFF;opacity:.85}
+body.server-mode.win98 .card > .head .note-btn:hover{background:rgba(255,255,255,.18);color:#FFFFFF}
+body.server-mode.win98.head-shut .head-peek{color:#FFFFFF;font:700 11.5px/1.3 var(--f-sans);letter-spacing:.01em}
+body.server-mode.win98 .head-tool{
+background:#C0C0C0;color:#000;border:0;border-radius:0;box-shadow:var(--w-raise);
+font:400 10px/1 var(--f-sans);letter-spacing:0;text-transform:none;padding:3px 6px;min-height:16px;
+}
+body.server-mode.win98 .head-tool:hover{color:#000;border:0}
+body.server-mode.win98 .head-tool:active{box-shadow:var(--w-press)}
+body.server-mode.win98 .head-tool.on{background:var(--w-dither);box-shadow:var(--w-press);color:#000}
+body.server-mode.win98 .head-tool.auto{outline:1px dotted #000;outline-offset:-4px}
+body.server-mode.win98 .head-fold{width:18px;height:16px;padding:0}
+body.server-mode.win98 .card > .head .item-note{color:var(--muted)}
+body.server-mode.win98 #title{font-family:var(--f-sans);font-weight:700;color:#000;letter-spacing:0;padding:2px 4px 3px}
+body.server-mode.win98 #title:hover{border-bottom-color:transparent;background:rgba(255,255,255,.22)}
+body.server-mode.win98 #title:focus{background:#FFFFFF;box-shadow:var(--w-sunk);border-bottom-color:transparent}
+body.server-mode.win98 #title::placeholder{color:#606060}
+body.server-mode.win98 .card > .scroll{
+background:#FFFFFF;margin:0 4px;
+border:2px solid #808080;border-image:var(--w-field) 2 stretch;
+}
+body.server-mode.win98 #sheetCard .scroll,body.server-mode.win98 #summaryCard .scroll{padding:0}
+body.server-mode.win98 #sheetTable,body.server-mode.win98 #summaryCard .sum-table{box-shadow:none}
+body.server-mode.win98 .card > .bar{background:#C0C0C0;border-top:0;border-radius:0;padding:6px 4px 3px}
+body.server-mode.win98 .card > .bar .legend{color:#000}
+body.server-mode.win98 .help-row .swatch.f{background:#FFFFFF}
+body.server-mode.win98 .help-row .swatch.c{background:#EBEBEB}
+
+
+/* ---- push buttons: grey, raised, pressed in when on ---- */
+body.server-mode.win98 .btn,body.server-mode.win98 .btn.alt,body.server-mode.win98 .btn.ghost,
+body.server-mode.win98 .bar .btn.alt,body.server-mode.win98 .bar .btn.ghost{
+background:#C0C0C0;color:#000;border:0;border-radius:0;box-shadow:var(--w-raise);
+font-family:var(--f-sans);font-weight:400;letter-spacing:0;text-transform:none;text-shadow:none;
+}
+body.server-mode.win98 .btn:hover,body.server-mode.win98 .btn.alt:hover,body.server-mode.win98 .btn.ghost:hover,
+body.server-mode.win98 .bar .btn.alt:hover,body.server-mode.win98 .bar .btn.ghost:hover{background:#C0C0C0;color:#000;border:0}
+body.server-mode.win98 .btn:active{box-shadow:var(--w-press)}
+body.server-mode.win98 .btn.on,body.server-mode.win98 .btn.alt.on,body.server-mode.win98 .btn.ghost.on{background:var(--w-dither);box-shadow:var(--w-press);color:#000}
+body.server-mode.win98 .btn:focus-visible{outline:1px dotted #000;outline-offset:-5px}
+body.server-mode.win98 .btn:disabled{color:#808080;text-shadow:1px 1px 0 #FFFFFF}
+body.server-mode.win98 .btn.danger,body.server-mode.win98 .btn.tiny.danger,body.server-mode.win98 .bar #deleteSheet,body.server-mode.win98 .bar #reset{color:#800000}
+body.server-mode.win98 .h-add,body.server-mode.win98 .sec-add,body.server-mode.win98 .tpl-btn{
+background:#C0C0C0;color:#000;border:0;border-radius:0;box-shadow:var(--w-raise);
+font-family:var(--f-sans);font-weight:400;letter-spacing:0;text-transform:none;
+}
+body.server-mode.win98 .h-add:hover,body.server-mode.win98 .sec-add:hover,body.server-mode.win98 .tpl-btn:hover{background:#C0C0C0;color:#000}
+body.server-mode.win98 .h-add:active,body.server-mode.win98 .sec-add:active,body.server-mode.win98 .tpl-btn:active{box-shadow:var(--w-press)}
+body.server-mode.win98 .pic-pair{background:#C0C0C0;border:0;border-radius:0;gap:1px}
+body.server-mode.win98 .pic-lab{background:transparent;border-right:0;color:#000;font-family:var(--f-sans);letter-spacing:0;text-transform:none;font-size:10.5px}
+body.server-mode.win98 .pic-pair button{background:#C0C0C0;color:#000;box-shadow:var(--w-raise);font-family:var(--f-sans);letter-spacing:0;text-transform:none;font-weight:400}
+body.server-mode.win98 .pic-pair button + button{border-left:0}
+body.server-mode.win98 .pic-pair button:hover{background:#C0C0C0;color:#000}
+body.server-mode.win98 .pic-pair button.on{background:var(--w-dither);box-shadow:var(--w-press);color:#000}
+body.server-mode.win98 select{background-color:#FFFFFF;color:#000;border:0;border-radius:0;box-shadow:var(--w-sunk);font-family:var(--f-sans)}
+body.server-mode.win98 :is(.lib,.proj,.side,.ed,.cz-win,.confirm-pop,.tab-opts,.folder-pop,.sum-notes) :is(input[type="text"],input[type="search"],input[type="number"],input[type="email"],input[type="password"],input:not([type]),textarea):not(table *){
+background:#FFFFFF;color:#000;border:0;border-radius:0;box-shadow:var(--w-sunk);
+}
+
+/* ---- edge tabs and drawers ---- */
+body.server-mode.win98 .lib-tab,body.server-mode.win98 .proj-tab{
+background:#C0C0C0;color:#000;border:0;box-shadow:var(--w-raise);
+font-family:var(--f-sans);font-weight:400;letter-spacing:.08em;text-shadow:none;
+}
+body.server-mode.win98 .lib-tab{border-radius:3px 0 0 3px}
+body.server-mode.win98 .proj-tab{border-radius:0 3px 3px 0}
+body.server-mode.win98 .lib-tab:hover,body.server-mode.win98 .proj-tab:hover{background:#C0C0C0;color:#000080}
+body.server-mode.win98.lib-open #libToggle,body.server-mode.win98.cat-open #catToggle,body.server-mode.win98.notes-open #notesToggle,
+body.server-mode.win98.hist-open #histToggle,body.server-mode.win98.wage-open #wageToggle,body.server-mode.win98.load-open #loadToggle,
+body.server-mode.win98.review-open #reviewToggle,body.server-mode.win98.link-open #linkToggle,body.server-mode.win98.sov-open #sovToggle,body.server-mode.win98.proj-open #projToggle,
+body.server-mode.win98.file-open #fileToggle,body.server-mode.win98.page-open #pageToggle,body.server-mode.win98.pref-open #prefToggle,
+body.server-mode.win98.ai-open #aiToggle,
+body.server-mode.win98.lib-open #libToggle:hover,body.server-mode.win98.cat-open #catToggle:hover,body.server-mode.win98.notes-open #notesToggle:hover,
+body.server-mode.win98.hist-open #histToggle:hover,body.server-mode.win98.wage-open #wageToggle:hover,body.server-mode.win98.load-open #loadToggle:hover,
+body.server-mode.win98.review-open #reviewToggle:hover,body.server-mode.win98.link-open #linkToggle:hover,body.server-mode.win98.sov-open #sovToggle:hover,body.server-mode.win98.proj-open #projToggle:hover,
+body.server-mode.win98.file-open #fileToggle:hover,body.server-mode.win98.page-open #pageToggle:hover,body.server-mode.win98.pref-open #prefToggle:hover,
+body.server-mode.win98.ai-open #aiToggle:hover{
+background:linear-gradient(180deg,#000080,#1084D0);color:#FFFFFF;font-weight:700;
+box-shadow:inset -1px -1px #0A0A0A,inset 1px 1px #DFDFDF;
+}
+body.server-mode.win98 .lib,body.server-mode.win98 .proj,body.server-mode.win98 .side,body.server-mode.win98 .ed{
+background:#C0C0C0;border:0;padding:3px;box-shadow:var(--w-win);
+}
+body.server-mode.win98 .lib-head,body.server-mode.win98 .ed-head{
+background:var(--w-title);border-bottom:0;padding:3px 3px 3px 7px;min-height:24px;color:#FFFFFF;
+}
+body.server-mode.win98 .lib-head .eyebrow,body.server-mode.win98 .ed-head .eyebrow{color:#FFFFFF;font:700 11.5px/1.2 var(--f-sans);letter-spacing:.01em;text-transform:none}
+body.server-mode.win98 .lib-close{
+background:#C0C0C0;color:#000;border:0;border-radius:0;box-shadow:var(--w-raise);
+width:18px;height:16px;padding:0 0 1px;font:700 13px/1 var(--f-sans);
+display:inline-flex;align-items:center;justify-content:center;
+}
+body.server-mode.win98 .lib-close:hover{background:#C0C0C0;color:#000}
+body.server-mode.win98 .lib-close:active{box-shadow:var(--w-press)}
+body.server-mode.win98 .lib-foot,body.server-mode.win98 .ed-foot{background:#C0C0C0;border-top:1px solid #808080;box-shadow:inset 0 1px #FFFFFF;color:#000}
+body.server-mode.win98 .lib-foot b{color:#000}
+body.server-mode.win98 .lib-hint,body.server-mode.win98 .ed-hint{color:#404040}
+body.server-mode.win98 .side-group{color:#000;font:700 11px var(--f-sans);letter-spacing:0;text-transform:none}
+body.server-mode.win98 .side-pick label{color:#000;font-family:var(--f-sans);letter-spacing:0;text-transform:none}
+body.server-mode.win98 .tpl{border-radius:0;border-color:#808080;background:#FFFFFF}
+body.server-mode.win98 .ed-namebox,body.server-mode.win98 .ed-meta,body.server-mode.win98 .ed-folder,body.server-mode.win98 .ed-attach{
+border:1px solid #808080;border-radius:0;background:transparent;box-shadow:inset 1px 1px #FFFFFF,1px 1px 0 #FFFFFF;
+}
+body.server-mode.win98 .pref-theme{
+background:#C0C0C0;color:#000;border:0;border-radius:0;box-shadow:var(--w-raise);
+font-family:var(--f-sans);font-weight:400;
+}
+body.server-mode.win98 .pref-theme:hover{border:0}
+body.server-mode.win98 .pref-theme.on{background:var(--w-dither);box-shadow:var(--w-press)}
+body.server-mode.win98 .pt-sw{border-radius:0;border:0;box-shadow:var(--w-sunk)}
+
+/* ---- menus, pop-ups and the windows over the page ---- */
+body.server-mode.win98 .confirm-pop,body.server-mode.win98 .tab-opts,body.server-mode.win98 .folder-pop,body.server-mode.win98 .print-menu{
+background:#C0C0C0;border:0;border-radius:0;box-shadow:var(--w-win),3px 3px 0 rgba(0,0,0,.28);
+}
+body.server-mode.win98 .pm-opt{border-radius:0;font-family:var(--f-sans);color:#000}
+body.server-mode.win98 .pm-opt:hover{background:#000080;color:#FFFFFF}
+body.server-mode.win98 .pm-rule{background:#808080;box-shadow:0 1px #FFFFFF}
+body.server-mode.win98 .cz-win{background:#C0C0C0;border:0;border-radius:0;padding:3px;box-shadow:var(--w-win),3px 3px 0 rgba(0,0,0,.28)}
+body.server-mode.win98 .cz-head{background:var(--w-title);color:#FFFFFF;border-bottom:0;--ink:#FFFFFF;--muted:#DDE3F5}
+body.server-mode.win98 .cz-back{background:#C0C0C0;color:#000;border:0;border-radius:0;box-shadow:var(--w-raise)}
+body.server-mode.win98 .cz-back:hover{color:#000}
+body.server-mode.win98 .cz-foot{background:#C0C0C0;border-top:1px solid #808080;box-shadow:inset 0 1px #FFFFFF}
+body.server-mode.win98 .cz-row{background:#FFFFFF;border-color:#808080;border-radius:0}
+body.server-mode.win98 .cz-row:hover,body.server-mode.win98 .cz-row:focus-visible{border-color:#000080}
+body.server-mode.win98 .tip{background:#FFFFE1;color:#000;border:1px solid #000;border-radius:0;box-shadow:2px 2px 0 rgba(0,0,0,.25);font-family:var(--f-sans);font-size:11px;padding:4px 7px}
+body.server-mode.win98 .tip::before{display:none}
+
+
+/* ---- the pricing sheet: a white grid with grey column buttons ---- */
+body.server-mode.win98 #sheetTable tbody,body.server-mode.win98 #sheetTable tfoot,
+body.server-mode.win98 .sum-table tbody,body.server-mode.win98 .sum-table tfoot,
+body.server-mode.win98 .calc-table,body.server-mode.win98 .grand-lip{
+--card:#FFFFFF;--rule:#A0A0A0;--rule-hair:#D0D0D0;--rule-strong:#808080;
+}
+body.server-mode.win98 #sheetTable thead th,body.server-mode.win98 .sum-table thead th,body.server-mode.win98 .calc-table th{
+background:#C0C0C0;color:#000;border-right-color:transparent;border-radius:0;
+box-shadow:var(--w-raise);
+font-family:var(--f-sans);font-weight:400;font-size:11px;letter-spacing:0;text-transform:none;text-shadow:none;
+}
+body.server-mode.win98 #sheetTable thead th.drop-before{box-shadow:inset 4px 0 0 #000080,var(--w-raise)}
+body.server-mode.win98 #sheetTable thead th.drop-after{box-shadow:inset -4px 0 0 #000080,var(--w-raise)}
+body.server-mode.win98 #sheetTable tfoot td,body.server-mode.win98 #summaryCard .sum-table tfoot td{border-radius:0}
+body.server-mode.win98 .h-lab{border-bottom-color:transparent}
+body.server-mode.win98 thead th:hover .h-lab{border-bottom-color:#000}
+body.server-mode.win98 .h-sym{color:#404040}
+body.server-mode.win98 .h-lab-in{color:#000;border-bottom-color:#808080;font-family:var(--f-sans);letter-spacing:0;text-transform:none}
+body.server-mode.win98 .h-lab-in::placeholder{color:#808080}
+body.server-mode.win98 .h-input{background:#FFFFFF;color:#000;border:0;box-shadow:var(--w-sunk);padding:1px 3px;font-family:var(--f-sans)}
+body.server-mode.win98 .h-input:focus{background:#FFFFFF}
+body.server-mode.win98 .fee-x{color:#000}
+body.server-mode.win98 .fee-x:hover{color:#800000;background:transparent}
+body.server-mode.win98 #sheetTable thead th.col-grand,body.server-mode.win98 .sum-table thead th.col-grand{
+background:var(--w-title);color:#FFFFFF;font-weight:700;
+border-top-color:transparent;border-left-color:transparent;border-right-color:transparent;
+box-shadow:inset -1px -1px #0A0A0A,inset 1px 1px #5A78C8;
+}
+body.server-mode.win98 thead th.col-grand .h-lab{border-bottom-color:rgba(255,255,255,.4)}
+body.server-mode.win98 thead th.col-grand .h-sym,body.server-mode.win98 thead th.col-grand .fee-x{color:#FFFFFF}
+
+body.server-mode.win98 #sheetTable td.fill:focus-within{background:#FFFFFF}
+body.server-mode.win98 #sheetTable tbody tr.in-section[data-lvl="0"] td.c-item{border-left-color:#808080}
+body.server-mode.win98 #sheetTable td.calc.grand{background:#FFFFE1}
+body.server-mode.win98 #sheetTable td.calc.grand .money{color:#000080;font-weight:700}
+@media (hover:hover){
+body.server-mode.win98 #sheetTable tbody tr:hover td.calc.grand{background:#FFF8C4}
+}
+
+/* the card deck: each line a small raised panel, its fields white and sunken.
+These sit before the section rules below, which carry the same weight */
+body.server-mode.win98.cards .card > .scroll{background:transparent;border:0;border-image:none;margin:0}
+body.server-mode.win98.cards #sheetTable tbody tr{background:#C0C0C0;border:0;border-radius:0;box-shadow:var(--w-raise)}
+body.server-mode.win98.cards #sheetTable td.fill:not(.c-item) .cell-in,
+body.server-mode.win98.cards #sheetTable td.mk .cell-in{background:#FFFFFF;border:0;border-radius:0;box-shadow:var(--w-sunk)}
+body.server-mode.win98.cards #sheetTable tbody td.calc.grand{box-shadow:var(--w-thinsunk);padding:2px 6px}
+body.server-mode.win98.cards #sheetTable tbody tr.card-shut td.calc.grand{padding:2px 6px}
+body.server-mode.win98.cards #sheetTable td.calc{border-top-color:#A0A0A0}
+body.server-mode.win98.cards .deck-caret{background:#C0C0C0;color:#000;border:0;border-radius:0;box-shadow:var(--w-raise)}
+body.server-mode.win98.cards .deck-caret:active{box-shadow:var(--w-press)}
+body.server-mode.win98.cards #sheetTable tbody tr.press-arm{background:#C8D0F0;box-shadow:var(--w-raise),inset 0 0 0 3px #000080}
+body.server-mode.win98.cards #sheetTable tbody tr.dragging{background:transparent;box-shadow:none;border:1px dashed #000}
+body.server-mode.win98.cards #sheetTable tbody tr.divider{background:none;box-shadow:none;border:1px dashed #808080}
+body.server-mode.win98.cards #sheetTable tfoot tr{background:#C0C0C0;border:0;border-radius:0;box-shadow:var(--w-win)}
+body.server-mode.win98.cards #sheetTable tfoot td{background:none}
+body.server-mode.win98.cards #sheetTable tfoot td.grand .money{color:#000080}
+body.server-mode.win98.cards .deck-hint{color:#FFFFFF}
+body.server-mode.win98.cards .deck-add .btn.alt{background:#C0C0C0}
+
+/* section heads: a title bar, navy at the top level and a scheme colour per level */
+body.server-mode.win98 #sheetTable tr.section-head{--ink:#FFFFFF;--muted:#D8DCEA;--faint:#AEB8D8;--slate:#FFFFFF}
+body.server-mode.win98 #sheetTable tbody tr.section-head{background:linear-gradient(90deg,#000080 58%,#1084D0)}
+body.server-mode.win98 #sheetTable tbody tr.section-head[data-lvl] td,
+body.server-mode.win98 #sheetTable tbody tr.section-head[data-lvl]:hover td{
+background:transparent;border-top-color:#00004A;border-bottom-color:#00004A;border-right-color:transparent;
+}
+body.server-mode.win98 #sheetTable tbody tr.section-head td.c-item{background-color:#000080;border-left-color:#00004A}
+body.server-mode.win98 #sheetTable tbody tr.section-head[data-lvl] .name-in{
+color:#FFFFFF;font-family:var(--f-sans);font-weight:700;letter-spacing:.01em;text-transform:none;
+}
+body.server-mode.win98 #sheetTable tr.section-head .name-in::placeholder{color:#AEB8D8}
+body.server-mode.win98 #sheetTable tr.section-head .caret{color:#FFFFFF}
+body.server-mode.win98 #sheetTable tr.section-head .caret:hover{background:rgba(255,255,255,.16)}
+body.server-mode.win98 #sheetTable tr.section-head .grip{color:#FFFFFF!important}
+body.server-mode.win98 #sheetTable tr.section-head .del,body.server-mode.win98 #sheetTable tr.section-head .note-btn{color:#FFFFFF}
+body.server-mode.win98 #sheetTable tr.section-head .money{color:#FFFFFF}
+body.server-mode.win98 #sheetTable tbody tr.section-head td.calc.grand{border-left-color:transparent;border-right-color:transparent}
+body.server-mode.win98 #sheetTable tr.section-head td.calc.grand .money{color:#FFFF80}
+body.server-mode.win98 .sec-unit input{background:#FFFFFF;color:#000;border:0;border-radius:0;box-shadow:var(--w-sunk)}
+body.server-mode.win98 .sec-unit input.lab{background:transparent;color:#D8DCEA;box-shadow:none}
+body.server-mode.win98 .sec-unit input.inherited{color:#808080}
+body.server-mode.win98 #sheetTable tbody tr.section-head.nested[data-lvl="1"]{background:linear-gradient(90deg,#7A5300 58%,#C8961E)}
+body.server-mode.win98 #sheetTable tbody tr.section-head.nested[data-lvl="1"] td.c-item{background-color:#7A5300}
+body.server-mode.win98 #sheetTable tbody tr.section-head.nested[data-lvl="2"]{background:linear-gradient(90deg,#005E5E 58%,#1FA3A3)}
+body.server-mode.win98 #sheetTable tbody tr.section-head.nested[data-lvl="2"] td.c-item{background-color:#005E5E}
+body.server-mode.win98 #sheetTable tbody tr.section-head.nested[data-lvl="3"]{background:linear-gradient(90deg,#5E005E 58%,#A848A8)}
+body.server-mode.win98 #sheetTable tbody tr.section-head.nested[data-lvl="3"] td.c-item{background-color:#5E005E}
+body.server-mode.win98 #sheetTable tbody tr.section-head.nested[data-lvl] td.c-item{border-left:4px solid var(--lv1)}
+body.server-mode.win98 #sheetTable tbody tr.section-head.nested[data-lvl="2"] td.c-item{border-left-color:var(--lv2)}
+body.server-mode.win98 #sheetTable tbody tr.section-head.nested[data-lvl="3"] td.c-item{border-left-color:var(--lv3)}
+body.server-mode.win98.cards #sheetTable tbody tr.section-head{border-radius:0;box-shadow:none}
+body.server-mode.win98.cards #sheetTable tbody tr.section-head[data-lvl] td.c-item{background-color:transparent}
+
+/* section subtotals: a grey status band */
+body.server-mode.win98 #sheetTable tbody tr.section-foot[data-lvl] td,
+body.server-mode.win98 #sheetTable tbody tr.section-foot[data-lvl]:hover td{background:#C0C0C0}
+body.server-mode.win98:not(.cards) #sheetTable tbody tr.section-foot td{box-shadow:inset 0 1px #FFFFFF;border-bottom-color:#808080}
+body.server-mode.win98 #sheetTable tr.section-foot .sec-label{color:#000;font-family:var(--f-sans);font-weight:700;letter-spacing:0;text-transform:none}
+body.server-mode.win98 #sheetTable tr.section-foot .money{color:#000}
+body.server-mode.win98.cards #sheetTable tbody tr[data-type="sectionEnd"]{background:#C0C0C0;border-radius:0;box-shadow:var(--w-thinsunk)}
+
+/* totals: grey, the grand total selected in navy */
+body.server-mode.win98 #sheetTable tfoot td{background:#C0C0C0}
+body.server-mode.win98:not(.cards) #sheetTable tfoot td{border-top:1px solid #808080;box-shadow:inset 0 1px #FFFFFF}
+body.server-mode.win98 #sheetTable tfoot .tot-label{color:#000;font-family:var(--f-sans);font-weight:700;letter-spacing:0;text-transform:none}
+body.server-mode.win98:not(.cards) #sheetTable tfoot td.grand{background:#000080;box-shadow:inset 0 0 0 1px #000080,inset 0 0 0 2px #FFFFFF;border-left-color:#000080;border-right-color:#000080;border-bottom-color:#000080}
+body.server-mode.win98:not(.cards) #sheetTable tfoot .grand .money{color:#FFFFFF}
+body.server-mode.win98 .grand-lip{background:#FFFFE1;border:1px solid #000;border-top:0;border-radius:0;box-shadow:2px 2px 0 rgba(0,0,0,.25)}
+body.server-mode.win98 .grand-lip .lip-money{color:#000}
+body.server-mode.win98 .grand-lip .lip-tag{color:#000}
+
+/* the notes and the cost breakdown under the table */
+body.server-mode.win98 .card > .scroll .sum-notes .eyebrow,body.server-mode.win98 .card > .scroll .cost-break .eyebrow{color:#000;font-family:var(--f-sans);letter-spacing:0;text-transform:none;font-weight:700}
+body.server-mode.win98 .sum-block,body.server-mode.win98 .cb-cards{border-radius:0;background:#FFFFFF;border-color:#808080 #FFFFFF #FFFFFF #808080}
+
+/* summary and calculators: the same grid */
+body.server-mode.win98 .sum-table tr.s-sec td{background:#EBEBEB}
+body.server-mode.win98 .sum-table tr.s-folder:not(.colored) td{background:#000080;--ink:#FFFFFF;--muted:#D8DCEA;color:#FFFFFF}
+body.server-mode.win98 .sum-table td.s-grand,body.server-mode.win98 .sum-table tr.s-sec td.s-grand{background:#FFFFE1}
+body.server-mode.win98 .sum-table td.s-grand .money{color:#000080;font-weight:700}
+body.server-mode.win98 .sum-table tfoot td{background:#C0C0C0;border-top:1px solid #808080;box-shadow:inset 0 1px #FFFFFF}
+body.server-mode.win98 .sum-table tfoot td.grand{background:#000080;color:#FFFFFF;--ink:#FFFFFF;--slate:#FFFFFF}
+body.server-mode.win98 .calc-table td{background-color:#FFFFFF}
+body.server-mode.win98 .calc-table input{background:#FFFFFF;color:#000;border-color:#808080 #DFDFDF #DFDFDF #808080;border-radius:0}
+body.server-mode.win98 .load-block-head{background:var(--w-title);color:#FFFFFF;--ink:#FFFFFF;--muted:#D8DCEA}
+body.server-mode.win98 .wage-table tr.wage-sec td{background:#000080;color:#FFFFFF;--ink:#FFFFFF;--muted:#D8DCEA;--slate:#FFFFFF}
+body.server-mode.win98 .wage-table tr.wage-sub td,body.server-mode.win98 .wage-table tr.wage-total td{background:#C0C0C0}
+body.server-mode.win98 .wage-table tr.wage-grand td{background:#000080;color:#FFFFFF}
+
+/* scroll bars, arrows and all */
+body.server-mode.win98 ::-webkit-scrollbar{width:16px;height:16px}
+body.server-mode.win98 ::-webkit-scrollbar-track{background:var(--w-dither)}
+body.server-mode.win98 ::-webkit-scrollbar-thumb{background:#C0C0C0;box-shadow:var(--w-raise)}
+body.server-mode.win98 ::-webkit-scrollbar-corner{background:#C0C0C0}
+body.server-mode.win98 ::-webkit-scrollbar-button:single-button{
+display:block;width:16px;height:16px;background-color:#C0C0C0;box-shadow:var(--w-raise);
+background-repeat:no-repeat;background-position:center;
+}
+body.server-mode.win98 ::-webkit-scrollbar-button:single-button:active{box-shadow:var(--w-press)}
+body.server-mode.win98 ::-webkit-scrollbar-button:single-button:vertical:decrement{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M4 10h8L8 6z'/%3E%3C/svg%3E")}
+body.server-mode.win98 ::-webkit-scrollbar-button:single-button:vertical:increment{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M4 6h8l-4 4z'/%3E%3C/svg%3E")}
+body.server-mode.win98 ::-webkit-scrollbar-button:single-button:horizontal:decrement{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M10 4v8L6 8z'/%3E%3C/svg%3E")}
+body.server-mode.win98 ::-webkit-scrollbar-button:single-button:horizontal:increment{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M6 4v8l4-4z'/%3E%3C/svg%3E")}
+

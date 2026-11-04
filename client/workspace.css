@@ -332,6 +332,9 @@ body #sheetTable tr.section-head.tree-child .sec-add:hover{color:var(--ink);bord
 .sheet-load-dock-head{display:flex;align-items:center;gap:14px;padding:8px 12px;flex-wrap:wrap}
 #sheetLoadDock{flex:none;border-top:1px solid var(--rule);background:var(--card);color:var(--ink);min-width:0}
 #sheetLoadSummary{font:12px var(--f-sans);color:var(--muted)}
+body.server-mode #sheetLoadDock:has(#sheetLoad[hidden]) .sheet-load-dock-head{padding:2px 8px;gap:10px;flex-wrap:nowrap;min-height:28px}
+body.server-mode #sheetLoadDock:has(#sheetLoad[hidden]) #sheetLoadOpen{padding:3px 6px;min-height:24px;font:600 11px var(--f-sans);letter-spacing:0;text-transform:none;white-space:nowrap}
+body.server-mode #sheetLoadDock:has(#sheetLoad[hidden]) #sheetLoadSummary{font-size:11px;min-width:0}
 #sheetLoad{padding:0 12px 10px;max-height:min(40vh,360px);overflow:auto;overscroll-behavior:contain}
 #sheetLoad .load-block{margin:0;min-width:960px}
 #sheetLoad .calc-table input{min-height:36px;font-size:14px}

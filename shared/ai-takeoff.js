@@ -48,6 +48,11 @@ export const takeoffSchema={type:'object',required:['id','name','sheets'],proper
   sheets:{type:'array',minItems:1,items:{type:'object',required:['id','rows'],properties:{id:idSchema,title:{type:'string'},color:{type:'string',enum:['',...pageColors],description:'Shared color for the page tab, Summary page/section rows, and assigned Scope items. Editable in Summary and Scope. Choose a palette key; omit or use empty text for no color.'},flatAddEnabled:{type:'boolean'},units:{type:'array',description:'UP columns for this page. Create a column before assigning section overrides to its ID.',items:unitColumnSchema},rows:{type:'array',items:{type:'object',required:['id'],properties:{id:idSchema,type:{enum:['item','section','sectionEnd']},name:{type:'string'},kind:{type:'string'},count:numeric,time:numeric,days:numeric,cost:numeric,markup:numeric,flatAdd:numeric,note:{type:'string'},units:sectionUnitsSchema,sid:idSchema}}}}}}
 }};
 takeoffSchema.properties.sheets.items.properties.folderId={type:'string',maxLength:160,description:'ID from this takeoff\'s folders array. Omit or use empty text for Unfiled. Moving a page preserves its ID, prices and Scope assignments.'};
+takeoffSchema.properties.sheets.items.properties.loadOn={type:'boolean',description:'Expand the per-page load calculator. Hiding it does not remove its entries or totals.'};
+takeoffSchema.properties.sheets.items.properties.loadCalc={type:'array',description:'Editable load calculator for this page, shared with the Load Calc tab. Independent of estimate prices. Sections group following lines until the next section; no sectionEnd records. Computed SF, CY, fluff CY, total CY and loads are derived, not stored.',items:{type:'object',required:['id'],properties:{
+  id:idSchema,type:{enum:['section'],description:'Only set for a section heading; omit for a calculation line.'},name:{type:'string'},shut:{type:'boolean',description:'Collapse a section heading.'},
+  ct:{...numeric,description:'Count multiplier.'},l:{...numeric,description:'Length in feet.'},w:{...numeric,description:'Width in feet.'},d:{...numeric,description:'Depth in inches.'},fluff:{...numeric,description:'Swell percentage, e.g. 30 means 30%.'},lt:{...numeric,description:'Truck capacity in cubic yards per load. Blank or zero yields zero loads.'}
+}}};
 export const changeSchema={type:'object',required:['revision','takeoff'],additionalProperties:false,properties:{revision:{type:'string',pattern:'^[a-f0-9]{64}$'},takeoff:takeoffSchema,requestId:{type:'string',minLength:1,maxLength:100}}};
 
 export function validateTakeoff(next, before) {
@@ -101,6 +106,20 @@ export function validateTakeoff(next, before) {
     if(sheet.title!==undefined&&typeof sheet.title!=='string')fail('Option title must be text.');
     if(!Array.isArray(sheet.rows))fail('Each option needs a rows array.');
     if(sheet.flatAddEnabled!==undefined&&typeof sheet.flatAddEnabled!=='boolean')fail('flatAddEnabled must be true or false.');
+    if(sheet.loadOn!==undefined&&typeof sheet.loadOn!=='boolean')fail('loadOn must be true or false.');
+    if(sheet.loadCalc!==undefined&&!Array.isArray(sheet.loadCalc))fail('Page loadCalc must be an array.');
+    const loadIds=new Set();
+    for(const row of sheet.loadCalc||[]){
+      if(!row||typeof row!=='object'||Array.isArray(row)||typeof row.id!=='string'||!row.id||row.id.length>160)fail('Each load calculator entry needs an ID.');
+      if(loadIds.has(row.id))fail('Load calculator IDs must be unique within a page.');loadIds.add(row.id);
+      if(row.type!==undefined&&row.type!=='section')fail('Load calculator type must be section or omitted for a line.');
+      if(row.name!==undefined&&typeof row.name!=='string')fail('Load calculator name must be text.');
+      if(row.shut!==undefined&&typeof row.shut!=='boolean')fail('Load calculator shut must be true or false.');
+      for(const key of ['ct','l','w','d','fluff','lt']){
+        const value=row[key];
+        if(value!==undefined&&!(value===''||typeof value==='number'&&Number.isFinite(value)||typeof value==='string'&&/^-?\d+(\.\d+)?$/.test(value)))fail('Invalid load calculator number: '+key);
+      }
+    }
     if(sheet.units!==undefined&&!Array.isArray(sheet.units))fail('Page units must be an array of UP columns.');
     const unitIds=new Set();
     for(const unit of sheet.units||[]){

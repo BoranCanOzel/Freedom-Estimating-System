@@ -39,6 +39,9 @@ test('page load calculator stays accessible and supports keyboard entry and page
   expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   await page.screenshot({path:'.tools/load-dock-mobile.png'});
   await toggle.click();await expect(calc).toBeHidden();await expect(page.locator('#sheetLoadSummary')).toHaveText('20.00 total CY · 2.22 loads');
+  expect((await page.locator('#sheetLoadDock').boundingBox()).height).toBeLessThanOrEqual(34);
+  await expect(page.locator('#sheetLoadSummary')).toBeInViewport();
+  await page.screenshot({path:'test-results/load-dock-compact-mobile.png'});
 });
 async function openWorkbook(page, data = workbook(), name = 'Workspace tester') {
   const reuse = name === 'Workspace tester' && workspaceCookies;
@@ -2569,15 +2572,14 @@ test('seasonal styles stay readable, persist, and keep decoration away from edit
     await page.locator('[data-theme="'+theme+'"]').click();
     await page.locator('#workspace-view > summary').press('Escape');
     await expect(page.locator('body')).toHaveClass(new RegExp(theme));
-    await expect(page.locator('#seasonal-trim')).toBeVisible();
-    await expect(page.locator('#seasonal-trim')).toHaveCSS('pointer-events','none');
+    expect(await page.locator('body').evaluate(el=>getComputedStyle(el,'::after').pointerEvents)).toBe('none');
     await page.evaluate(()=>document.fonts.ready);
-    expect(await page.evaluate(theme=>document.fonts.check('30px "'+(theme==='christmas'?'Berkshire Swash':'Creepster')+'"'),theme)).toBe(true);
+    expect(await page.evaluate(theme=>document.fonts.check((theme==='christmas'?'700 ':'')+'30px "'+(theme==='christmas'?'Mountains of Christmas':'Creepster')+'"'),theme)).toBe(true);
     const contrast=await page.evaluate(()=>{
       const rgb=color=>color.match(/[\d.]+/g).slice(0,3).map(Number);
       const luminance=color=>rgb(color).map(n=>{n/=255;return n<=.04045?n/12.92:((n+.055)/1.055)**2.4;}).reduce((sum,n,i)=>sum+n*[.2126,.7152,.0722][i],0);
       const root=getComputedStyle(document.body),surface=root.getPropertyValue('--card');
-      return ['--ink','--muted','--season-title'].map(key=>{
+      return ['--ink','--muted','--fest-c'].map(key=>{
         const probe=document.createElement('span');probe.style.color=root.getPropertyValue(key);probe.style.backgroundColor=surface;document.body.append(probe);
         const style=getComputedStyle(probe),a=luminance(style.color),b=luminance(style.backgroundColor);probe.remove();return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
       });
@@ -2592,10 +2594,10 @@ test('seasonal styles stay readable, persist, and keep decoration away from edit
     await page.reload();await expect(page.locator('body')).toHaveClass(new RegExp(theme));
     await expect(page.locator('#server-status')).toHaveText('All changes saved');
     await page.emulateMedia({reducedMotion:'reduce'});
-    expect(await page.locator('#seasonal-scenery').evaluate(el=>getComputedStyle(el,'::before').animationName)).toBe('none');
+    expect(await page.locator('body').evaluate(el=>getComputedStyle(el,'::after').animationName)).toBe('none');
     await page.evaluate(()=>window.dispatchEvent(new Event('beforeprint')));
     await expect(page.locator('body')).not.toHaveClass(/christmas|halloween|dark/);
-    await expect(page.locator('#seasonal-trim')).toBeHidden();
+    expect(await page.locator('body').evaluate(el=>getComputedStyle(el,'::after').content)).toBe('none');
     await page.evaluate(()=>window.dispatchEvent(new Event('afterprint')));
     await expect(page.locator('body')).toHaveClass(new RegExp(theme));
     await page.setViewportSize({width:390,height:844});
@@ -2607,8 +2609,37 @@ test('seasonal styles stay readable, persist, and keep decoration away from edit
     await page.evaluate(()=>window.estimator.openLocation({...window.estimator.getLocation(),view:'sheet'}));
   }
   await page.evaluate(()=>window.estimator.setTheme('light'));
-  await expect(page.locator('#seasonal-scenery')).toBeHidden();
-  await expect(page.locator('#seasonal-trim')).toBeHidden();
+  expect(await page.locator('body').evaluate(el=>getComputedStyle(el,'::after').content)).toBe('none');
+});
+
+test('theme preview panel preserves the compact sidebar and Windows 98 persists',async({page})=>{
+  await openWorkbook(page);
+  await page.locator('#workspace-sidebar-toggle').click();
+  await expect(page.locator('body')).toHaveClass(/sidebar-compact/);
+  const before=await page.locator('#server-bar').boundingBox();
+  const iconBefore=await page.locator('#workspace-view > summary').boundingBox();
+  await page.locator('#workspace-view > summary').click();
+  await expect(page.locator('.workspace-themes .pt-sw')).toHaveCount(6);
+  await expect(page.locator('.workspace-themes .pt-sw i')).toHaveCount(18);
+  await expect(page.locator('#server-bar')).toHaveJSProperty('offsetWidth',Math.round(before.width));
+  await page.screenshot({path:'test-results/theme-preview-compact.png'});
+  await page.getByRole('button',{name:'Windows 98',exact:true}).click();
+  await expect(page.locator('body')).toHaveClass(/win98/);await expect(page.locator('body')).not.toHaveClass(/\bdark\b/);
+  await expect(page.locator('#win98Mode')).toHaveAttribute('aria-pressed','true');
+  await page.locator('#workspace-view > summary').press('Escape');
+  const iconAfter=await page.locator('#workspace-view > summary').boundingBox();
+  expect(iconAfter.width).toBe(iconBefore.width);expect(iconAfter.height).toBe(iconBefore.height);
+  await page.locator('#title').fill('Retro scope');await page.locator('#title').blur();
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');
+  await page.screenshot({path:'test-results/theme-win98-sheet.png'});
+  await page.reload();await expect(page.locator('body')).toHaveClass(/win98/);await expect(page.locator('#title')).toHaveValue('Retro scope');
+  await page.evaluate(()=>window.dispatchEvent(new Event('beforeprint')));await expect(page.locator('body')).not.toHaveClass(/win98/);
+  await page.evaluate(()=>window.dispatchEvent(new Event('afterprint')));await expect(page.locator('body')).toHaveClass(/win98/);
+  await page.locator('#workspace-sidebar-toggle').click();await page.locator('#workspace-view > summary').click();
+  await page.screenshot({path:'test-results/theme-preview-expanded.png'});
+  await page.setViewportSize({width:390,height:844});
+  await expect(page.locator('#win98Mode')).toBeInViewport();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
 
 test('menus preserve rounding, display, downloads, printing and keyboard access', async ({page}) => {

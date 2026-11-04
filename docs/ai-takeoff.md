@@ -224,3 +224,13 @@ Example page fragment (merge these fields into the full takeoff you read, then v
 ```
 
 With no markup or fees, this example computes $100/EA for Openings and $2.50/LF for Saw cutting, from the same $300 nested total.
+
+### Per-page load calculator
+
+AI can read and edit `takeoff.sheets[].loadCalc` through `read_takeoff`, `validate_changes`, and `save_takeoff` (HTTP and MCP). This is the same data shown in each page's bottom Load calc panel and the all-pages Load Calc tab. Match the page by its existing ID; preserve other pages and estimate rows. Set `sheets[].loadOn` to true to expand that page's calculator, or false to collapse it without removing its quantities.
+
+Each calculation line has a unique `id`, `name`, `ct` (count), `l` and `w` (feet), `d` (inches), `fluff` (swell percentage), and `lt` (truck capacity in CY/load). Omit `type` on lines. Numeric values may be numbers or numeric strings; blank or omitted values calculate as zero. Explicitly supply `ct:1` and the intended fluff percentage when adding a line (the UI starts new lines at 30%). Use known dimensions and truck capacities; do not guess missing measurements.
+
+Formula: SF = ct × l × w; CY = SF × (d / 12) / 27; fluff CY = CY × fluff / 100; total CY = CY + fluff CY; loads = total CY / lt. Blank or zero lt gives zero loads. Page totals sum all lines, including collapsed sections. Do not store calculated totals or round inputs; the UI displays two decimal places. These quantities do not change estimate prices or automatically add hauling charges.
+
+Example line: `{"id":"load-slab","name":"Slab removal","ct":1,"l":27,"w":10,"d":12,"fluff":30,"lt":10}` produces 270 SF, 10 CY, 3 fluff CY, 13 total CY and 1.30 loads. Sections use `{"id":"load-section","type":"section","name":"Concrete","shut":false}` and group subsequent lines until the next section. They are not nested and need no sectionEnd. Preserve existing IDs when editing; validate the complete takeoff before saving with its revision and a unique requestId.
