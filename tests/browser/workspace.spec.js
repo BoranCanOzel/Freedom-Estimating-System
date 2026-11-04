@@ -1080,6 +1080,59 @@ test('Ctrl selection edits multiple fields and drags nonadjacent items together'
   expect(await page.evaluate(()=>window.estimator.exportBook().sheets[0].rows.map(r=>r.id))).toEqual(['b','d','a','c']);
 });
 
+test('Shift row selection moves visible items together into a nested subsection',async({page})=>{
+  const data=workbook(),sh=data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0];
+  const item=id=>({id,kind:'labor',name:id,count:1,time:1,days:1,cost:10});
+  sh.rows=[item('a'),item('b'),{id:'hidden-section',type:'section',name:'Hidden'},item('hidden'),
+    {id:'hidden-end',type:'sectionEnd',sid:'hidden-section'},item('c'),item('d'),
+    {id:'parent',type:'section',name:'Parent'},{id:'child',type:'section',name:'Child'},item('target'),
+    {id:'child-end',type:'sectionEnd',sid:'child'},{id:'parent-end',type:'sectionEnd',sid:'parent'}];
+  await openWorkbook(page,data);
+  const row=id=>page.locator('#body tr[data-id="'+id+'"]');
+  await row('hidden-section').locator('.caret[aria-expanded="true"]').click();
+  await expect(row('hidden')).not.toBeVisible();
+  await row('a').locator('.grip').click();
+  await row('d').locator('.grip').click({modifiers:['Shift']});
+  await expect(page.locator('#body .multi-row')).toHaveCount(4);
+  await row('c').locator('.grip').click({modifiers:['Shift']});
+  await expect(page.locator('#body .multi-row')).toHaveCount(3);
+  await row('b').locator('.grip').click({modifiers:['Control']});
+  await expect(page.locator('#body .multi-row')).toHaveCount(2);
+  await expect(row('hidden')).not.toHaveClass(/multi-row/);
+  const order=()=>page.evaluate(()=>window.estimator.exportBook().sheets[0].rows.map(r=>r.id));
+  const original=await order();
+  const drag=async()=>{
+    const from=await row('a').locator('.grip').boundingBox(),to=await row('target').boundingBox();
+    await page.mouse.move(from.x+from.width/2,from.y+from.height/2);await page.mouse.down();
+    await page.mouse.move(to.x+80,to.y+to.height*.8,{steps:10});
+  };
+  await drag();await page.keyboard.press('Escape');await page.mouse.up();expect(await order()).toEqual(original);
+  await row('a').locator('.grip').click({modifiers:['Control']});
+  await row('c').locator('.grip').click({modifiers:['Control']});
+  await drag();await page.mouse.up();
+  const moved=['b','hidden-section','hidden','hidden-end','d','parent','child','target','a','c','child-end','parent-end'];
+  expect(await order()).toEqual(moved);
+  await expect(row('a')).toHaveClass(/in-section/);await expect(row('c')).toHaveClass(/in-section/);
+  await page.keyboard.press('Control+z');expect(await order()).toEqual(original);
+  await page.keyboard.press('Control+y');expect(await order()).toEqual(moved);
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');await page.reload();
+  await expect(row('a')).toBeVisible();expect(await order()).toEqual(moved);
+});
+
+test('selected item name fields can be dragged as a group',async({page})=>{
+  const data=workbook();
+  data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0].rows=['a','b','c','d'].map(id=>({id,kind:'labor',name:id,count:1,time:1,days:1,cost:10}));
+  await openWorkbook(page,data);
+  const row=id=>page.locator('#body tr[data-id="'+id+'"]');
+  await row('a').locator('.name-in').click();await row('c').locator('.name-in').click({modifiers:['Shift']});
+  await expect(page.locator('#body .multi-input')).toHaveCount(3);
+  const from=await row('b').locator('.grip').boundingBox(),to=await row('d').boundingBox();
+  await page.mouse.move(from.x+from.width/2,from.y+from.height/2);await page.mouse.down();
+  await page.mouse.move(to.x+80,to.y+to.height*.8,{steps:10});await page.mouse.up();
+  expect(await page.evaluate(()=>window.estimator.exportBook().sheets[0].rows.map(r=>r.id))).toEqual(['d','a','b','c']);
+  await expect(page.locator('#body .multi-input')).toHaveCount(0);
+});
+
 test('Ctrl deselects immediately and keeps typing in the remaining selection', async ({page}) => {
   const data=workbook();
   data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0].rows=['a','b','c'].map(id=>({id,kind:'labor',name:id,count:1,time:1,days:1,cost:10}));

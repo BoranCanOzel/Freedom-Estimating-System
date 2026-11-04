@@ -109,6 +109,8 @@ Workspace controls are grouped by purpose:
 
 Use **Ctrl+Z** to undo and **Ctrl+Y** or **Ctrl+Shift+Z** to redo (Command shortcuts also work on Mac). The top toolbar has Undo and Redo buttons. History covers saved workbook edits, including rows, sections, moves between options, library folders/templates, and project details. Open detail editors keep a separate history for unsaved changes; saving an editor becomes a workbook undo step. Search boxes and temporary naming fields retain their normal text undo. Each browser tracks only its own edits, including offline edits; history resets when you reload or close/switch the workbook. Navigation and appearance preferences are not workbook undo steps.
 
+To move multiple items, Ctrl-click (Cmd-click on Mac) their drag handles or row numbers to toggle individual rows. Shift-click selects a range of visible items from the last anchor. Drag any selected handle to move the group into another section or subsection, preserving item order. Escape clears the selection or cancels a drag. Selected input fields can still be edited together; dragging a handle in that selection moves their rows together.
+
 | Location | Controls |
 | --- | --- |
 | File | JSON import/export, estimate Excel export, printing, company and project directory exports |

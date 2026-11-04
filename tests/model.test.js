@@ -11,6 +11,18 @@ function exchange(a,b) { const aa = Y.encodeStateAsUpdate(a), bb = Y.encodeState
 test('round-trips a workbook, preserving numbers, empty arrays, and text', () => {
   const [a] = replicas(); assert.deepEqual(readBook(a), seed);
 });
+
+test('unchanged rendered defaults do not recreate fields removed by undo',()=>{
+  const [doc]=replicas();
+  const rendered={...readBook(doc),statuses:['Open','Completed','Closed']};
+  const before=Y.encodeStateVector(doc);
+  writeBook(doc,rendered,structuredClone(rendered));
+  assert.deepEqual(Y.encodeStateVector(doc),before);
+  assert.equal(readBook(doc).statuses,undefined);
+  const edited=structuredClone(rendered);edited.statuses.push('Pending');
+  writeBook(doc,rendered,edited);
+  assert.deepEqual(readBook(doc).statuses,edited.statuses);
+});
 test('simultaneous changes to different fields survive', () => {
   const [a,b] = replicas(), av = readBook(a), bv = readBook(b), aa = structuredClone(av), bb = structuredClone(bv);
   aa.sheets[0].rows[0].count = 7; bb.sheets[0].rows[0].cost = 99;

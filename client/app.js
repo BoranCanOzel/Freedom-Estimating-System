@@ -127,7 +127,9 @@ class LiveProject {
     this.cacheKey = user + ':' + project.id; this.baseline = {}; this.retry = 0;
     this.locationKey = 'freedom:location:' + this.cacheKey;
     this.detailPreferences=createDetailPreferences({api,user,workbook:project.id,onError:text=>message(text,true)});
-    this.history = new Y.UndoManager(this.doc, {trackedOrigins:new Set(['local']), captureTimeout:500});
+    // The whole-document scope also sees empty flushes; those must not clear redo.
+    this.history = new Y.UndoManager(this.doc, {trackedOrigins:new Set(['local']), captureTimeout:500,
+      captureTransaction:transaction=>transaction.changedParentTypes.size>0});
     this.history.on('stack-item-added', ({stackItem}) => {
       if (!this.history.undoing && !this.history.redoing) stackItem.meta.set('before', this.historyLocation || bridge.getLocation());
       document.dispatchEvent(new Event('estimator:history'));

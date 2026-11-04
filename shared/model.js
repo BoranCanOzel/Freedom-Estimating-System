@@ -85,11 +85,14 @@ function changeOrder(order, previous, next) {
 
 export function writeBook(doc, previous, next, origin = 'local') {
   const before = flatten(previous), after = flatten(next), fields = doc.getMap('fields');
+  const initialized = fields.has('[]');
   doc.transact(() => {
     for (const k of before.keys()) if (!after.has(k)) fields.delete(k);
     for (const [k, value] of after) {
       const old = before.get(k);
-      if (equal(old, value) && fields.has(k)) continue;
+      // Render-time defaults and unchanged fields are not new user edits, even
+      // when undo or a remote deletion removed their stored representation.
+      if (equal(old, value) && (initialized || fields.has(k))) continue;
       if (value.kind === 'text') {
         const current = fields.get(k);
         if (current instanceof Y.Text) changeText(current, current.toString(), value.value);

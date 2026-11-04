@@ -3423,6 +3423,7 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
     grip.className = 'grip';
     grip.style.color = 'var(--' +
       (row.type === 'section' ? 'slate' : (derivedKind(row) || row.kind)) + ')';
+    if(row.type!=='section')label+=' · Ctrl/Cmd-click to select items; Shift-click to select a range; drag a selected handle to move them together';
     grip.title = label;
     grip.setAttribute('aria-label', label + '. Hold Alt and press the up or down arrow key to move it.');
     grip.innerHTML = '<svg viewBox="0 0 8 14" width="8" height="14" aria-hidden="true" focusable="false"><g fill="currentColor">' +
@@ -5690,7 +5691,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       ['dot round', 'The Round column is a display only, it never feeds the maths']
     ]],
     ['Lines', [
-      ['ico grip', 'Drag the grip to reorder a line or whole section, or drop it on another option tab to move it there'],
+      ['ico grip', 'Ctrl/Cmd-click item grips to select several; Shift-click for a range. Drag a selected grip to move them together into a section or another option tab. Escape cancels. Section grips move the whole section.'],
       ['ico dup', 'The copy icon duplicates a line, or a section and everything in it'],
       ['ico card', 'The card icon opens the line as a full card'],
       ['ico type', 'The type icon on the right sets labor, equipment, material and the rest']
@@ -6487,16 +6488,44 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   const selectedInputs = new Set();
   let singleInputAnchor = null;
   let rangeInputAnchor = null;
+  let rangeRowAnchor = null;
   let copyingSelectedInput = false;
   function clearMultiSelection(){
     singleInputAnchor = null;
     rangeInputAnchor = null;
+    rangeRowAnchor = null;
     selectedLineIds.clear(); selectedInputs.clear();
     document.querySelectorAll('.multi-row,.multi-input').forEach(el => el.classList.remove('multi-row','multi-input'));
   }
   body.addEventListener('pointerdown', event => {
+    if(event.button!==0)return;
     const row = event.target.closest('tr[data-type="item"]');
     const input = event.target.closest('input:not([type=checkbox]):not([type=file]),textarea');
+    const rowTarget=row&&!input&&!event.target.closest('button:not(.grip),select,a');
+    if(rowTarget&&(event.shiftKey||event.ctrlKey||event.metaKey)){
+      const visible=[...body.querySelectorAll('tr[data-type="item"]')].filter(el=>el.getClientRects().length&&!el.classList.contains('drop-preview'));
+      const start=visible.findIndex(el=>el.dataset.id===rangeRowAnchor),end=visible.indexOf(row);
+      selectedInputs.clear();singleInputAnchor=null;rangeInputAnchor=null;
+      body.querySelectorAll('.multi-input').forEach(el=>el.classList.remove('multi-input'));
+      if(event.shiftKey&&start>=0&&end>=0){
+        if(!event.ctrlKey&&!event.metaKey)selectedLineIds.clear();
+        visible.slice(Math.min(start,end),Math.max(start,end)+1).forEach(el=>selectedLineIds.add(el.dataset.id));
+      }else{
+        if(event.shiftKey)selectedLineIds.clear();
+        const id=row.dataset.id;
+        if(selectedLineIds.has(id))selectedLineIds.delete(id);else selectedLineIds.add(id);
+        rangeRowAnchor=id;
+      }
+      body.querySelectorAll('tr[data-type="item"]').forEach(el=>el.classList.toggle('multi-row',selectedLineIds.has(el.dataset.id)));
+      event.preventDefault();event.stopPropagation();
+      return;
+    }
+    // A drag handle also moves the rows belonging to a bulk cell selection.
+    if(rowTarget&&event.target.closest('.grip')&&[...selectedInputs].some(el=>el.closest('tr')===row)){
+      selectedLineIds.clear();
+      selectedInputs.forEach(el=>{const tr=el.closest('tr');selectedLineIds.add(tr.dataset.id);tr.classList.add('multi-row');el.classList.remove('multi-input');});
+      selectedInputs.clear();singleInputAnchor=null;rangeInputAnchor=null;
+    }
     if (event.shiftKey && row && input && !input.readOnly && !input.disabled){
       const anchor = rangeInputAnchor;
       const column = input.closest('td')?.cellIndex;
@@ -6540,19 +6569,12 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
             if (next){ next.focus(); next.select(); }
           }
         } else { input.focus(); input.select(); }
-      } else if (!event.target.closest('button:not(.grip),select,a')){
-        singleInputAnchor = null;
-        rangeInputAnchor = null;
-        selectedInputs.clear(); body.querySelectorAll('.multi-input').forEach(el => el.classList.remove('multi-input'));
-        const id = row.dataset.id;
-        if (selectedLineIds.has(id)) selectedLineIds.delete(id); else selectedLineIds.add(id);
-        row.classList.toggle('multi-row',selectedLineIds.has(id));
-        event.preventDefault(); event.stopPropagation();
       }
     } else {
       if (!(input && selectedInputs.has(input)) && !selectedLineIds.has(row?.dataset.id)) clearMultiSelection();
       if (!selectedInputs.size && row && input && !input.readOnly && !input.disabled) singleInputAnchor = input;
       if (row && input && !input.readOnly && !input.disabled) rangeInputAnchor = input;
+      if(rowTarget)rangeRowAnchor=row.dataset.id;
     }
   }, true);
   body.addEventListener('keydown', event => {
