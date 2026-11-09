@@ -2113,6 +2113,37 @@ test('adding a library requires confirmation and cancellation leaves existing li
   expect((await snapshot()).libs).toEqual(created.libs);
 });
 
+test('new templates keep the folder where creation started, including nested folders',async({page})=>{
+  const data=workbook();data.folders=['Disposal/Special'];
+  data.templates={items:[{id:'existing-root',name:'Existing root item',kind:'labor',folder:''}],sections:[],scopes:[]};
+  await openWorkbook(page,data);await page.locator('#libToggle').click();
+  const templates=()=>page.evaluate(()=>window.estimator.exportBook().templates);
+  const start=async(button,name,section=false)=>{
+    await page.locator('#libCreate>summary').click();await page.locator('#'+button).click();
+    if(section)await page.locator('#editor').getByLabel('Section name',{exact:true}).fill(name);
+    else await page.locator('#editor').getByPlaceholder('Item name',{exact:true}).fill(name);
+  };
+  await page.getByRole('button',{name:'Disposal folder',exact:true}).click();
+  for(const [button,name,section]of [['libNewLabor','Disposal crew',false],['libNewEquipment','Disposal truck',false],['libNewMaterial','Disposal supplies',false],['libNewSection','Disposal section',true]]){
+    await start(button,name,section);await page.locator('#edSave').click();
+    const records=await templates();expect(records[section?'sections':'items'].find(item=>item.name===name)?.folder).toBe('Disposal');
+    await expect(page.locator('#libAll .tpl-name').filter({hasText:name})).toBeVisible();
+  }
+  await page.locator('#libAll .folder-head[data-folder="Disposal/Special"]').click();
+  await start('libNewLabor','Nested crew');
+  await page.getByRole('button',{name:'Equipment folder',exact:true}).click();await page.locator('#edSave').click();
+  expect((await templates()).items.find(item=>item.name==='Nested crew').folder).toBe('Disposal/Special');
+  await page.locator('#libBreadcrumbs .crumb').filter({hasText:/^Library$/}).click();
+  await start('libNewMaterial','Root material');await page.locator('#edSave').click();
+  expect((await templates()).items.find(item=>item.name==='Root material').folder).toBe('');
+  await page.locator('#libAll .tpl-wrap').filter({hasText:'Existing root item'}).getByRole('button',{name:'Edit',exact:true}).click();
+  await page.getByRole('button',{name:'Disposal folder',exact:true}).click();await page.locator('#edSave').click();
+  expect((await templates()).items.find(item=>item.id==='existing-root').folder).toBe('');
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');await page.reload();
+  expect((await templates()).sections.find(section=>section.name==='Disposal section').folder).toBe('Disposal');
+  expect((await templates()).items.find(item=>item.name==='Nested crew').folder).toBe('Disposal/Special');
+});
+
 test('compact library creation menu opens each editor and supports keyboard dismissal', async ({page}) => {
   const data=workbook();data.templates={items:Array.from({length:60},(_,i)=>({id:'footer-item-'+i,name:'Library item '+i,kind:'labor',cost:25})),sections:[],scopes:[]};
   await openWorkbook(page,data);
@@ -2141,9 +2172,16 @@ test('compact library creation menu opens each editor and supports keyboard dism
   await expect(page.locator('#libNewLabor')).not.toBeVisible();
   await create.locator('summary').click();await page.locator('#libNewSection').click();
   await expect(page.locator('#edTitle')).toHaveText('New section');
+  const removedBlocks=page.locator('#editor .ed-img,#editor .ed-meta,#editor .ed-attach,#editor .ed-folder,#editor .ed-notes');
+  await expect(removedBlocks).toHaveCount(0);
+  await page.locator('#editor .slim-head .caret').click();await expect(removedBlocks).toHaveCount(0);
+  await page.locator('#editor .slim-head .caret').click();await expect(removedBlocks).toHaveCount(0);
   await page.locator('#editor').getByLabel('Section name',{exact:true}).fill('Reusable crew section');
   await page.locator('#edSave').click();
   expect(await page.evaluate(()=>window.estimator.exportBook().templates.sections.find(section=>section.name==='Reusable crew section')?.items.length)).toBe(1);
+  await page.locator('#libAll .tpl-wrap').filter({hasText:'Reusable crew section'}).getByRole('button',{name:'Edit',exact:true}).click();
+  await expect(removedBlocks).toHaveCount(0);await expect(page.locator('#editor').getByLabel('Section name',{exact:true})).toHaveValue('Reusable crew section');
+  await page.locator('#edCancel').click();
   await page.locator('#libNewFolder>summary').click();await page.locator('#folderNew').fill('Toolbar folder');await page.locator('#folderAdd').click();
   expect(await page.evaluate(()=>window.estimator.exportBook().folders)).toContain('Toolbar folder');await expect(page.locator('#folderNew')).toBeHidden();
   await page.locator('.lib-save-existing > summary').click();

@@ -9145,7 +9145,6 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   }
 
   function renderSecEd(box){
-    box.appendChild(imageBlock(secDraft));
     box.appendChild(edField('Section name', secDraft.name, v => { secDraft.name = v; }, {ph:'Demo / dispose'}));
     box.appendChild(edField('Detail', secDraft.note, v => { secDraft.note = v; }, {area:true}));
 
@@ -9154,9 +9153,6 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     packHead.appendChild(blockHead(secDraft, 'Lines', 'linesLocked', 'linesOpen'));
     box.appendChild(packHead);
     if (secDraft.linesOpen === false){
-      box.appendChild(metaBlock(secDraft));
-      box.appendChild(attachBlock(secDraft));
-      box.appendChild(folderField(secDraft));
       return;
     }
 
@@ -9189,9 +9185,6 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     add.textContent = '+ Add line';
     add.addEventListener('click', () => { secDraft.items.push(blankLine()); renderEditor(); });
     box.appendChild(add);
-    box.appendChild(metaBlock(secDraft));
-    box.appendChild(attachBlock(secDraft));
-    box.appendChild(folderField(secDraft));
   }
 
   function scopeRow(it, onRemove, inSection){
@@ -9685,7 +9678,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
            folderLocked:t.folderLocked, folderOpen:t.folderOpen,
            meta:t.meta, metaLocked:t.metaLocked, metaOpen:t.metaOpen,
            items:(t.items || []).map(i => Object.assign({}, i))}
-        : {id:null, name:'', note:'', folder:'', items:[blankLine()]};
+        : {id:null, name:'', note:'', folder:libPath, items:[blankLine()]};
     } else if (mode === 'part'){
       partDraft = t ? Object.assign({}, t)
         : {id:null, kind:'part', name:'', note:'', folder:'', cost:'', markup:''};
@@ -10038,9 +10031,9 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     });
     document.addEventListener('click',event=>{if(!event.composedPath().includes(menu))menu.open=false;});
   });
-  document.getElementById('libNewLabor').addEventListener('click', () => openEditor('item', {kind:'labor'}));
-  document.getElementById('libNewEquipment').addEventListener('click', () => openEditor('item', {kind:'equip'}));
-  document.getElementById('libNewMaterial').addEventListener('click', () => openEditor('item', {kind:'material'}));
+  document.getElementById('libNewLabor').addEventListener('click', () => openEditor('item', {kind:'labor',folder:libPath}));
+  document.getElementById('libNewEquipment').addEventListener('click', () => openEditor('item', {kind:'equip',folder:libPath}));
+  document.getElementById('libNewMaterial').addEventListener('click', () => openEditor('item', {kind:'material',folder:libPath}));
   document.getElementById('libNewSection').addEventListener('click', () => openEditor('section', null));
 
   function addItemRow(at){
