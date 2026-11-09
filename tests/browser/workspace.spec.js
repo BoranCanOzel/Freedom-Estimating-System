@@ -2089,24 +2089,36 @@ test('large estimate scrolls without changing rows or totals', async ({page}) =>
 });
 
 test('compact library creation menu opens each editor and supports keyboard dismissal', async ({page}) => {
-  await openWorkbook(page);
+  const data=workbook();data.templates={items:Array.from({length:60},(_,i)=>({id:'footer-item-'+i,name:'Library item '+i,kind:'labor',cost:25})),sections:[],scopes:[]};
+  await openWorkbook(page,data);
   await page.locator('#libToggle').click();
+  const actions=page.locator('#library .lib-actions'),list=page.locator('#library .lib-body'),categories=page.locator('#libMainFolders');
+  await expect(actions.locator('#libCreateBlock,#folderNew')).toHaveCount(2);
+  await expect(list.locator('#libCreateBlock,#folderNew')).toHaveCount(0);
+  const before=await actions.boundingBox(),body=await list.boundingBox(),tabs=await categories.boundingBox();
+  expect(before.y).toBeGreaterThanOrEqual(body.y+body.height-1);expect(before.y+before.height).toBeLessThanOrEqual(tabs.y+1);
+  await list.evaluate(el=>el.scrollTop=el.scrollHeight);expect((await actions.boundingBox()).y).toBe(before.y);
+  await expect(page.locator('#folderNew')).toBeInViewport();
   const create=page.locator('#libCreate');
-  for(const [button,mode] of [['libNew','item'],['libNewPart','part'],['libNewCon','construct'],['libNewSvc','service'],['libNewSec','section'],['libNewScope','scope']]){
+  for(const [button,kind] of [['libNewLabor','labor'],['libNewEquipment','equip'],['libNewMaterial','material']]){
     await expect(page.locator('#'+button)).not.toBeVisible();
     await create.locator('summary').click();
     await page.locator('#'+button).click();
-    await expect(page.locator('#edTitle')).toHaveText('New '+mode);
+    await expect(page.locator('#edTitle')).toHaveText('New item');
+    await expect(page.locator('#libraryItemType')).toHaveValue(kind);
     await expect(create).not.toHaveAttribute('open','');
     await page.locator('#edCancel').click();
   }
   await create.locator('summary').press('Enter');
-  await expect(page.locator('#libNew')).toBeVisible();
+  await expect(page.locator('#libNewLabor')).toBeVisible();
   await create.locator('summary').press('Escape');
-  await expect(page.locator('#libNew')).not.toBeVisible();
+  await expect(page.locator('#libNewLabor')).not.toBeVisible();
+  await page.locator('#folderNew').fill('Footer folder');await page.locator('#folderAdd').click();
+  expect(await page.evaluate(()=>window.estimator.exportBook().folders)).toContain('Footer folder');
   await page.locator('.lib-save-existing > summary').click();
   await page.locator('#libCaptureType').selectOption('page');
   await expect(page.locator('#libCapScope')).toBeVisible();
+  await page.setViewportSize({width:390,height:600});await expect(categories).toBeInViewport();
 });
 
 test('library folders can be renamed with contents preserved and conflicting names rejected', async ({page}) => {
@@ -3613,11 +3625,15 @@ test('AI Information times out stalled requests and enables retry without a new 
 
 test('saved library items can change type without changing their data or existing takeoff rows',async({page})=>{
   const data=workbook();data.templates={items:[{id:'saved-item',name:'Saved type item',kind:'material',count:2,time:3,days:1,cost:25,markup:10,note:'Keep this detail',folder:'',meta:{category:'Legacy category',sku:'ABC'},files:[{id:'old-file',name:'Existing attachment',url:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='}],img:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='}],sections:[],scopes:[]};
+  data.gameCard=true;
   await openWorkbook(page,data);await page.locator('#libToggle').click();
   const item=page.locator('#libAll .tpl-wrap').filter({hasText:'Saved type item'}),editor=page.locator('#editor');
   const saved=()=>page.evaluate(()=>window.estimator.exportBook().templates.items.find(item=>item.id==='saved-item'));
   const original=await saved(),rows=await page.evaluate(()=>window.estimator.exportBook().sheets[0].rows);
   await item.getByRole('button',{name:'Edit',exact:true}).click();
+  await expect(editor.getByRole('button',{name:'Card view',exact:true})).toHaveCount(0);
+  await expect(editor.locator('.gcard')).toHaveCount(0);
+  expect(await page.evaluate(()=>window.estimator.exportBook().gameCard)).toBeUndefined();
   await expect(editor.locator('.ed-img,.ed-attach,.ed-meta,.ed-folder,.ed-notes')).toHaveCount(0);
   const type=editor.getByRole('combobox',{name:'Item type',exact:true});
   await expect(type).toHaveValue('material');await expect(type.locator('option')).toHaveText(['Labor','Equipment','Material']);
@@ -3626,8 +3642,7 @@ test('saved library items can change type without changing their data or existin
   expect(await saved()).toMatchObject({...original,kind:'labor'});await expect(item.locator('.tpl-tag')).toHaveText('Labor');
   await expect(page.locator('#server-status')).toHaveText('All changes saved');await page.reload();await page.locator('#libToggle').click();
   await item.getByRole('button',{name:'Edit',exact:true}).click();await expect(type).toHaveValue('labor');
-  await editor.getByRole('button',{name:'Card view',exact:true}).click();await type.selectOption('equip');
-  await expect(editor.locator('.gcard')).toHaveClass(/k-equip/);await expect(type).toHaveValue('equip');
+  await type.selectOption('equip');await expect(type).toHaveValue('equip');
   await expect(editor.locator('.gc-art,.gc-artholder,input[type="file"],.ed-img,.ed-attach,.ed-meta,.ed-folder,.ed-notes')).toHaveCount(0);
   await page.locator('#edSave').click();expect(await saved()).toMatchObject({...original,kind:'equip'});
   expect(await page.evaluate(()=>window.estimator.exportBook().sheets[0].rows)).toEqual(rows);

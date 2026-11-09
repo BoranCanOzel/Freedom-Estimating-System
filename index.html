@@ -1466,147 +1466,6 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
   .ed.ed-left .ed-grab{left:auto;right:0;border-radius:0 16px 16px 0}
   .lib.lib-target{box-shadow:inset 0 0 0 3px var(--amber),-14px 0 34px -26px rgba(19,23,25,.9)}
 
-  /* ---------- game card view ---------- */
-  .gcard{
-    position:relative;width:100%;max-width:330px;margin:0 auto 14px;
-    min-height:280px;display:flex;flex-direction:column;gap:9px;
-    padding:72px 14px 14px;border-radius:16px;
-    box-shadow:0 18px 34px -18px rgba(19,23,25,.7),
-               inset 0 0 0 2px rgba(255,255,255,.22),
-               inset 0 0 0 7px rgba(0,0,0,.22);
-  }
-  /* the frame texture changes with the item type */
-  .gcard.k-labor{
-    background:
-      repeating-linear-gradient(45deg, rgba(255,255,255,.05) 0 7px, rgba(0,0,0,.06) 7px 14px),
-      linear-gradient(160deg,#2E5470,#1B3346 70%);
-  }
-  .gcard.k-equip{
-    background:
-      repeating-linear-gradient(90deg, rgba(255,255,255,.07) 0 4px, rgba(0,0,0,.07) 4px 9px),
-      linear-gradient(160deg,#B27A1B,#6E4A0C 72%);
-  }
-  .gcard.k-part{
-    background:
-      repeating-linear-gradient(0deg, rgba(255,255,255,.06) 0 5px, rgba(0,0,0,.07) 5px 10px),
-      linear-gradient(160deg,#B9814F,#6B4326 72%);
-  }
-  .gcard.k-part .gc-orb{color:#6B4326}
-  .gcard.k-material{
-    background:
-      repeating-linear-gradient(-45deg, rgba(255,255,255,.06) 0 6px, rgba(0,0,0,.07) 6px 12px),
-      linear-gradient(160deg,#6E8355,#3F4E31 72%);
-  }
-
-  .gc-orb{
-    position:absolute;top:9px;left:9px;z-index:3;
-    width:54px;height:54px;border-radius:50%;cursor:pointer;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
-    background:radial-gradient(circle at 34% 30%, #FDFBF4, #D8CFB8 70%, #A99C7E);
-    border:3px solid rgba(19,23,25,.45);color:#2A2A22;
-    box-shadow:0 3px 7px rgba(0,0,0,.4), inset 0 0 6px rgba(255,255,255,.7);
-  }
-  .gc-orb i{display:flex;line-height:0}
-  .gc-orb b{font-family:var(--f-cond);font-size:7.5px;
-    letter-spacing:.05em;text-transform:uppercase;font-weight:700}
-  .gcard.k-labor .gc-orb{color:#1B3346}
-  .gcard.k-equip .gc-orb{color:#6E4A0C}
-  .gcard.k-material .gc-orb{color:#3F4E31}
-
-  /* meta type badge, upper right */
-  .gc-meta{
-    position:absolute;top:11px;right:11px;z-index:3;
-    display:flex;flex-direction:column;align-items:center;gap:1px;
-    min-width:46px;padding:4px 7px 3px;border-radius:5px;
-    background:linear-gradient(180deg,#F6F1E2,#CFC3A2);
-    border:2px solid rgba(19,23,25,.5);color:#3A3324;
-    box-shadow:0 3px 7px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.8);
-  }
-  .gc-meta i{display:flex;line-height:0}
-  .gc-meta b{
-    font-family:var(--f-cond);font-size:7.5px;font-weight:700;
-    letter-spacing:.06em;text-transform:uppercase;
-  }
-
-  /* the item name banner */
-  .gc-banner{
-    position:relative;z-index:2;flex:none;
-    width:calc(100% - 18px);margin:0 auto;padding:5px 12px;
-    background:linear-gradient(180deg,#F6F1E2,#D9CDAB 62%,#C0B189);
-    border:2px solid rgba(19,23,25,.55);border-radius:5px;
-    box-shadow:0 5px 12px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.85),
-               inset 0 0 0 1px rgba(122,94,20,.5);
-  }
-  .gc-banner::before,.gc-banner::after{
-    content:'';position:absolute;top:50%;width:15px;height:22px;
-    transform:translateY(-50%);z-index:-1;
-    background:linear-gradient(180deg,#C4B489,#8C7A4B);
-    border:2px solid rgba(19,23,25,.55);
-  }
-  .gc-banner::before{left:-13px;clip-path:polygon(0 0,100% 0,100% 100%,0 100%,34% 50%)}
-  .gc-banner::after{right:-13px;clip-path:polygon(0 0,100% 0,66% 50%,100% 100%,0 100%)}
-  .gc-name{
-    width:100%;border:0;background:transparent;text-align:center;
-    font-family:var(--f-cond);font-weight:700;font-size:15px;
-    letter-spacing:.01em;color:#241F16;
-  }
-  .gc-name:focus{outline:none}
-  .gc-name::placeholder{color:#9A907A}
-
-  .gc-text{
-    position:relative;flex:1;min-height:120px;border-radius:5px;padding:8px 9px;
-    background:linear-gradient(180deg,#F7F3E7,#E7E0CB);
-    border:3px solid rgba(19,23,25,.5);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.7);
-  }
-  .gc-text textarea{
-    width:100%;height:100%;border:0;background:transparent;resize:none;
-    font-family:var(--f-sans);font-size:11.5px;line-height:1.45;color:#2A2419;
-  }
-  .gc-text textarea:focus{outline:none}
-  .gc-mk{
-    position:absolute;top:-9px;right:6px;
-    background:#8C2E24;color:#F6EDE2;border:2px solid rgba(19,23,25,.5);border-radius:9px;
-    font-family:var(--f-mono);font-size:9px;padding:1px 6px;
-  }
-
-  .gc-foot{flex:none;display:flex;align-items:center;justify-content:flex-start;gap:9px}
-  .gc-uom{
-    display:flex;align-items:center;min-width:70px;padding:5px 10px;border-radius:14px;
-    background:linear-gradient(180deg,#EFE9D8,#C9BE9F);
-    border:3px solid rgba(19,23,25,.5);
-    box-shadow:0 3px 8px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.7);
-  }
-  .gc-uom input{
-    width:100%;min-width:0;border:0;background:transparent;text-align:center;
-    font-family:var(--f-mono);font-size:12.5px;font-weight:600;color:#3A3324;
-  }
-  .gc-uom input:focus{outline:none}
-  .gc-uom input::placeholder{color:#8B8168}
-  .gcard.k-service .gc-orb{color:#1F544E}
-  .gcard.k-construct .gc-orb{color:#333F4C}
-  .gcard.k-hybrid{
-    background:
-      repeating-linear-gradient(60deg, rgba(255,255,255,.06) 0 5px, rgba(0,0,0,.07) 5px 11px),
-      linear-gradient(160deg,#8E72A6,#4E3C63 72%);
-  }
-  .gcard.k-hybrid .gc-orb{color:#4E3C63}
-  .gc-cost{
-    display:flex;align-items:center;gap:3px;min-width:126px;justify-content:center;
-    padding:5px 14px;border-radius:20px;
-    background:linear-gradient(180deg,#F7E3A8,#D8B455 58%,#B8912F);
-    border:3px solid #7A5E14;
-    box-shadow:0 3px 8px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.7);
-  }
-  .gc-cost span{
-    font-family:var(--f-mono);font-size:13px;font-weight:600;color:#4A390B;
-  }
-  .gc-cost input{
-    width:74px;border:0;background:transparent;text-align:center;
-    font-family:var(--f-mono);font-size:15px;font-weight:600;color:#3A2C06;
-  }
-  .gc-cost input:focus{outline:none}
-
   .con-pack{padding:2px 0 0;border-left:3px solid var(--part);padding-left:10px}
   .con-total{
     display:flex;align-items:center;justify-content:space-between;gap:10px;
@@ -1620,11 +1479,6 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
   .con-total b{font-family:var(--f-mono);font-size:16px;color:var(--slate)}
   td.calc.cost-sum{background:var(--s44);cursor:help}
   td.calc.cost-sum .money{color:var(--slate);font-weight:600}
-  .gcard.k-construct{
-    background:
-      repeating-linear-gradient(45deg, rgba(255,255,255,.06) 0 5px, rgba(0,0,0,.08) 5px 11px),
-      linear-gradient(160deg,#5D6E7E,#333F4C 72%);
-  }
 
   .svc-pack{padding:2px 0 0;border-left:3px solid var(--service);padding-left:10px}
   .svc-pack .ed-table,.con-pack .ed-table{table-layout:fixed}
@@ -1666,11 +1520,6 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
   .svc-total .line{border-top:1px dashed var(--rule-strong);padding-top:5px;margin-top:2px}
   .svc-total .line b{font-size:13px;color:var(--muted)}
   .ed-mini-c.baserate{width:88px}
-  .gcard.k-service{
-    background:
-      repeating-linear-gradient(135deg, rgba(255,255,255,.06) 0 6px, rgba(0,0,0,.07) 6px 12px),
-      linear-gradient(160deg,#3E8C82,#1F544E 72%);
-  }
 
   /* rounding controls */
   td.c-round,td.calc.round{background:var(--s47)}
@@ -2934,10 +2783,6 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
     <button type="button" class="lib-close" id="libClose" aria-label="Close the library">&times;</button>
   </div>
   <div class="lib-body">
-    <div class="lib-newfolder">
-      <input id="folderNew" placeholder="New folder name">
-      <button type="button" class="btn alt tiny" id="folderAdd">Add</button>
-    </div>
     <datalist id="folderList"></datalist>
 
     <div id="libTemplates">
@@ -2945,6 +2790,9 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
       <div class="lib-list" id="libAll"></div>
     </div>
 
+    </div>
+  </div>
+  <section class="lib-actions" aria-label="Library actions">
     <div class="lib-block" id="libCreateBlock">
       <details class="lib-create" id="libCreate">
         <summary>+ Create template <span aria-hidden="true">⌄</span></summary>
@@ -2966,9 +2814,11 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
       </details>
     </div>
 
+    <div class="lib-newfolder">
+      <input id="folderNew" placeholder="New folder name">
+      <button type="button" class="btn alt tiny" id="folderAdd">Add</button>
     </div>
-
-  </div>
+  </section>
   <nav id="libMainFolders" aria-label="Main library folders"></nav>
   <div class="lib-foot">Drag onto a folder to organize, or onto the sheet to place an item.</div>
 </aside>
@@ -7034,6 +6884,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   function adoptBook(bk){
     book = bk;
     delete book.catalog;
+    delete book.gameCard;
     if (book.edW) delete book.edW.subtype;
     book.sheets.forEach((sh, i) => {
       normalize(sh);
@@ -8842,102 +8693,6 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     return box;
   }
 
-  const KIND_TAG = {labor:'Labor', equip:'Equipment', material:'Material', part:'Parts', service:'Service', construct:'Construct', none:'Blank', hybrid:'Hybrid'};
-
-  // a playing-card skin over the same draft
-  const META_TAG = {part:'Parts', service:'Service', construct:'Construct'};
-
-  function gameCard(d){
-    const kind = (d.kind && d.kind !== 'none') ? d.kind : 'labor';
-    const mainK = derivedKind(d) || kind;         // what the card is actually built from
-    const metaK = META_TAG[kind] ? kind : null;   // parts, service, construct — or a plain item
-    const card = document.createElement('div');
-    card.className = 'gcard k-' + kind;
-
-    // main type in the far top left, the way a mana gem sits on a Hearthstone card
-    const orb = document.createElement('button');
-    orb.type = 'button';
-    orb.className = 'gc-orb';
-    orb.title = 'Click to change the type';
-    orb.innerHTML = '<i>' + iconSvg(mainK, 'kind-ico') + '</i><b>' + KIND_TAG[mainK] + '</b>';
-    orb.addEventListener('click', () => {
-      d.kind = KIND_KEYS[(KIND_KEYS.indexOf(kind) + 1) % KIND_KEYS.length];
-      renderEditor();
-    });
-
-    // meta type in the upper right
-    const meta = document.createElement('div');
-    meta.className = 'gc-meta';
-    meta.title = metaK ? 'This is a ' + META_TAG[metaK].toLowerCase() + ' card' : 'A plain item card';
-    meta.innerHTML = '<i>' + iconSvg(metaK || 'material', 'kind-ico') + '</i><b>' +
-                     (metaK ? META_TAG[metaK] : 'Item') + '</b>';
-
-    const banner = document.createElement('div');
-    banner.className = 'gc-banner';
-    const nm = document.createElement('input');
-    nm.className = 'gc-name';
-    nm.value = d.name || '';
-    nm.placeholder = 'Card name';
-    nm.addEventListener('input', () => { d.name = nm.value; });
-    banner.appendChild(nm);
-
-    const text = document.createElement('div');
-    text.className = 'gc-text';
-    const ta = document.createElement('textarea');
-    ta.value = d.note || '';
-    ta.placeholder = 'What this covers\u2026';
-    ta.addEventListener('input', () => { d.note = ta.value; });
-    text.appendChild(ta);
-    if (num(d.markup)){
-      const mk = document.createElement('span');
-      mk.className = 'gc-mk';
-      mk.textContent = '+' + num(d.markup) + '%';
-      mk.title = 'Markup';
-      text.appendChild(mk);
-    }
-
-    const foot = document.createElement('div');
-    foot.className = 'gc-foot';
-    const plate = document.createElement('div');
-    plate.className = 'gc-cost';
-    const sign = document.createElement('span');
-    sign.textContent = '$';
-    const cost = document.createElement('input');
-    cost.inputMode = 'decimal';
-    cost.value = d.cost == null ? '' : d.cost;
-    cost.placeholder = '0.00';
-    cost.addEventListener('input', () => { d.cost = cost.value.replace(/,/g, ''); });
-    plate.append(sign, cost);
-
-    const uom = document.createElement('div');
-    uom.className = 'gc-uom';
-    const ui = document.createElement('input');
-    ui.autocomplete = 'off';
-    ui.placeholder = 'UoM';
-    ui.title = 'Unit of measurement';
-    ui.value = d.uom == null ? '' : d.uom;
-    ui.addEventListener('input', () => { d.uom = ui.value; });
-    uom.appendChild(ui);
-
-    foot.append(plate, uom);
-
-    card.append(orb, meta, banner, text, foot);
-    return card;
-  }
-
-  function cardViewToggle(){
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'btn alt tiny wide';
-    b.textContent = book.gameCard ? 'Back to the form' : 'Card view';
-    b.addEventListener('click', () => {
-      book.gameCard = !book.gameCard;
-      renderEditor();
-      save();
-    });
-    return b;
-  }
-
   let partDraft = null, conDraft = null;
 
   function renderPartEd(box){
@@ -9305,16 +9060,8 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     typeSelect.value=MAIN_KINDS.includes(d.kind)?d.kind:'';
     typeSelect.addEventListener('change',()=>{
       d.kind=typeSelect.value;
-      if(book.gameCard){renderEditor();document.getElementById('libraryItemType').focus();}
     });
     typeField.append(typeSelect);box.append(typeField);
-
-    if (book.gameCard){
-      box.appendChild(gameCard(d));
-      box.appendChild(cardViewToggle());
-      return;
-    }
-
 
     const nameBox = document.createElement('div');
     nameBox.className = 'ed-namebox';
@@ -9343,7 +9090,6 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     nameBox.appendChild(miniGrid(d));
     box.appendChild(nameBox);
 
-    box.appendChild(cardViewToggle());
   }
 
   function armPackDrag(e, el, it, list){
@@ -10295,7 +10041,6 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   });
 
   const libraryCreate = document.getElementById('libCreate');
-  document.getElementById('libTemplates').prepend(document.getElementById('libCreateBlock'));
   libraryCreate.addEventListener('click', event => {
     if (event.target.closest('button')) libraryCreate.open = false;
   });
@@ -11703,7 +11448,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   // The server adapter keeps navigation local and shares canonical data only.
   const personalRoot = new Set(['view','active','activeTakeoff','activeList','activeLib',
     'theme','dark','zoom','libW','projW','edW','sumWidths','sumOpen','sumSectionClosed','sumDetail',
-    'statusHidden','fieldPicks','picsOn','gameCard','stOpen']);
+    'statusHidden','fieldPicks','picsOn','stOpen']);
   const personalNested = new Set(['active','activeFolder','collapsed','shut','noteOpen','widths','hiddenCols','roundColumnVisible','loadShut']);
   const aliases = new Set(['sheets','companies','templates','folders','_app','_v']);
   let personal = new Map();
