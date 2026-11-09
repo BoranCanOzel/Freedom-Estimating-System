@@ -828,6 +828,8 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
     font-size:14px;line-height:1;padding:3px 5px;border-radius:3px;
   }
   .tpl-btn:hover{background:var(--s27);color:var(--slate)}
+  .tpl-btn.tpl-duplicate{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;padding:4px}
+  .tpl-duplicate:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
   .tpl-btn.rm:hover{background:var(--s28);color:#B23A2E}
   .folder-rename-form{display:flex;align-items:center;gap:4px;flex:1;min-width:0;flex-wrap:wrap}
   .folder-rename-form input{flex:1;min-width:70px;width:90px;padding:5px;border:1px solid var(--rule);border-radius:3px;background:var(--card);color:var(--ink);font:inherit}
@@ -1025,11 +1027,6 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
   .ed-img-hint b{font-weight:400}
   .img-x{position:absolute;top:5px;right:5px;background:rgba(255,255,255,.9)}
 
-  .ed-notes textarea{margin-top:9px;min-height:70px}
-  .ed-notes.locked textarea{
-    background:var(--s39);color:var(--muted);border-style:solid;cursor:default;
-  }
-  .ed-notes.locked textarea:focus{outline:none}
   .ed-namebox,.ed-meta{
     border:1.5px solid var(--slate);border-radius:6px;padding:11px;background:var(--card);margin-bottom:14px;
   }
@@ -1472,8 +1469,8 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
   /* ---------- game card view ---------- */
   .gcard{
     position:relative;width:100%;max-width:330px;margin:0 auto 14px;
-    aspect-ratio:5/7;display:flex;flex-direction:column;gap:9px;
-    padding:15px 14px 14px;border-radius:16px;
+    min-height:280px;display:flex;flex-direction:column;gap:9px;
+    padding:72px 14px 14px;border-radius:16px;
     box-shadow:0 18px 34px -18px rgba(19,23,25,.7),
                inset 0 0 0 2px rgba(255,255,255,.22),
                inset 0 0 0 7px rgba(0,0,0,.22);
@@ -1531,10 +1528,10 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
     letter-spacing:.06em;text-transform:uppercase;
   }
 
-  /* the name banner slung under the art */
+  /* the item name banner */
   .gc-banner{
     position:relative;z-index:2;flex:none;
-    width:calc(100% - 18px);margin:-15px auto 0;padding:5px 12px;
+    width:calc(100% - 18px);margin:0 auto;padding:5px 12px;
     background:linear-gradient(180deg,#F6F1E2,#D9CDAB 62%,#C0B189);
     border:2px solid rgba(19,23,25,.55);border-radius:5px;
     box-shadow:0 5px 12px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.85),
@@ -1556,23 +1553,8 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
   .gc-name:focus{outline:none}
   .gc-name::placeholder{color:#9A907A}
 
-  .gc-art{
-    flex:0 0 38%;border-radius:5px;overflow:hidden;cursor:pointer;
-    border:4px solid rgba(19,23,25,.55);background:#0F1418;
-    display:flex;align-items:center;justify-content:center;
-    box-shadow:inset 0 0 14px rgba(0,0,0,.6);
-  }
-  .gc-art{position:relative}
-  .gc-art img{position:absolute;inset:0;width:100%;height:100%;display:block}
-  .gc-art-bg{object-fit:cover;filter:blur(9px) brightness(.55);transform:scale(1.12)}
-  .gc-art-fg{object-fit:contain}
-  .gc-artholder{
-    font-family:var(--f-mono);font-size:9.5px;letter-spacing:.12em;
-    text-transform:uppercase;color:rgba(255,255,255,.5);
-  }
-
   .gc-text{
-    position:relative;flex:1;min-height:0;border-radius:5px;padding:8px 9px;
+    position:relative;flex:1;min-height:120px;border-radius:5px;padding:8px 9px;
     background:linear-gradient(180deg,#F7F3E7,#E7E0CB);
     border:3px solid rgba(19,23,25,.5);
     box-shadow:inset 0 1px 0 rgba(255,255,255,.7);
@@ -2908,11 +2890,13 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
   <div class="lib-body">
     <div class="lib-block">
       <p class="lib-hint">Shared Human Information notes, available across your workbooks.</p>
-      <button type="button" class="btn alt tiny" id="noteAdd">+ New note</button>
-      <button type="button" class="btn alt tiny" id="notesOpenHuman">Open full notebook</button>
     </div>
     <div class="lib-block"><div class="lib-list" id="notesList"></div></div>
   </div>
+  <footer class="lib-foot notes-actions">
+    <button type="button" class="btn alt tiny" id="noteAdd">+ New note</button>
+    <button type="button" class="btn alt tiny" id="notesOpenHuman">Open full notebook</button>
+  </footer>
 </aside>
 
 <aside id="projects" class="proj" aria-label="Project list">
@@ -7507,7 +7491,9 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     edit.addEventListener('click', e => { e.stopPropagation(); onEdit(); });
 
     const duplicate = document.createElement('button');
-    duplicate.type = 'button'; duplicate.className = 'tpl-btn'; duplicate.textContent = 'Duplicate';
+    duplicate.type = 'button'; duplicate.className = 'tpl-btn tpl-duplicate';
+    duplicate.setAttribute('aria-label','Duplicate');
+    duplicate.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="8" height="8" rx="1.5"/><path d="M6 12v1a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-1"/></svg>';
     duplicate.title = 'Duplicate this template';
     duplicate.addEventListener('click', e => { e.stopPropagation(); duplicateTemplate(t, kind); });
 
@@ -8813,27 +8799,6 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     return head;
   }
 
-  function notesBlock(d){
-    const box = document.createElement('div');
-    box.className = 'ed-namebox ed-notes' + (d.notesLocked ? ' locked' : '');
-    box.appendChild(blockHead(d, 'Notes', 'notesLocked', 'notesOpen'));
-    if (d.notesOpen === false) return box;
-
-    const ta = document.createElement('textarea');
-    ta.className = 'ed-note tpl-notes';
-    ta.rows = 4;
-    ta.value = d.notes || '';
-    if (d.notesLocked){
-      ta.readOnly = true;
-      ta.placeholder = 'Locked \u2014 open the padlock to write';
-    } else {
-      ta.placeholder = 'Anything worth remembering about this one';
-      ta.addEventListener('input', () => { d.notes = ta.value; });
-    }
-    box.appendChild(ta);
-    return box;
-  }
-
   function readOnlyLine(label, value){
     const r = document.createElement('div');
     r.className = 'ro-line';
@@ -8879,7 +8844,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
   const KIND_TAG = {labor:'Labor', equip:'Equipment', material:'Material', part:'Parts', service:'Service', construct:'Construct', none:'Blank', hybrid:'Hybrid'};
 
-  // a playing-card skin over the same draft — name, art, text and cost stay editable
+  // a playing-card skin over the same draft
   const META_TAG = {part:'Parts', service:'Service', construct:'Construct'};
 
   function gameCard(d){
@@ -8907,26 +8872,6 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     meta.innerHTML = '<i>' + iconSvg(metaK || 'material', 'kind-ico') + '</i><b>' +
                      (metaK ? META_TAG[metaK] : 'Item') + '</b>';
 
-    const art = document.createElement('div');
-    art.className = 'gc-art';
-    if (d.img){
-      const bg = document.createElement('img');
-      bg.src = d.img;
-      bg.alt = '';
-      bg.className = 'gc-art-bg';
-      const im = document.createElement('img');
-      im.src = d.img;
-      im.alt = '';
-      im.className = 'gc-art-fg';
-      art.append(bg, im);
-    } else {
-      art.innerHTML = '<span class="gc-artholder">Click to add art</span>';
-    }
-    art.addEventListener('click', () => {
-      pickPicture(url => { d.img = url; renderEditor(); }, 640, 0.8);
-    });
-
-    // the name rides a banner slung under the art
     const banner = document.createElement('div');
     banner.className = 'gc-banner';
     const nm = document.createElement('input');
@@ -8976,7 +8921,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
     foot.append(plate, uom);
 
-    card.append(orb, meta, art, banner, text, foot);
+    card.append(orb, meta, banner, text, foot);
     return card;
   }
 
@@ -9351,6 +9296,18 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
   function renderItemEd(box){
     const d = itemDraft;
+    const typeField=document.createElement('label');typeField.className='ed-f';typeField.textContent='Item type';
+    const typeSelect=document.createElement('select');typeSelect.id='libraryItemType';typeSelect.className='ed-select';
+    if(!MAIN_KINDS.includes(d.kind)){
+      const previous=new Option(KINDS[d.kind]||'Choose item type','');previous.disabled=true;typeSelect.add(previous);
+    }
+    for(const kind of MAIN_KINDS)typeSelect.add(new Option(KINDS[kind],kind));
+    typeSelect.value=MAIN_KINDS.includes(d.kind)?d.kind:'';
+    typeSelect.addEventListener('change',()=>{
+      d.kind=typeSelect.value;
+      if(book.gameCard){renderEditor();document.getElementById('libraryItemType').focus();}
+    });
+    typeField.append(typeSelect);box.append(typeField);
 
     if (book.gameCard){
       box.appendChild(gameCard(d));
@@ -9358,7 +9315,6 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       return;
     }
 
-    box.appendChild(imageBlock(d));
 
     const nameBox = document.createElement('div');
     nameBox.className = 'ed-namebox';
@@ -9374,7 +9330,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     nm.placeholder = 'Item name';
     nm.value = d.name || '';
     nm.addEventListener('input', () => { d.name = nm.value; });
-    top.append(nm, kindMenu(d));
+    top.append(nm);
     nameBox.appendChild(top);
 
     const note = document.createElement('textarea');
@@ -9387,10 +9343,6 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     nameBox.appendChild(miniGrid(d));
     box.appendChild(nameBox);
 
-    box.appendChild(metaBlock(d));
-    box.appendChild(attachBlock(d));
-    box.appendChild(folderField(d));
-    box.appendChild(notesBlock(d));
     box.appendChild(cardViewToggle());
   }
 

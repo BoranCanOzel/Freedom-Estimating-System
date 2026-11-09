@@ -2718,6 +2718,36 @@ test('left sidebar frees the top edge, remembers its size and keeps menus and pa
   await page.screenshot({path:'.tools/workspace-sidebar-mobile.png'});
 });
 
+test('Christmas section bands cover every pricing column and distinguish nested levels',async({page})=>{
+  const data=workbook(),sh=data.lists[0].companies[0].projects[0].takeoffs[0].sheets[0];
+  sh.hiddenCols=[];sh.fees=[{id:'fee-a',label:'Fee',pct:3},{id:'fee-b',label:'Other fee',pct:2}];
+  sh.units=[{id:'sf',label:'SF',qty:100},{id:'lf',label:'LF',qty:20}];
+  sh.rows=[{id:'root',type:'section',name:'Main section'},...Array.from({length:3},(_,i)=>({id:'child-'+(i+1),type:'section',name:'Subsection level '+(i+1)})),
+    {id:'priced',kind:'labor',name:'Crew',count:1,time:2,days:1,cost:50,markup:10},
+    ...[3,2,1].map(level=>({id:'end-'+level,type:'sectionEnd',sid:'child-'+level})),{id:'end-root',type:'sectionEnd',sid:'root'}];
+  await openWorkbook(page,data);await page.evaluate(()=>window.estimator.setTheme('christmas'));
+  const row=id=>page.locator('#body tr[data-id="'+id+'"]');
+  const colors=async id=>row(id).locator(':scope > td').evaluateAll(cells=>cells.map(cell=>getComputedStyle(cell).backgroundColor));
+  const checkBands=async()=>{
+    const levels=[];
+    for(const id of ['root','child-1','child-2','child-3']){
+      const backgrounds=await colors(id);expect(new Set(backgrounds).size).toBe(1);expect(backgrounds[0]).not.toBe('rgba(0, 0, 0, 0)');levels.push(backgrounds[0]);
+      const contrast=await row(id).evaluate(el=>{
+        const luminance=color=>color.match(/[\d.]+/g).slice(0,3).map(Number).map(n=>{n/=255;return n<=.04045?n/12.92:((n+.055)/1.055)**2.4;}).reduce((sum,n,i)=>sum+n*[.2126,.7152,.0722][i],0);
+        const a=luminance(getComputedStyle(el.querySelector('.name-in')).color),b=luminance(getComputedStyle(el.querySelector('td')).backgroundColor);return(Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+      });expect(contrast).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(new Set(levels).size).toBe(4);expect(levels[0]).toBe('rgb(139, 31, 46)');
+  };
+  await checkBands();await row('root').hover();await checkBands();
+  await expect(row('child-1').locator('.subsection-badge')).toHaveText('Subsection 1.1');
+  const before=await colors('root');await row('root').locator('.caret').click();await expect(row('root')).toHaveClass(/collapsed/);
+  expect(await colors('root')).toEqual(before);await expect(row('root').locator('td.grand .money')).toBeVisible();
+  await row('root').locator('.caret').click();await page.setViewportSize({width:2200,height:1100});
+  await page.screenshot({path:'test-results/christmas-section-bands.png',fullPage:true});
+  await page.setViewportSize({width:390,height:844});await checkBands();
+});
+
 test('seasonal styles stay readable, persist, and keep decoration away from editing and print',async({page})=>{
   await openWorkbook(page);
   for(const theme of ['christmas','halloween']){
@@ -3581,6 +3611,32 @@ test('AI Information times out stalled requests and enables retry without a new 
   await expect(page.locator('#ai-info-status')).toHaveText('Library loaded.');
 });
 
+test('saved library items can change type without changing their data or existing takeoff rows',async({page})=>{
+  const data=workbook();data.templates={items:[{id:'saved-item',name:'Saved type item',kind:'material',count:2,time:3,days:1,cost:25,markup:10,note:'Keep this detail',folder:'',meta:{category:'Legacy category',sku:'ABC'},files:[{id:'old-file',name:'Existing attachment',url:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='}],img:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='}],sections:[],scopes:[]};
+  await openWorkbook(page,data);await page.locator('#libToggle').click();
+  const item=page.locator('#libAll .tpl-wrap').filter({hasText:'Saved type item'}),editor=page.locator('#editor');
+  const saved=()=>page.evaluate(()=>window.estimator.exportBook().templates.items.find(item=>item.id==='saved-item'));
+  const original=await saved(),rows=await page.evaluate(()=>window.estimator.exportBook().sheets[0].rows);
+  await item.getByRole('button',{name:'Edit',exact:true}).click();
+  await expect(editor.locator('.ed-img,.ed-attach,.ed-meta,.ed-folder,.ed-notes')).toHaveCount(0);
+  const type=editor.getByRole('combobox',{name:'Item type',exact:true});
+  await expect(type).toHaveValue('material');await expect(type.locator('option')).toHaveText(['Labor','Equipment','Material']);
+  await type.selectOption('equip');await page.locator('#edCancel').click();expect(await saved()).toEqual(original);
+  await item.getByRole('button',{name:'Edit',exact:true}).click();await type.selectOption('labor');await page.locator('#edSave').click();
+  expect(await saved()).toMatchObject({...original,kind:'labor'});await expect(item.locator('.tpl-tag')).toHaveText('Labor');
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');await page.reload();await page.locator('#libToggle').click();
+  await item.getByRole('button',{name:'Edit',exact:true}).click();await expect(type).toHaveValue('labor');
+  await editor.getByRole('button',{name:'Card view',exact:true}).click();await type.selectOption('equip');
+  await expect(editor.locator('.gcard')).toHaveClass(/k-equip/);await expect(type).toHaveValue('equip');
+  await expect(editor.locator('.gc-art,.gc-artholder,input[type="file"],.ed-img,.ed-attach,.ed-meta,.ed-folder,.ed-notes')).toHaveCount(0);
+  await page.locator('#edSave').click();expect(await saved()).toMatchObject({...original,kind:'equip'});
+  expect(await page.evaluate(()=>window.estimator.exportBook().sheets[0].rows)).toEqual(rows);
+  const duplicate=item.getByRole('button',{name:'Duplicate',exact:true});
+  await expect(duplicate).toHaveText('');await expect(duplicate.locator('svg')).toHaveCount(1);await duplicate.click();
+  const copies=await page.evaluate(()=>window.estimator.exportBook().templates.items);
+  expect(copies).toHaveLength(2);expect(copies[1]).toMatchObject({name:'Saved type item (copy)',kind:'equip',cost:25,note:'Keep this detail'});expect(copies[1].id).not.toBe(original.id);
+});
+
 test('removing Catalog preserves template details and the remaining right drawers',async({page})=>{
   const data=workbook(),errors=[];page.on('pageerror',error=>errors.push(error.message));
   data.catalog={folders:['Blades'],subtypes:[{id:'blade-size',name:'Blade size',options:['14 inch'],offerItem:true}]};
@@ -3591,12 +3647,11 @@ test('removing Catalog preserves template details and the remaining right drawer
   await expect(page.locator('#catalog, #catToggle')).toHaveCount(0);
   await page.locator('#libToggle').click();
   await page.locator('#libAll .tpl-wrap').filter({hasText:'Blade template'}).getByRole('button',{name:'Edit',exact:true}).click();
-  await expect(page.locator('#edBody input[placeholder="Field"]')).toHaveValue('Blade size');
-  await expect(page.locator('#edBody input[placeholder="Value"]')).toHaveValue('14 inch');
-  await page.locator('#edBody input[placeholder="Value"]').fill('16 inch');await page.locator('#edSave').click();
+  await expect(page.locator('#edBody .ed-meta')).toHaveCount(0);
+  await page.locator('#edSave').click();
   const saved=await page.evaluate(()=>window.estimator.exportBook());
   expect(saved.catalog).toBeUndefined();expect(saved.edW?.subtype).toBeUndefined();
-  expect(saved.templates.items[0].meta.subtypes[0].value).toBe('16 inch');
+  expect(saved.templates.items[0].meta.subtypes[0].value).toBe('14 inch');
   await page.locator('#notesToggle').click();await expect(page.locator('body')).toHaveClass(/notes-open/);
   await expect(page.locator('body')).not.toHaveClass(/lib-open/);
   await page.locator('#notesClose').click();await page.locator('#libToggle').click();

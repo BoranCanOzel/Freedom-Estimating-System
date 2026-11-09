@@ -636,58 +636,44 @@ body.server-mode.christmas.cards #sheetTable tfoot tr{background:#0D1C15;border-
 body.server-mode.christmas.cards #sheetTable tfoot td.grand .money{color:var(--fx3);text-shadow:0 0 10px rgba(245,196,81,.7)}
 body.server-mode.christmas.cards .deck-hint{color:#9CC6B1}
 
-/* section heads: a band in the theme's main colour at the top level, then three level colours */
-body.server-mode.christmas #sheetTable tr.section-head{--ink:#FFFFFF;--muted:#F9CCD2;--faint:#F49AA4;--slate:#FFFFFF}
-body.server-mode.christmas #sheetTable tbody tr.section-head{
-background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 6' preserveAspectRatio='none'%3E%3Cpath d='M0 0 H80 V2.4 C75 5 71 3.2 66 4.2 C60 6 56 3 50 4 C44 5.8 40 2.6 34 3.8 C28 5.6 24 3 18 4 C12 5.8 6 3.2 0 4.2 Z' fill='%23F4F8FB' opacity='.88'/%3E%3C/svg%3E") left top/80px 6px repeat-x,linear-gradient(90deg,rgba(232,52,74,.5) 58%,rgba(245,196,81,.2) 80%,rgba(91,214,154,.05)),#2E0A12;
+/* Section bands use the live depth attributes and cover every pricing cell. */
+body.server-mode.christmas #sheetTable tbody :is(tr.section-head,tr.section-foot){
+--section-fill:#8B1F2E;--section-edge:#E47A87;--section-soft:#FFE1E6;--section-footer:#30141C;
+--ink:#FFFFFF;--muted:#FFE1E6;--faint:#F4B8C1;--slate:#FFFFFF;
+--section-snow:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 6' preserveAspectRatio='none'%3E%3Cpath d='M0 0 H80 V2.4 C75 5 71 3.2 66 4.2 C60 6 56 3 50 4 C44 5.8 40 2.6 34 3.8 C28 5.6 24 3 18 4 C12 5.8 6 3.2 0 4.2 Z' fill='%23F4F8FB' opacity='.88'/%3E%3C/svg%3E");
 }
-body.server-mode.dark.christmas #sheetTable tbody tr.section-head[data-lvl] td,
-body.server-mode.dark.christmas #sheetTable tbody tr.section-head[data-lvl]:hover td{
-background:transparent;border-top-color:rgba(232,52,74,.65);border-bottom-color:rgba(232,52,74,.65);border-right-color:transparent;
+body.server-mode.christmas #sheetTable tbody :is(tr.section-head,tr.section-foot).tree-child{
+--section-fill:#284650;--section-edge:#8EC8D8;--section-soft:#DCF5FF;--section-footer:#152F35;--section-snow:none;
 }
-body.server-mode.christmas #sheetTable tbody tr.section-head td.c-item{background-color:#8B1F2E;border-left-color:var(--fx1)}
-body.server-mode.dark.christmas #sheetTable tbody tr.section-head[data-lvl] .name-in{
-color:#FFFFFF;text-shadow:0 0 8px rgba(232,52,74,.95),0 0 2px rgba(255,255,255,.5);
+body.server-mode.christmas #sheetTable tbody :is(tr.section-head,tr.section-foot)[data-depth="1"]{
+--section-fill:#234F3A;--section-edge:#7DCCA4;--section-soft:#DCF8E9;--section-footer:#102F22;
 }
-body.server-mode.christmas #sheetTable tr.section-head .name-in::placeholder{color:#F6AEB7;text-shadow:none}
-body.server-mode.christmas #sheetTable tr.section-head .caret{color:#FFFFFF}
-body.server-mode.christmas #sheetTable tr.section-head .caret:hover{background:rgba(255,255,255,.14)}
-body.server-mode.christmas #sheetTable tr.section-head .grip{color:#F9CCD2!important}
-body.server-mode.christmas #sheetTable tr.section-head .del{color:#FAD2D7}
-body.server-mode.christmas #sheetTable tr.section-head .money{color:#FFFFFF;text-shadow:0 0 6px rgba(232,52,74,.7)}
-body.server-mode.christmas #sheetTable tbody tr.section-head td.calc.grand{background:rgba(0,0,0,.2)}
-body.server-mode.christmas #sheetTable tr.section-head td.calc.grand .money{color:var(--fx3);text-shadow:0 0 7px rgba(245,196,81,.7)}
-body.server-mode.christmas .sec-unit input{background:rgba(6,13,10,.6);border-color:rgba(91,214,154,.4);color:#FFFFFF}
-body.server-mode.christmas .sec-unit input.lab{background:transparent;border-color:rgba(255,255,255,.2);color:#F9C6CC}
-body.server-mode.christmas #sheetTable tbody tr.section-head.nested[data-lvl="1"]{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 6' preserveAspectRatio='none'%3E%3Cpath d='M0 0 H80 V2.4 C75 5 71 3.2 66 4.2 C60 6 56 3 50 4 C44 5.8 40 2.6 34 3.8 C28 5.6 24 3 18 4 C12 5.8 6 3.2 0 4.2 Z' fill='%23F4F8FB' opacity='.88'/%3E%3C/svg%3E") left top/80px 6px repeat-x,linear-gradient(90deg,rgba(91,214,154,.32) 58%,rgba(91,214,154,.08) 82%,transparent),#11221A}
-body.server-mode.christmas #sheetTable tbody tr.section-head.nested[data-lvl="1"] td.c-item{background-color:#295C43}
-body.server-mode.christmas #sheetTable tbody tr.section-head.nested[data-lvl="2"]{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 6' preserveAspectRatio='none'%3E%3Cpath d='M0 0 H80 V2.4 C75 5 71 3.2 66 4.2 C60 6 56 3 50 4 C44 5.8 40 2.6 34 3.8 C28 5.6 24 3 18 4 C12 5.8 6 3.2 0 4.2 Z' fill='%23F4F8FB' opacity='.88'/%3E%3C/svg%3E") left top/80px 6px repeat-x,linear-gradient(90deg,rgba(245,196,81,.32) 58%,rgba(245,196,81,.08) 82%,transparent),#1C2014}
-body.server-mode.christmas #sheetTable tbody tr.section-head.nested[data-lvl="2"] td.c-item{background-color:#615428}
-body.server-mode.christmas #sheetTable tbody tr.section-head.nested[data-lvl="3"]{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 6' preserveAspectRatio='none'%3E%3Cpath d='M0 0 H80 V2.4 C75 5 71 3.2 66 4.2 C60 6 56 3 50 4 C44 5.8 40 2.6 34 3.8 C28 5.6 24 3 18 4 C12 5.8 6 3.2 0 4.2 Z' fill='%23F4F8FB' opacity='.88'/%3E%3C/svg%3E") left top/80px 6px repeat-x,linear-gradient(90deg,rgba(159,216,240,.32) 58%,rgba(159,216,240,.08) 82%,transparent),#162220}
-body.server-mode.christmas #sheetTable tbody tr.section-head.nested[data-lvl="3"] td.c-item{background-color:#425C63}
-body.server-mode.dark.christmas #sheetTable tbody tr.section-head.nested[data-lvl="1"] .name-in{text-shadow:0 0 8px rgba(91,214,154,.85)}
-body.server-mode.dark.christmas #sheetTable tbody tr.section-head.nested[data-lvl="2"] .name-in{text-shadow:0 0 8px rgba(245,196,81,.85)}
-body.server-mode.dark.christmas #sheetTable tbody tr.section-head.nested[data-lvl="3"] .name-in{text-shadow:0 0 8px rgba(159,216,240,.85)}
-body.server-mode.dark.christmas #sheetTable tbody tr.section-head.nested[data-lvl="1"] td,
-body.server-mode.dark.christmas #sheetTable tbody tr.section-head.nested[data-lvl="1"]:hover td{border-top-color:rgba(91,214,154,.5);border-bottom-color:rgba(91,214,154,.5)}
-body.server-mode.dark.christmas #sheetTable tbody tr.section-head.nested[data-lvl="2"] td,
-body.server-mode.dark.christmas #sheetTable tbody tr.section-head.nested[data-lvl="2"]:hover td{border-top-color:rgba(245,196,81,.5);border-bottom-color:rgba(245,196,81,.5)}
-body.server-mode.dark.christmas #sheetTable tbody tr.section-head.nested[data-lvl="3"] td,
-body.server-mode.dark.christmas #sheetTable tbody tr.section-head.nested[data-lvl="3"]:hover td{border-top-color:rgba(159,216,240,.55);border-bottom-color:rgba(159,216,240,.55)}
-body.server-mode.christmas #sheetTable tbody tr.section-head.nested[data-lvl] td.c-item{border-left:4px solid var(--lv1)}
-body.server-mode.christmas #sheetTable tbody tr.section-head.nested[data-lvl="2"] td.c-item{border-left-color:var(--lv2)}
-body.server-mode.christmas #sheetTable tbody tr.section-head.nested[data-lvl="3"] td.c-item{border-left-color:var(--lv3)}
-body.server-mode.christmas.cards #sheetTable tbody tr.section-head{border-color:rgba(232,52,74,.6);box-shadow:0 0 16px -6px rgba(232,52,74,.7)}
-body.server-mode.christmas.cards #sheetTable tbody tr.section-head[data-lvl] td.c-item{background-color:transparent}
-
-/* subtotals */
-body.server-mode.dark.christmas #sheetTable tbody tr.section-foot[data-lvl] td,
-body.server-mode.dark.christmas #sheetTable tbody tr.section-foot[data-lvl]:hover td{background:#0F2419}
-body.server-mode.dark.christmas #sheetTable tbody tr.section-foot[data-lvl] td.calc.grand{background:rgba(245,196,81,.08)}
-body.server-mode.christmas #sheetTable tr.section-foot td{border-bottom-color:rgba(232,52,74,.45)}
-body.server-mode.christmas #sheetTable tr.section-foot .sec-label{color:#F18592;text-shadow:0 0 6px rgba(232,52,74,.5)}
-body.server-mode.christmas #sheetTable tr.section-foot .money{color:#FFFFFF}
-body.server-mode.christmas.cards #sheetTable tbody tr[data-type="sectionEnd"]{background:#0F2419;border-color:rgba(232,52,74,.4)}
+body.server-mode.christmas #sheetTable tbody :is(tr.section-head,tr.section-foot)[data-depth="2"]{
+--section-fill:#554727;--section-edge:#DCC379;--section-soft:#FFF2C8;--section-footer:#292614;
+}
+body.server-mode.christmas #sheetTable tbody tr.section-head{background:var(--section-fill)}
+body.server-mode.christmas #sheetTable tbody tr.section-head:not(.dragging):not(.drop-preview)>td{
+background-color:var(--section-fill)!important;
+background-image:var(--section-snow)!important;background-size:80px 6px;background-repeat:repeat-x;background-position:left top;
+border-top:1px solid var(--section-edge);border-bottom:1px solid var(--section-edge);border-right-color:transparent;
+}
+body.server-mode.christmas #sheetTable tbody tr.section-head .name-in{color:#FFFFFF;text-shadow:none;font-weight:700}
+body.server-mode.christmas #sheetTable tbody tr.section-head .name-in::placeholder{color:var(--section-soft);text-shadow:none}
+body.server-mode.christmas #sheetTable tbody tr.section-head .money{color:#FFFFFF;text-shadow:none}
+body.server-mode.christmas #sheetTable tbody tr.section-head td.calc.grand .money{color:#FFF2C8;text-shadow:none}
+body.server-mode.christmas #sheetTable tbody tr.section-head .grip{color:var(--section-soft)!important}
+body.server-mode.christmas #sheetTable tbody tr.section-head :is(.caret,.del,.dup-btn,.note-btn){color:var(--section-soft)}
+body.server-mode.christmas #sheetTable tbody tr.section-head .caret{background:transparent}
+body.server-mode.christmas #sheetTable tbody tr.section-head .caret:hover{background:rgba(255,255,255,.14);color:#FFFFFF}
+body.server-mode.christmas #sheetTable tbody tr.section-head .sec-add{color:var(--section-soft);background:rgba(0,0,0,.12);border-color:var(--section-edge);text-shadow:none;box-shadow:none}
+body.server-mode.christmas #sheetTable tbody tr.section-head .sec-add:hover{color:#FFFFFF;background:rgba(255,255,255,.12)}
+body.server-mode.christmas #sheetTable tbody tr.section-head.tree-child .subsection-badge{padding:2px 6px;border:1px solid var(--section-edge);border-radius:4px;background:rgba(0,0,0,.12);color:var(--section-soft);font-weight:600;text-shadow:none}
+body.server-mode.christmas #sheetTable tbody tr.section-head .sec-unit :is(input,select){background:rgba(0,0,0,.18);border-color:var(--section-edge);color:#FFFFFF}
+body.server-mode.christmas #sheetTable tbody tr.section-foot:not(.dragging):not(.drop-preview)>td{background:var(--section-footer)!important;border-top-color:var(--section-edge);border-bottom-color:var(--section-edge)}
+body.server-mode.christmas #sheetTable tbody tr.section-foot :is(.sec-label,.money){color:var(--section-soft);text-shadow:none}
+body.server-mode.christmas.cards #sheetTable tbody tr.section-head{border-color:var(--section-edge);box-shadow:none}
+body.server-mode.christmas.cards #sheetTable tbody tr.section-head:not(.dragging):not(.drop-preview)>td{background-image:none!important}
+body.server-mode.christmas.cards #sheetTable tbody tr.section-foot{background:var(--section-footer);border-color:var(--section-edge)}
 
 /* totals: the answer in the third colour */
 body.server-mode.christmas #sheetTable tfoot td{background:#0B1912;border-top-color:var(--fx2)}
@@ -726,8 +712,6 @@ body.server-mode.christmas ::-webkit-scrollbar-thumb:horizontal{background:linea
 body.server-mode.christmas ::-webkit-scrollbar-corner{background:#091A11}
 
 /* the extras: snow caps on section heads, a candy-cane Grand head, falling snow */
-body.server-mode.dark.christmas #sheetTable tbody tr.section-head td.c-item{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 6' preserveAspectRatio='none'%3E%3Cpath d='M0 0 H80 V2.4 C75 5 71 3.2 66 4.2 C60 6 56 3 50 4 C44 5.8 40 2.6 34 3.8 C28 5.6 24 3 18 4 C12 5.8 6 3.2 0 4.2 Z' fill='%23F4F8FB' opacity='.88'/%3E%3C/svg%3E");background-size:80px 6px;background-repeat:repeat-x;background-position:left top}
-body.server-mode.christmas.cards #sheetTable tbody tr.section-head td.c-item{background-image:none}
 body.server-mode.christmas #sheetTable thead th.col-grand,body.server-mode.christmas .sum-table thead th.col-grand{
 background:repeating-linear-gradient(135deg,#E8344A 0 5px,#FFF6F0 5px 10px) left top/100% 4px no-repeat,linear-gradient(180deg,#3B1A16,#1D0D0C);
 }

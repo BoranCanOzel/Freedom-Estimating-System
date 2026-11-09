@@ -14,7 +14,8 @@
 #human-info-tree{display:flex;flex-direction:column;gap:5px;font-size:13px}#human-info-tree button{text-align:left;overflow-wrap:anywhere;border-color:transparent;background:transparent;line-height:1.5}
 #human-info-tree button[aria-pressed=true]{background:var(--paper);border-color:var(--rule);box-shadow:inset 3px 0 var(--teal)}
 #human-information-page #human-info-save{background:var(--ink);color:var(--paper)}
-#notesPanel #noteAdd,#notesPanel #notesOpenHuman{display:block;width:100%;margin:8px 0}
+#notesPanel .notes-actions{display:grid;gap:8px;flex:none;padding:12px 14px}
+#notesPanel #noteAdd,#notesPanel #notesOpenHuman{display:block;width:100%;margin:0}
 .human-note-card{display:flex;align-items:stretch;gap:5px;min-width:0;margin:5px 0}
 #notesPanel .human-note-card .human-note-row{flex:1;min-width:0;margin:0}
 .human-note-actions{display:flex;flex-direction:column;justify-content:center;gap:3px}
