@@ -783,6 +783,44 @@ test('AI Information drag and drop moves folders with descendants, reorders and 
   await expect(page.locator('#ai-info-tree button')).toHaveText(['▸  Rates','▸  Concrete','—  Cutting','—  Crew','▸  Standards']);
 });
 
+test('notes support shared stars and pins without saving unfinished text edits',async({page})=>{
+  await openWorkbook(page);
+  const initial=await (await page.request.get('/api/human-information')).json();
+  const items=[{id:'team',kind:'folder',parent:'',title:'Team',text:''},...['Alpha','Bravo','Charlie'].map(title=>({id:title,kind:'entry',parent:title==='Bravo'?'team':'',title,text:title+' original text'}))];
+  await page.request.put('/api/human-information',{data:{revision:initial.revision,items}});
+  await page.locator('#notesToggle').click();
+  const drawer=page.locator('#notesPanel'),rows=drawer.locator('#notesList .human-note-row strong'),filters=drawer.locator('.human-note-filters');
+  await expect(rows).toHaveText(['Alpha','Bravo','Charlie']);
+  await drawer.getByRole('button',{name:'Star Bravo',exact:true}).click();await expect(drawer.locator('#human-info-drawer-status')).toHaveText('Saved.');
+  await drawer.getByRole('button',{name:'Pin Charlie',exact:true}).click();await expect(drawer.getByRole('button',{name:'Unpin Charlie',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(rows).toHaveText(['Charlie','Bravo','Alpha']);
+  await filters.getByRole('button',{name:'Starred',exact:true}).click();await expect(rows).toHaveText(['Bravo']);
+  await filters.getByRole('button',{name:'Pinned',exact:true}).click();await expect(rows).toHaveText(['Charlie']);
+  await drawer.locator('.human-note-row').click();await expect(drawer.locator('#human-info-editor')).toBeHidden();
+  await drawer.getByRole('button',{name:'Unpin Charlie',exact:true}).click();await expect(drawer.getByRole('button',{name:'Pin Charlie',exact:true})).toHaveAttribute('aria-pressed','false');
+  await drawer.getByRole('button',{name:'Back to notes',exact:true}).click();await expect(drawer.locator('#notesList')).toHaveText('No pinned notes yet.');
+  await filters.getByRole('button',{name:'All',exact:true}).click();await expect(rows).toHaveText(['Bravo','Alpha','Charlie']);
+  await page.locator('#notesOpenHuman').click();
+  const full=page.locator('#human-information-page');await full.locator('.human-note-filters').getByRole('button',{name:'Starred',exact:true}).click();
+  await expect(full.locator('#human-info-tree button')).toHaveCount(2);
+  await full.locator('#human-info-tree button').filter({hasText:'Bravo'}).click();
+  await full.locator('#human-info-text').fill('Unfinished draft');
+  await full.getByRole('button',{name:'Pin Bravo',exact:true}).click();
+  await expect(full.locator('#human-info-status')).toContainText('Your text changes are still unsaved');
+  await expect(full.locator('#human-info-text')).toHaveValue('Unfinished draft');
+  let stored=await (await page.request.get('/api/human-information')).json();
+  expect(stored.items.find(item=>item.id==='Bravo')).toMatchObject({starred:true,pinned:true,text:'Bravo original text'});
+  await full.locator('#human-info-save').click();await expect(full.locator('#human-info-status')).toHaveText('Saved.');
+  await full.getByRole('button',{name:'Back to estimating',exact:true}).click();await page.reload();await page.locator('#notesToggle').click();
+  await expect(rows).toHaveText(['Bravo','Alpha','Charlie']);
+  await expect(drawer.getByRole('button',{name:'Unstar Bravo',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(drawer.getByRole('button',{name:'Unpin Bravo',exact:true})).toHaveAttribute('aria-pressed','true');
+  await drawer.getByRole('button',{name:'Unstar Bravo',exact:true}).click();
+  await drawer.getByRole('button',{name:'Unpin Bravo',exact:true}).click();await expect(rows).toHaveText(['Alpha','Bravo','Charlie']);
+  stored=await (await page.request.get('/api/human-information')).json();
+  expect(stored.items.find(item=>item.id==='Bravo')).toMatchObject({starred:false,pinned:false,text:'Unfinished draft'});
+});
+
 test('right notes drawer opens in view mode and edits only after pressing Edit',async({page})=>{
   await openWorkbook(page);
   const initial=await (await page.request.get('/api/human-information')).json();

@@ -21,12 +21,49 @@ export function setupHumanInformation(api){
   drawerEditor.append(preview);
   const drawerStatus=document.createElement('p');drawerStatus.id='human-info-drawer-status';drawerStatus.setAttribute('role','status');drawerBody.append(drawerStatus);
   const form=$('editor'),pageMain=form.parentElement;
+  const previewFlags=document.createElement('div');previewFlags.className='human-note-flags';preview.querySelector('header').after(previewFlags);
+  const editorFlags=document.createElement('div');editorFlags.className='human-note-flags';$('kind').after(editorFlags);
   const cancel=document.createElement('button');cancel.type='button';cancel.id='human-info-cancel';cancel.textContent='Cancel';cancel.hidden=true;form.querySelector('.human-info-tools').append(cancel);
   const message=text=>{$('status').textContent=text;drawerStatus.textContent=text;};
   let library={items:[],revision:''},saved=structuredClone(library),selected='',dirty=false,busy=false,operation=null,drawerActive=false,drawerMode='view',returnToDrawer=false;
+  let drawerFilter='all',pageFilter='all';
+  function filterBar(change){
+    const bar=document.createElement('div');bar.className='human-note-filters';bar.setAttribute('role','group');bar.setAttribute('aria-label','Filter notes');
+    for(const [key,label]of [['all','All'],['starred','Starred'],['pinned','Pinned']]){
+      const control=document.createElement('button');control.type='button';control.textContent=label;control.dataset.filter=key;control.setAttribute('aria-pressed',String(key==='all'));control.onclick=()=>change(key);bar.append(control);
+    }return bar;
+  }
+  const drawerFilters=filterBar(key=>{drawerFilter=key;paintDrawer();});document.getElementById('notesList').before(drawerFilters);
+  const pageFilters=filterBar(key=>{pageFilter=key;tree();});$('tree').before(pageFilters);
+  const ordered=items=>[...items].sort((a,b)=>Number(!!b.pinned)-Number(!!a.pinned)||Number(!!b.starred)-Number(!!a.starred));
+  const flagIcon=flag=>flag==='starred'?'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9z"/></svg>':'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h8l-1 6 4 5H5l4-5zM12 14v7"/></svg>';
+  function flagButton(item,flag,compact=false){
+    const control=document.createElement('button');control.type='button';control.className='human-note-flag';control.disabled=busy;
+    const active=item[flag]===true,action=flag==='starred'?(active?'Unstar':'Star'):(active?'Unpin':'Pin');
+    control.setAttribute('aria-label',action+' '+item.title);control.setAttribute('aria-pressed',String(active));control.title=action+' note';control.innerHTML=flagIcon(flag);
+    if(!compact)control.append(document.createTextNode(flag==='starred'?(active?'Starred':'Star'):(active?'Pinned':'Pin')));
+    control.onclick=()=>run(()=>toggleFlag(item.id,flag));return control;
+  }
+  function paintFlags(){
+    const item=current();for(const host of [previewFlags,editorFlags]){
+      host.replaceChildren();host.hidden=item?.kind!=='entry';if(item?.kind==='entry')host.append(flagButton(item,'starred'),flagButton(item,'pinned'));
+    }
+  }
+  async function toggleFlag(entryId,flag){
+    const item=library.items.find(item=>item.id===entryId);if(item?.kind!=='entry')return;
+    const value=!item[flag];
+    if(!saved.items.some(item=>item.id===entryId)){item[flag]=value;dirty=true;message('Unsaved changes.');}
+    else{
+      const result=await request({method:'PUT',body:JSON.stringify({revision:saved.revision,items:saved.items.map(item=>item.id===entryId?{...item,[flag]:value}:item)})});
+      saved=structuredClone(result);library.revision=result.revision;item[flag]=value;
+      message(dirty?'Note marked. Your text changes are still unsaved.':'Saved.');
+    }
+    paintFlags();tree();paintDrawer();
+  }
   function mountEditor(inDrawer){
     drawerActive=inDrawer;drawerEditor.hidden=!inDrawer;
     document.getElementById('notesList').hidden=inDrawer;
+    drawerFilters.hidden=inDrawer;
     (inDrawer?drawerEditor:pageMain).append(form);
     preview.hidden=!inDrawer||drawerMode!=='view'||!current();
     form.hidden=!current()||(inDrawer&&drawerMode==='view');
@@ -49,10 +86,16 @@ export function setupHumanInformation(api){
   function path(id){const names=[],seen=new Set();while(id&&!seen.has(id)){seen.add(id);const item=library.items.find(item=>item.id===id);if(!item)break;names.unshift(item.title);id=item.parent;}return names.join(' / ');}
   function tree(){
     $('tree').replaceChildren();const query=$('search').value.trim().toLowerCase(),visited=new Set();
-    function add(parent,depth){for(const item of library.items.filter(item=>item.parent===parent)){
+    pageFilters.querySelectorAll('button').forEach(control=>control.setAttribute('aria-pressed',String(control.dataset.filter===pageFilter)));
+    const visible=new Set();
+    for(const item of library.items.filter(item=>item.kind==='entry'&&(pageFilter==='all'||item[pageFilter]))){
+      let node=item;while(node&&!visible.has(node.id)){visible.add(node.id);node=library.items.find(item=>item.id===node.parent);}
+    }
+    function add(parent,depth){for(const item of ordered(library.items.filter(item=>item.parent===parent))){
       if(visited.has(item.id))continue;visited.add(item.id);
-      if(!query||(item.title+' '+item.text+' '+path(item.parent)).toLowerCase().includes(query)){
+      if((pageFilter==='all'||visible.has(item.id))&&(!query||(item.title+' '+item.text+' '+path(item.parent)).toLowerCase().includes(query))){
         const row=document.createElement('button');row.type='button';row.textContent=(item.kind==='folder'?'▸  ':'—  ')+item.title;row.title=path(item.id);row.style.paddingLeft=(12+Math.min(depth,8)*16)+'px';row.setAttribute('aria-pressed',String(item.id===selected));
+        if(item.starred)row.append(document.createTextNode(' ★'));if(item.pinned)row.append(document.createTextNode(' · Pinned'));
         row.onclick=()=>{if(busy||!discard())return;selected=item.id;render();message('');};$('tree').append(row);
       }
       if(item.kind==='folder')add(item.id,depth+1);
@@ -60,7 +103,7 @@ export function setupHumanInformation(api){
     if(!$('tree').children.length)$('tree').textContent=query?'No matching notes.':'No notes yet.';
   }
   function render(){
-    tree();const item=current();if(drawerActive&&!item)mountEditor(false);
+    tree();paintFlags();const item=current();if(drawerActive&&!item)mountEditor(false);
     const viewing=drawerActive&&drawerMode==='view';
     form.hidden=!item||viewing;preview.hidden=!item||!viewing;cancel.hidden=!drawerActive||drawerMode!=='edit';
     $('empty').hidden=!!item;if(!item)return;
@@ -110,13 +153,17 @@ export function setupHumanInformation(api){
   }
   function paintDrawer(){
     const box=document.getElementById('notesList');if(!box)return;
-    const entries=library.items.filter(item=>item.kind==='entry');box.replaceChildren();
-    if(!entries.length){box.textContent='No shared notes yet. Choose + New note to add one.';return;}
+    drawerFilters.querySelectorAll('button').forEach(control=>control.setAttribute('aria-pressed',String(control.dataset.filter===drawerFilter)));
+    const entries=ordered(library.items.filter(item=>item.kind==='entry'&&(drawerFilter==='all'||item[drawerFilter])));box.replaceChildren();
+    if(!entries.length){box.textContent=drawerFilter==='all'?'No shared notes yet. Choose + New note to add one.':'No '+drawerFilter+' notes yet.';return;}
     entries.forEach(item=>{
+      const card=document.createElement('div');card.className='human-note-card';card.dataset.note=item.id;
       const row=document.createElement('button');row.type='button';row.className='human-note-row';
       const title=document.createElement('strong');title.textContent=item.title;
       const excerpt=document.createElement('span');excerpt.textContent=item.text.split('\n').find(line=>line.trim())||'No note text';
-      row.append(title,excerpt);row.title='View note';row.onclick=()=>viewInDrawer(item.id);box.append(row);
+      row.append(title,excerpt);row.title='View note';row.onclick=()=>viewInDrawer(item.id);
+      const actions=document.createElement('div');actions.className='human-note-actions';actions.append(flagButton(item,'starred',true),flagButton(item,'pinned',true));
+      card.append(row,actions);box.append(card);
     });
   }
   async function open(entryId=selected){

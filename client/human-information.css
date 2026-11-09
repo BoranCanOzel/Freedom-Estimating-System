@@ -15,6 +15,17 @@
 #human-info-tree button[aria-pressed=true]{background:var(--paper);border-color:var(--rule);box-shadow:inset 3px 0 var(--teal)}
 #human-information-page #human-info-save{background:var(--ink);color:var(--paper)}
 #notesPanel #noteAdd,#notesPanel #notesOpenHuman{display:block;width:100%;margin:8px 0}
+.human-note-card{display:flex;align-items:stretch;gap:5px;min-width:0;margin:5px 0}
+#notesPanel .human-note-card .human-note-row{flex:1;min-width:0;margin:0}
+.human-note-actions{display:flex;flex-direction:column;justify-content:center;gap:3px}
+.human-note-flags,.human-note-filters{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 16px}
+.human-note-flags[hidden],.human-note-filters[hidden]{display:none}
+:is(#notesPanel,#human-information-page) .human-note-flag{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:6px;min-width:30px;min-height:30px;border:1px solid var(--rule);border-radius:4px;background:var(--card);color:var(--ink);font:12px var(--f-sans);cursor:pointer}
+.human-note-flag svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round;flex:none}
+.human-note-flag[aria-pressed=true] svg{fill:var(--amber)}
+:is(#notesPanel,#human-information-page) .human-note-flag[aria-pressed=true]{border-color:var(--amber);background:var(--calc)}
+.human-note-filters button{padding:6px 9px;border:1px solid var(--rule);border-radius:4px;background:var(--card);color:var(--ink);font:12px var(--f-sans);cursor:pointer}
+.human-note-filters button[aria-pressed=true]{box-shadow:inset 0 -2px var(--amber);font-weight:600}
 #notesPanel .human-note-row{display:flex;width:100%;flex-direction:column;gap:5px;text-align:left;padding:9px;margin:5px 0;border:1px solid var(--rule);border-radius:5px;background:var(--card);color:var(--ink);cursor:pointer}
 #notesPanel .human-note-row:hover{border-color:var(--amber);background:var(--calc)}
 #notesPanel .human-note-row strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:600 12px var(--f-sans)}

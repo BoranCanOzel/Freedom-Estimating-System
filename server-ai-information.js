@@ -55,7 +55,9 @@ function mountInformationLibrary({app,db,session},kind){
       if(!Array.isArray(items)||items.length>1000)throw Error('Use at most 1,000 folders and entries.');
       const ids=new Map();
       for(const item of items){
-        if(!item||typeof item!=='object'||Object.keys(item).some(k=>!['id','parent','kind','title','text'].includes(k)))throw Error('Only text entries and folders are supported.');
+        const allowed=['id','parent','kind','title','text',...(kind==='human'?['starred','pinned']:[])];
+        if(!item||typeof item!=='object'||Object.keys(item).some(k=>!allowed.includes(k)))throw Error('Only text entries and folders are supported.');
+        if(kind==='human')for(const flag of ['starred','pinned'])if(Object.hasOwn(item,flag)&&(typeof item[flag]!=='boolean'||item.kind!=='entry'))throw Error('Only notes support star and pin flags, which must be true or false.');
         if(typeof item.id!=='string'||!item.id.length||item.id.length>100||ids.has(item.id))throw Error('Invalid or duplicate item ID.');
         if(!['folder','entry'].includes(item.kind)||typeof item.parent!=='string'||typeof item.title!=='string'||!item.title.trim()||item.title.length>160||typeof item.text!=='string'||item.text.length>100000)throw Error('Each item needs a title (up to 160 characters) and plain text (up to 100,000 characters).');
         if(item.kind==='folder'&&item.text)throw Error('Save reference text inside an entry.');

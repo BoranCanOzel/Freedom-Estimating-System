@@ -19,11 +19,16 @@ test('human notes persist, are shared with signed-in teammates, reject stale sav
     assert.equal((await call(endpoint,'PUT',{items:[]},{})).status,401);
     const initial=await (await call(endpoint)).json();assert.deepEqual(initial.items,[]);
     const aiBefore=await (await call('/api/ai-information')).json();
-    const items=[{id:'folder',parent:'',kind:'folder',title:'Team reminders',text:''},{id:'note',parent:'folder',kind:'entry',title:'Human-only reminder',text:'Internal note 7c21: call the supplier on Friday.'}];
+    const items=[{id:'folder',parent:'',kind:'folder',title:'Team reminders',text:''},{id:'note',parent:'folder',kind:'entry',title:'Human-only reminder',text:'Internal note 7c21: call the supplier on Friday.',starred:true,pinned:true}];
     const saved=await call(endpoint,'PUT',{revision:initial.revision,items});assert.equal(saved.status,200);const current=await saved.json();
     assert.deepEqual(await (await call(endpoint,'GET',undefined,{cookie:bob})).json(),current);
     assert.equal((await call(endpoint,'PUT',{revision:initial.revision,items:[]},{cookie:bob})).status,409);
     for(const invalid of [[{...items[0],parent:'folder'}],[{...items[1],parent:'missing'}],[{...items[1],parent:'',file:'x'}],[{...items[1],parent:'',title:''}]])assert.equal((await call(endpoint,'PUT',{revision:current.revision,items:invalid})).status,422);
+    for(const flag of ['starred','pinned']){
+      assert.equal((await call(endpoint,'PUT',{revision:current.revision,items:[{...items[1],parent:'',[flag]:'true'}]})).status,422);
+      assert.equal((await call(endpoint,'PUT',{revision:current.revision,items:[{...items[0],[flag]:true}]})).status,422);
+    }
+    assert.equal((await call('/api/ai-information','PUT',{revision:aiBefore.revision,items:[{...items[1],parent:''}]})).status,422);
     assert.deepEqual(await (await call('/api/ai-information')).json(),aiBefore);
     const key=(await (await call('/api/ai-access/universal','POST')).json()).key,headers={Authorization:'Bearer '+key};
     assert.equal((await call(endpoint,'GET',undefined,headers)).status,401);
