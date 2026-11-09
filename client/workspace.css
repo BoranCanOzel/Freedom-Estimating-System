@@ -111,6 +111,16 @@ body #sheetTable tr.section-head.tree-child .name-in::placeholder{color:var(--mu
 body.server-mode .sheet>.card{padding-bottom:8px}
 body.server-mode #sheetCard>.head{padding-top:7px;padding-bottom:5px}
 body.server-mode #sheetCard .eyebrow-row{min-height:32px;gap:10px;flex-wrap:wrap}
+.page-color-picker{position:relative;display:inline-flex;align-items:center;z-index:12}
+.page-color-trigger{display:inline-grid;place-items:center;width:28px;height:28px;padding:0;border:1px solid var(--rule);border-radius:50%;background:var(--card);cursor:pointer}
+.page-color-trigger:hover,.page-color-trigger:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.page-color-trigger[hidden]{display:none}
+.page-color-current{width:13px;height:13px;border:1px solid color-mix(in srgb,var(--ink) 35%,transparent);border-radius:50%;background:transparent}
+.page-color-menu{position:absolute;top:calc(100% + 7px);left:0;display:grid;grid-template-columns:repeat(4,30px);gap:4px;padding:7px;background:var(--card);border:1px solid var(--rule);border-radius:8px;box-shadow:0 6px 18px #0003}
+.page-color-menu[hidden]{display:none}
+.page-color-option{display:grid;place-items:center;width:30px;height:30px;padding:0;border:1px solid transparent;border-radius:5px;background:transparent;cursor:pointer}
+.page-color-option:hover,.page-color-option:focus-visible{border-color:var(--ink);outline:none}
+.page-color-option>span{width:17px;height:17px;border:1px solid color-mix(in srgb,var(--ink) 35%,transparent);border-radius:50%}
 body.server-mode #titleNote{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:32px;min-width:80px;padding:6px 10px;opacity:1;border:1px solid var(--rule);border-radius:5px;font:500 12px var(--f-sans);line-height:1;color:var(--ink)}
 body.server-mode #titleNote svg{width:14px;height:12px}
 body.server-mode #workspace-toggle-notes{margin-left:auto;min-height:32px;padding:6px 10px;border:1px solid var(--rule);border-radius:5px;background:transparent;color:var(--ink);font:500 12px var(--f-sans);cursor:pointer}

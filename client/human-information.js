@@ -47,14 +47,59 @@ export function setupHumanInformation(api){
     if(busy)return;const controller=new AbortController();operation=controller;setBusy(true);
     const timer=setTimeout(()=>controller.abort(new Error('The request timed out. Your unsaved notes are still here. Reload to check whether a save completed before retrying.')),20000);
     const aborted=new Promise((_,reject)=>controller.signal.addEventListener('abort',()=>reject(controller.signal.reason),{once:true}));
-    try{await Promise.race([fn(),aborted]);}catch(error){if(operation===controller&&!page.hidden)message(error.message);}
+    try{await Promise.race([fn(),aborted]);}catch(error){if(operation===controller){message(error.message);const box=document.getElementById('notesList');if(page.hidden&&box)box.textContent=error.message;}}
     finally{clearTimeout(timer);if(operation===controller){operation=null;setBusy(false);}}
   }
-  async function reload(){library=await request();saved=structuredClone(library);dirty=false;if(!current())selected='';render();message('Notes loaded.');}
-  async function persist(items){library=await request({method:'PUT',body:JSON.stringify({revision:library.revision,items})});saved=structuredClone(library);dirty=false;render();message('Saved.');}
-  button.onclick=event=>{if(!currentTabClick(event))return;event.preventDefault();run(async()=>{if(!page.hidden)return;page.hidden=false;background(true);button.setAttribute('aria-current','page');message('Loading notes...');await reload();if(!page.hidden)page.querySelector('[data-action="close"]').focus();});};
+  async function reload(){library=await request();saved=structuredClone(library);dirty=false;if(!current())selected='';render();paintDrawer();message('Notes loaded.');}
+  async function persist(items){library=await request({method:'PUT',body:JSON.stringify({revision:library.revision,items})});saved=structuredClone(library);dirty=false;render();paintDrawer();message('Saved.');}
+  async function migrateLegacyNotes(){
+    const legacy=window.estimator?.getLegacyNotes?.()||[];
+    if(!legacy.length){window.estimator?.clearLegacyNotes?.(legacy);return;}
+    const workbook=window.freedomSession?.workbookId?.()||'';
+    const source=String(workbook||'workbook').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,50)||'workbook';
+    const additions=legacy.filter(note=>note&&typeof note==='object').map((note,index)=>({
+      id:'imported-'+source+'-'+String(note.id||index).replace(/[^a-zA-Z0-9_-]/g,'').slice(0,35),kind:'entry',parent:'',
+      title:String(note.title||'Imported note').trim()||'Imported note',text:String(note.text||'')
+    }));
+    if(additions.length){
+      let result;
+      for(let attempt=0;attempt<2;attempt++){
+        const existing=new Set(library.items.map(item=>item.id)),missing=additions.filter(note=>!existing.has(note.id));
+        if(!missing.length){result=library;break;}
+        try{result=await request({method:'PUT',body:JSON.stringify({revision:library.revision,items:[...library.items,...missing]})});break;}
+        catch(error){if(error.status!==409||attempt)throw error;await reload();}
+      }
+      library=result;saved=structuredClone(result);
+    }
+    if(workbook===(window.freedomSession?.workbookId?.()||''))window.estimator?.clearLegacyNotes?.(legacy);
+    render();paintDrawer();
+  }
+  async function renderDrawer(){
+    if(dirty)return;
+    await reload();await migrateLegacyNotes();paintDrawer();
+  }
+  function paintDrawer(){
+    const box=document.getElementById('notesList');if(!box)return;
+    const entries=library.items.filter(item=>item.kind==='entry');box.replaceChildren();
+    if(!entries.length){box.textContent='No shared notes yet. Choose + New note to add one.';return;}
+    entries.forEach(item=>{
+      const row=document.createElement('button');row.type='button';row.className='human-note-row';
+      const title=document.createElement('strong');title.textContent=item.title;
+      const excerpt=document.createElement('span');excerpt.textContent=item.text.split('\n').find(line=>line.trim())||'No note text';
+      row.append(title,excerpt);row.title='Edit in Human Information';row.onclick=()=>run(()=>open(item.id));box.append(row);
+    });
+  }
+  async function open(entryId=selected,create=false){
+    if(!page.hidden&&!discard())return;
+    page.hidden=false;background(true);button.setAttribute('aria-current','page');
+    message('Loading notes...');await reload();await migrateLegacyNotes();
+    if(create){const created={id:crypto.randomUUID(),kind:'entry',parent:'',title:'Untitled note',text:''};library.items.push(created);selected=created.id;dirty=true;render();message('Name it, then save.');$('title').focus();$('title').select();}
+    else{selected=entryId;render();message('');$('title').focus();}
+  }
+  button.onclick=event=>{if(!currentTabClick(event))return;event.preventDefault();run(async()=>{if(page.hidden){await open();page.querySelector('[data-action="close"]').focus();}});};
   function close(){if(!discard())return;operation?.abort();operation=null;setBusy(false);page.hidden=true;background(false);button.setAttribute('aria-current','false');clearPageLink('human-information');button.focus();}
   page.querySelector('[data-action="close"]').onclick=close;
+  window.humanInformation={open:()=>run(()=>open()),createFromDrawer:()=>run(()=>open('',true)),renderDrawer:()=>run(renderDrawer)};
   document.getElementById('server-bar').addEventListener('click',event=>{
     if(event.target.closest('a[href]')&&!currentTabClick(event))return;
     if(page.hidden||button.contains(event.target))return;

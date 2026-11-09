@@ -35,6 +35,11 @@ test('universal keys target current and future workbooks while preserving projec
     const scoped=await (await call(api+'/takeoffs','GET',undefined,project.key)).json();assert.equal(scoped.takeoffs.length,1);assert.equal(scoped.takeoffs[0].workbook,first);
     assert.equal((await call(api+'/takeoff'+query(targetB),'GET',undefined,project.key)).status,403);
     assert.equal((await call(api+'/takeoff','GET',undefined,key)).status,422);
+    assert.equal((await call(api+'/library','GET',undefined,key)).status,422);
+    assert.equal((await call(api+'/library'+query(targetB),'GET',undefined,project.key)).status,403);
+    const library=await (await call(api+'/library'+query(targetB),'GET',undefined,key)).json();
+    assert.equal(library.readOnly,true);assert(Array.isArray(library.libraries));
+    assert.equal(JSON.parse((await rpc('read_library',{target:targetA})).content[0].text).readOnly,true);
     assert.equal((await call(api+'/takeoff'+query({...targetA,takeoff:'missing'}),'GET',undefined,key)).status,404);
     assert.equal((await rpc('read_takeoff')).isError,true);
     const instructions=await (await call(api+'/instructions','GET',undefined,key)).json();assert.equal(instructions.access,'universal');assert(instructions.changeSchema.required.includes('target'));
@@ -208,7 +213,7 @@ test('AI grants enforce scope, repeated saves, revisions, validation, live broad
     assert.equal((await call(api+'/validate','POST',{revision:original.revision,takeoff:original.takeoff},fresh.key)).status,200);
     const rpc=async(method,params)=>{const response=await call(api+'/mcp','POST',{jsonrpc:'2.0',id:1,method,params},fresh.key);assert.equal(response.status,200);return response.json();};
     assert.equal((await rpc('initialize',{protocolVersion:'2025-11-25'})).result.protocolVersion,'2025-11-25');
-    assert.equal((await rpc('tools/list')).result.tools.length,10);
+    assert((await rpc('tools/list')).result.tools.some(tool=>tool.name==='read_library'&&tool.annotations.readOnlyHint));
     assert.equal(JSON.parse((await rpc('tools/call',{name:'read_takeoff',arguments:{}})).result.content[0].text).takeoff.id,'one');
     const restoredTimeline=JSON.parse((await rpc('tools/call',{name:'read_timeline',arguments:{}})).result.content[0].text);
     assert.deepEqual(restoredTimeline.tasks,[]);assert.equal(restoredTimeline.hasPlan,false);assert.equal(restoredTimeline.availableWork[0].id,'row-one');assert.equal(restoredTimeline.settings.hoursPerDay,8);

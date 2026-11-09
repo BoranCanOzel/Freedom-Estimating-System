@@ -1373,55 +1373,7 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
   body.notes-open #notesToggle:hover{background:#F0A518}
   body.notes-open .ed{right:calc(var(--libW) + 30px)}
 
-  /* a note in the list */
-  .note-row{
-    display:flex;align-items:center;gap:7px;padding:7px 9px;cursor:pointer;
-    border:1px solid var(--rule);border-radius:6px;background:var(--s42);
-  }
-  .note-row:hover{border-color:var(--rule-strong);background:var(--s43)}
-  .note-row.open{box-shadow:inset 0 0 0 2px var(--amber)}
-  .note-row .nr-name{
-    flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-    font-family:var(--f-cond);font-weight:700;font-size:12px;
-    letter-spacing:.04em;color:var(--ink);
-  }
-  .note-row .nr-peek{
-    flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-    font-size:11px;color:var(--muted);
-  }
-
-  /* the sticky note itself */
-  #stickies{position:fixed;inset:0;pointer-events:none;z-index:360}
-  .sticky{
-    position:absolute;width:260px;height:190px;pointer-events:auto;
-    display:flex;flex-direction:column;
-    resize:both;overflow:hidden;min-width:190px;min-height:110px;max-width:92vw;
-    background:#FDF3B8;border:1px solid #D9C86A;border-radius:3px;
-    box-shadow:0 14px 28px -14px rgba(19,23,25,.65), 0 2px 0 rgba(0,0,0,.06);
-  }
-  .sticky-head{
-    display:flex;align-items:center;gap:6px;padding:5px 6px 5px 9px;cursor:grab;
-    background:#F6E68C;border-bottom:1px solid #D9C86A;border-radius:2px 2px 0 0;
-  }
-  .sticky.lift .sticky-head{cursor:grabbing}
-  .sticky-title{
-    flex:1;min-width:0;border:0;background:transparent;
-    font-family:var(--f-cond);font-weight:700;font-size:12px;
-    letter-spacing:.05em;color:#3A3113;
-  }
-  .sticky-title:focus{outline:1px solid var(--amber);outline-offset:1px}
-  .sticky-x{
-    flex:none;border:0;background:transparent;cursor:pointer;color:#6B5C22;
-    font-size:14px;line-height:1;padding:2px 5px;border-radius:3px;
-  }
-  .sticky-x:hover{background:#E4CF63;color:#4A3E10}
-  .sticky textarea{
-    flex:1;min-height:0;width:100%;border:0;background:transparent;resize:none;
-    padding:9px 10px;font-family:var(--f-sans);font-size:12.5px;
-    line-height:1.5;color:#312A10;
-  }
-  .sticky textarea:focus{outline:none}
-  @media print{#stickies,.notes-tab,.notes-panel{display:none!important}}
+  @media print{.notes-panel{display:none!important}}
   .cat-panel{z-index:191}
   body.cat-open #catalog{transform:none}
   body.cat-open{padding-right:calc(var(--libW) + 14px + var(--tabW))}
@@ -1836,6 +1788,14 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
     letter-spacing:.09em;text-transform:uppercase;color:var(--slate);
   }
   .lc-secname:focus{background:var(--card)!important;border-color:var(--amber)!important}
+  .calc-table .lc-grip{display:inline-flex;align-items:center;justify-content:center;width:16px;min-width:16px;height:24px;margin-right:4px;padding:0;border:0;background:transparent;color:var(--muted);cursor:grab;touch-action:none;font-size:14px;vertical-align:middle}
+  .calc-table .lc-grip:hover,.calc-table .lc-grip:focus-visible{color:var(--ink);background:var(--s22)}
+  .calc-table tr.lc-dragging{opacity:.4}
+  .calc-table tr.lc-drop-before td{border-top:2px solid var(--amber)}
+  .calc-table tr.lc-drop-after td{border-bottom:2px solid var(--amber)}
+  .load-page-colored .load-block-head{border-left:3px solid var(--load-page-color,var(--rule));background:linear-gradient(90deg,color-mix(in srgb,var(--load-page-color,var(--card)) 16%,var(--card)),var(--card) 55%)}
+  .load-page-colored .lc-sec td.c1{border-left-color:var(--load-page-color,var(--slate))}
+  .load-page-colored .lc-in td:first-child{border-left-color:color-mix(in srgb,var(--load-page-color,var(--s22)) 60%,var(--s22))}
   .calc-table td:last-child{width:34px;text-align:center}
 
   .wage-card{
@@ -2784,6 +2744,10 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
     <div class="head">
       <div class="eyebrow-row">
         <span class="eyebrow">Scope of work</span>
+        <span class="page-color-picker" id="pageColorPicker">
+          <button type="button" id="pageColorTrigger" class="page-color-trigger" aria-label="Change page color" aria-haspopup="true" aria-expanded="false" aria-controls="pageColorMenu" title="Change page color"><span class="page-color-current" aria-hidden="true"></span></button>
+          <span class="page-color-menu" id="pageColorMenu" role="menu" aria-label="Page color" hidden></span>
+        </span>
         <button type="button" class="note-btn head-note" id="titleNote" aria-label="Add detail"></button>
       </div>
       <textarea id="title" rows="1" aria-label="Scope of work" placeholder="Describe the scope of work"></textarea>
@@ -2953,13 +2917,13 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
   </div>
   <div class="lib-body">
     <div class="lib-block">
+      <p class="lib-hint">Shared Human Information notes, available across your workbooks.</p>
       <button type="button" class="btn alt tiny" id="noteAdd">+ New note</button>
+      <button type="button" class="btn alt tiny" id="notesOpenHuman">Open Human Information</button>
     </div>
     <div class="lib-block"><div class="lib-list" id="notesList"></div></div>
   </div>
 </aside>
-
-<div id="stickies"></div>
 
 <aside id="catalog" class="lib cat-panel" aria-label="Catalog options">
   <div class="lib-head">
@@ -3030,12 +2994,9 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
       <details class="lib-create" id="libCreate">
         <summary>+ Create template <span aria-hidden="true">⌄</span></summary>
         <div class="lib-create-choices">
-          <button type="button" id="libNew"><strong>Item</strong><small>A single estimating line</small></button>
-          <button type="button" id="libNewPart"><strong>Part</strong><small>A reusable component with a cost</small></button>
-          <button type="button" id="libNewCon"><strong>Construct</strong><small>An assembly of parts</small></button>
-          <button type="button" id="libNewSvc"><strong>Service</strong><small>A base service with add-ons</small></button>
-          <button type="button" id="libNewSec"><strong>Section</strong><small>A group of estimating lines</small></button>
-          <button type="button" id="libNewScope"><strong>Scope</strong><small>A reusable page layout</small></button>
+          <button type="button" id="libNewLabor"><strong>Labor</strong><small>Labor line item</small></button>
+          <button type="button" id="libNewEquipment"><strong>Equipment</strong><small>Equipment line item</small></button>
+          <button type="button" id="libNewMaterial"><strong>Material</strong><small>Material line item</small></button>
         </div>
       </details>
       <details class="lib-save-existing">
@@ -4552,6 +4513,42 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
   ];
   const tabColor = k => TAB_COLORS.find(c => c.k === k) || null;
 
+  function syncPageColorPicker(){
+    const trigger=document.getElementById('pageColorTrigger'),menu=document.getElementById('pageColorMenu');
+    if(!trigger||!menu)return;
+    const active=book.view==='sheet'&&!!book.active;
+    trigger.hidden=!active;
+    const current=tabColor(state?.color);
+    trigger.querySelector('.page-color-current').style.background=current?.dot||'transparent';
+    trigger.title=current?'Page color: '+current.k:'Choose page color';
+    trigger.setAttribute('aria-label',current?'Change page color, currently '+current.k:'Choose page color');
+    if(menu.childElementCount)return;
+    const options=[{k:'',dot:'transparent',label:'No color'},...TAB_COLORS.map(c=>({...c,label:c.k}))];
+    options.forEach(c=>{
+      const option=document.createElement('button');option.type='button';option.className='page-color-option';option.setAttribute('role','menuitemradio');option.dataset.color=c.k;
+      option.setAttribute('aria-label',c.label);option.title=c.label;
+      const swatch=document.createElement('span');swatch.style.background=c.dot;swatch.setAttribute('aria-hidden','true');option.appendChild(swatch);menu.appendChild(option);
+    });
+  }
+  document.getElementById('pageColorTrigger')?.addEventListener('click',event=>{
+    event.stopPropagation();const trigger=event.currentTarget,menu=document.getElementById('pageColorMenu');
+    menu.hidden=!menu.hidden;trigger.setAttribute('aria-expanded',String(!menu.hidden));
+  });
+  document.getElementById('pageColorMenu')?.addEventListener('click',event=>{
+    const option=event.target.closest('.page-color-option');if(!option||!state)return;
+    state.color=option.dataset.color||'';save();renderTabs();syncPageColorPicker();
+    const menu=document.getElementById('pageColorMenu'),trigger=document.getElementById('pageColorTrigger');menu.hidden=true;trigger.setAttribute('aria-expanded','false');trigger.focus();
+  });
+  document.addEventListener('click',event=>{
+    if(event.target.closest('#pageColorPicker'))return;
+    const menu=document.getElementById('pageColorMenu'),trigger=document.getElementById('pageColorTrigger');
+    if(menu&&!menu.hidden){menu.hidden=true;trigger?.setAttribute('aria-expanded','false');}
+  });
+  document.addEventListener('keydown',event=>{
+    if(event.key!=='Escape')return;const menu=document.getElementById('pageColorMenu'),trigger=document.getElementById('pageColorTrigger');
+    if(menu&&!menu.hidden){menu.hidden=true;trigger?.setAttribute('aria-expanded','false');trigger?.focus();}
+  });
+
 document.addEventListener('click', () => { document.getElementById('tabPalette').hidden = true; });
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') document.getElementById('tabPalette').hidden = true;
@@ -4770,6 +4767,23 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     const input=host.querySelector('[data-load-sheet="'+CSS.escape(sh.id)+'"] [data-load-row="'+CSS.escape(rowId)+'"] [data-load-field="'+field+'"]');
     if(input){input.focus({preventScroll:true});input.scrollIntoView({block:'nearest',inline:'nearest'});}
   }
+  function addLoadGrip(cell,row){
+    const grip=document.createElement('button');grip.type='button';grip.className='lc-grip';grip.textContent='⠿';
+    grip.title='Drag to reorder this load line';grip.setAttribute('aria-label',grip.title);grip.draggable=true;
+    grip.addEventListener('dragstart',event=>{
+      event.stopPropagation();
+      const rows=loadRowsFor(stateForLoadGrip(grip));
+      const start=rows.findIndex(item=>item.id===row.id);
+      if(start<0)return event.preventDefault();
+      let end=start+1;
+      if(row.type==='section')while(end<rows.length&&rows[end].type!=='section')end++;
+      event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('text/plain',row.id);
+      grip.closest('table').dataset.loadDragging=JSON.stringify({start,end});
+      rows.slice(start,end).forEach(item=>grip.closest('table').querySelector('[data-load-row="'+CSS.escape(item.id)+'"]')?.classList.add('lc-dragging'));
+    });
+    cell.prepend(grip);
+  }
+  function stateForLoadGrip(grip){return book.sheets.find(sheet=>sheet.id===grip.closest('[data-load-sheet]')?.dataset.loadSheet)||state;}
 
   // builds one option's table into t; again() re-renders whichever view owns it
   function buildLoadTable(t, sh, again){
@@ -4796,6 +4810,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         tr.className = 'lc-sec';
         const td = document.createElement('td');
         td.className = 'c1 lc-sec-cell';
+        addLoadGrip(td,r);
         const caret = document.createElement('button');
         caret.type = 'button';
         caret.className = 'caret lc-caret' + (r.shut ? ' shut' : '');
@@ -4859,7 +4874,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       nm.value = r.name || '';
       nm.placeholder = 'Slab, wall, footing\u2026';
       nm.addEventListener('input', () => { r.name = nm.value; save(); });
-      nameTd.appendChild(nm);
+      addLoadGrip(nameTd,r);nameTd.appendChild(nm);
       tr.appendChild(nameTd);
 
       // typing only recomputes the output cells, so focus stays where it is
@@ -4931,6 +4946,26 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       if(next){next.focus();next.scrollIntoView({block:'nearest',inline:'nearest'});}
       else if(!event.shiftKey){const row=blankLoad();rows.push(row);again();save();focusLoadField(sh,row.id);}
     });
+    t.addEventListener('dragover',event=>{
+      const meta=t.dataset.loadDragging;if(!meta)return;
+      const target=event.target.closest('tr[data-load-row]');if(!target)return;
+      event.preventDefault();event.dataTransfer.dropEffect='move';
+      t.querySelectorAll('.lc-drop-before,.lc-drop-after').forEach(el=>el.classList.remove('lc-drop-before','lc-drop-after'));
+      target.classList.add(event.clientY<target.getBoundingClientRect().top+target.getBoundingClientRect().height/2?'lc-drop-before':'lc-drop-after');
+    });
+    t.addEventListener('drop',event=>{
+      const target=event.target.closest('tr[data-load-row]'),meta=t.dataset.loadDragging;
+      if(!target||!meta)return;
+      event.preventDefault();
+      const rows=loadRowsFor(sh),{start,end}=JSON.parse(meta),to=rows.findIndex(row=>row.id===target.dataset.loadRow);
+      const insertAfter=event.clientY>=target.getBoundingClientRect().top+target.getBoundingClientRect().height/2;
+      if(to<start||to>=end){
+        const moving=rows.splice(start,end-start);let at=to+(insertAfter?1:0);if(at>end)at-=moving.length;
+        rows.splice(at,0,...moving);again();save();
+      }
+      delete t.dataset.loadDragging;
+    });
+    t.addEventListener('dragend',()=>{delete t.dataset.loadDragging;t.querySelectorAll('.lc-dragging,.lc-drop-before,.lc-drop-after').forEach(el=>el.classList.remove('lc-dragging','lc-drop-before','lc-drop-after'));});
     paint();
     return refs;
   }
@@ -5025,7 +5060,9 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     }
 
     book.sheets.forEach(sh => {
-      host.appendChild(loadBlock(sh, renderLoad, true));
+      const block=loadBlock(sh, renderLoad, true),color=tabColor(sh.color);
+      if(color){block.classList.add('load-page-colored');block.style.setProperty('--load-page-color',color.dot);}
+      host.appendChild(block);
       const s = loadTotalsFor(sh);
       ['sf','cy','fluff','total','loads'].forEach(k => { grand[k] += s[k]; });
     });
@@ -5566,6 +5603,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
   function addTakeoffPage(){
     const sh=seed(nextNum()),folder=findTakeoff(book.activeTakeoff)?.tk.activeFolder;
+    sh.color=TAB_COLORS[book.sheets.length%TAB_COLORS.length].k;
     if(folder)sh.folderId=folder;
     book.sheets.push(sh);book.view='sheet';book.active=sh.id;state=sh;updateTakeoffPageCount();showView();save();
   }
@@ -5663,6 +5701,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     add.setAttribute('aria-label','Add takeoff page');
     add.addEventListener('click', addTakeoffPage);
     rail.insertBefore(add, railEnd());
+    syncPageColorPicker();
 
     [['timeline','Timeline'], ['load','Load calc'], ['wage','Wage calc']].forEach(([v, label]) => {
       const b = document.createElement('button');
@@ -5844,7 +5883,6 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     clearSectionHighlight();
     applyTheme();
     applyZoom();
-    renderStickies();
     const hit = findTakeoff(book.activeTakeoff);
     if(hit){
       if(!hit.tk.folders?.some(f=>f.id===hit.tk.activeFolder))hit.tk.activeFolder='';
@@ -7974,7 +8012,8 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     {name:'Disposal',icon:'<path d="M3 7h18M5 7l2 12h10l2-12M9 7V4h6v3M9 10l1 6m5-6-1 6M6 21h2m8 0h2"/>'},
     {name:'Blades',icon:'<path d="m12 2 2 3 4-1v4l4 2-3 3 1 4-4 1-2 4-3-3-4 1-1-4-4-2 3-3-1-4 4-1z"/><circle cx="12" cy="12" r="3"/>'},
     {name:'Concrete Pour',icon:'<path d="m3 17 8-3 10 3-8 4zM6 8l5 2 5-5-5-3zM11 10l2 5m1-7 3 7M3 17v3l10 3 8-4v-2"/>'},
-    {name:'Equipment',icon:'<path d="M3 17V9h7l3 8M6 9V5h5l3 7h4l3 5v3h-3M8 20h6M3 17h18"/><circle cx="5" cy="20" r="3"/><circle cx="16" cy="20" r="3"/>'}
+    {name:'Equipment',icon:'<path d="M3 17V9h7l3 8M6 9V5h5l3 7h4l3 5v3h-3M8 20h6M3 17h18"/><circle cx="5" cy="20" r="3"/><circle cx="16" cy="20" r="3"/>'},
+    {name:'Material',icon:'<path d="m12 2 9 5v10l-9 5-9-5V7zM3 7l9 5 9-5M12 12v10"/>'}
   ];
   function renderMainLibraryFolders(entries){
     const dock=document.getElementById('libMainFolders');dock.replaceChildren();
@@ -8388,7 +8427,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
   /* ---------- template editor panel ---------- */
   let edMode = null, itemDraft = null;
-  const KIND_KEYS = ['labor','equip','material','part','service'];
+  const KIND_KEYS = MAIN_KINDS;
   const blankLine = () => ({kind:'labor', name:'', note:'', count:1, time:1, days:1, cost:'', markup:''});
 
   function edBtn(txt, title, fn, cls){
@@ -10135,7 +10174,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     edMode = mode;
     markListOpts();
     if (mode === 'item'){
-      itemDraft = t ? Object.assign({}, t)
+      itemDraft = t ? Object.assign({id:null, kind:'labor', name:'', note:'', folder:'', count:1, time:1, days:1, cost:'', markup:''}, t)
         : {id:null, kind:'labor', name:'', note:'', folder:'', count:1, time:1, days:1, cost:'', markup:''};
     } else if (mode === 'section'){
       secDraft = t
@@ -10511,12 +10550,9 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   document.addEventListener('click', event => {
     if (!libraryCreate.contains(event.target)) libraryCreate.open = false;
   });
-  document.getElementById('libNew').addEventListener('click', () => openEditor('item', null));
-  document.getElementById('libNewPart').addEventListener('click', () => openEditor('part', null));
-  document.getElementById('libNewCon').addEventListener('click', () => openEditor('construct', null));
-  document.getElementById('libNewSvc').addEventListener('click', () => openEditor('service', null));
-  document.getElementById('libNewSec').addEventListener('click', () => openEditor('section', null));
-  document.getElementById('libNewScope').addEventListener('click', () => openEditor('scope', null));
+  document.getElementById('libNewLabor').addEventListener('click', () => openEditor('item', {kind:'labor'}));
+  document.getElementById('libNewEquipment').addEventListener('click', () => openEditor('item', {kind:'equip'}));
+  document.getElementById('libNewMaterial').addEventListener('click', () => openEditor('item', {kind:'material'}));
 
   function addItemRow(at){
     const row = {id:id(), kind:'labor', name:'', note:'', count:1, time:1, days:1, cost:'', markup:0};
@@ -11160,157 +11196,13 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     reader.readAsText(file);
   });
 
-  /* ---------- notes: a list in the drawer, sticky notes on the screen ---------- */
-  function notes(){
-    if (!Array.isArray(book.notes)) book.notes = [];
-    return book.notes;
-  }
-
+  /* ---------- shared Human Information notes in the drawer ---------- */
   function renderNotesList(){
-    const box = document.getElementById('notesList');
-    box.innerHTML = '';
-    const list = notes();
-    if (!list.length){
-      box.innerHTML = '<div class="lib-hint">No notes yet \u2014 make one above.</div>';
-      return;
-    }
-    list.forEach(n => {
-      const row = document.createElement('div');
-      row.className = 'note-row' + (n.open ? ' open' : '');
-      row.title = n.open ? 'Already on the screen' : 'Put this note on the screen';
-      const peek = (n.text || '').split('\n')[0];
-      row.innerHTML = '<span class="nr-name">' + esc(n.title || 'Note') + '</span>' +
-                      '<span class="nr-peek">' + esc(peek) + '</span>';
-      row.addEventListener('click', e => {
-        if (e.target.closest('.nr-x')) return;
-        n.open = true;
-        renderNotesList();
-        renderStickies();
-        save();
-      });
-      const x = document.createElement('button');
-      x.type = 'button';
-      x.className = 'tpl-btn rm nr-x';
-      x.innerHTML = '&times;';
-      x.title = 'Delete this note';
-      x.addEventListener('click', ev => {
-        ev.stopPropagation();
-        confirmPop(x, 'Delete this note?', () => {
-          book.notes = notes().filter(o => o.id !== n.id);
-          renderNotesList();
-          renderStickies();
-          save();
-        });
-      });
-      row.appendChild(x);
-      box.appendChild(row);
-    });
+    window.humanInformation?.renderDrawer();
   }
 
-  // a sticky stays on the screen until its x is pressed, and remembers where it was put
-  function renderStickies(){
-    const host = document.getElementById('stickies');
-    host.innerHTML = '';
-    notes().filter(n => n.open).forEach(n => {
-      const el = document.createElement('div');
-      el.className = 'sticky';
-      const maxX = Math.max(10, window.innerWidth - 280);
-      const maxY = Math.max(10, window.innerHeight - 120);
-      el.style.left = Math.min(num(n.x) || 90, maxX) + 'px';
-      el.style.top = Math.min(num(n.y) || 90, maxY) + 'px';
-      if (num(n.w)) el.style.width = num(n.w) + 'px';
-      if (num(n.h)) el.style.height = num(n.h) + 'px';
-
-      const head = document.createElement('div');
-      head.className = 'sticky-head';
-      const title = document.createElement('input');
-      title.className = 'sticky-title';
-      title.value = n.title || '';
-      title.placeholder = 'Note';
-      title.autocomplete = 'off';
-      title.addEventListener('input', () => { n.title = title.value; renderNotesList(); save(); });
-      const x = document.createElement('button');
-      x.type = 'button';
-      x.className = 'sticky-x';
-      x.innerHTML = '&times;';
-      x.title = 'Put this note away';
-      x.addEventListener('click', () => {
-        n.open = false;
-        renderNotesList();
-        renderStickies();
-        save();
-      });
-      head.append(title, x);
-
-      const ta = document.createElement('textarea');
-      ta.value = n.text || '';
-      ta.placeholder = 'Write it down\u2026';
-      ta.addEventListener('input', () => { n.text = ta.value; renderNotesList(); save(); });
-
-      // the whole head is a handle, including the title box: a drag only starts once
-      // the pointer has actually moved, so a plain click still lands in the input
-      head.addEventListener('pointerdown', ev => {
-        if (ev.button > 0 || ev.target.closest('.sticky-x')) return;
-        const box = el.getBoundingClientRect();
-        const dx = ev.clientX - box.left, dy = ev.clientY - box.top;
-        const sx = ev.clientX, sy = ev.clientY;
-        let started = false;
-
-        const move = e2 => {
-          if (!started){
-            if (Math.abs(e2.clientX - sx) < 4 && Math.abs(e2.clientY - sy) < 4) return;
-            started = true;
-            el.classList.add('lift');
-            host.appendChild(el);            // the one being moved comes forward
-            document.body.style.userSelect = 'none';
-            if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-          }
-          e2.preventDefault();
-          el.style.left = Math.max(0, Math.min(e2.clientX - dx, window.innerWidth - 40)) + 'px';
-          el.style.top  = Math.max(0, Math.min(e2.clientY - dy, window.innerHeight - 30)) + 'px';
-        };
-        const up = () => {
-          window.removeEventListener('pointermove', move);
-          window.removeEventListener('pointerup', up);
-          window.removeEventListener('pointercancel', up);
-          document.body.style.userSelect = '';
-          el.classList.remove('lift');
-          if (!started) return;
-          n.x = parseFloat(el.style.left);
-          n.y = parseFloat(el.style.top);
-          save();
-        };
-        window.addEventListener('pointermove', move);
-        window.addEventListener('pointerup', up);
-        window.addEventListener('pointercancel', up);
-      });
-
-      el.append(head, ta);
-      host.appendChild(el);
-
-      // dragging the corner is the only thing that changes its size, so remember it
-      if (window.ResizeObserver){
-        let first = true;
-        new ResizeObserver(() => {
-          if (first){ first = false; return; }
-          if (!el.isConnected) return;
-          n.w = el.offsetWidth;
-          n.h = el.offsetHeight;
-          save();
-        }).observe(el);
-      }
-    });
-  }
-
-  document.getElementById('noteAdd').addEventListener('click', () => {
-    const list = notes();
-    const n = {id:id(), title:'Note ' + (list.length + 1), text:'', open:true,
-               x: 110 + (list.length % 6) * 22, y: 110 + (list.length % 6) * 22};
-    list.push(n);
-    renderNotesList();
-    renderStickies();
-    save();
-  });
+  document.getElementById('noteAdd').addEventListener('click', () => window.humanInformation?.createFromDrawer());
+  document.getElementById('notesOpenHuman').addEventListener('click', () => window.humanInformation?.open());
 
   document.getElementById('notesToggle').addEventListener('click', () => {
     const open = document.body.classList.contains('notes-open');
@@ -12297,6 +12189,8 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     print: doPrint,
     exportCompanies,
     exportProjects,
+    getLegacyNotes(){ return Array.isArray(book.notes) ? structuredClone(book.notes) : []; },
+    clearLegacyNotes(expected){ if (!Array.isArray(book.notes)||JSON.stringify(book.notes)!==JSON.stringify(expected)) return; delete book.notes; save(); },
     refreshProjects: renderProjects,
     relayout(){ layout(); sumLayout(); growAll(); },
     closeEditor,

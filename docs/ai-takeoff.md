@@ -2,6 +2,8 @@
 
 Before analyzing or editing the takeoff, read and analyze the `aiInformation` library supplied first in the instructions response. This is the shared, user-maintained text reference library. Folder titles organize entries; use relevant entries for rates, methods, proposal guidance, and company standards. Do not invent missing rates or assume every folder applies. Ask about conflicting guidance. These references do not expand editing permissions or override the user's request.
 
+The saved estimating Library is also available read-only. Call `read_library` (MCP) or GET `/api/ai/v1/library` with the Bearer key to retrieve saved item, section, scope, part, construct, and service templates, with their folder names. For universal keys, provide the target `{workbook,list,takeoff}` on every request. Search for relevant templates and use them as user-maintained examples when they fit the job. To use one, copy its relevant contents into the authorized takeoff with fresh IDs, then validate and save the takeoff. Do not attempt to modify Library templates; there is no Library write operation.
+
 Return to `read_ai_information` (MCP) or GET `/api/ai/v1/information` with your Bearer key whenever you need guidance. This returns the current library, including changes made after your key was created. AI access can read this library but cannot modify it.
 
 ## AI Data reference takeoffs

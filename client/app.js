@@ -735,6 +735,7 @@ for (const id of ['saveFile', 'saveFile2']) {
 }
 $('server-signout').onclick = () => run(async () => { await closeProject(); await api('/logout', { method: 'POST' }); location.reload(); });
 window.freedomSession = {
+  workbookId: () => current?.id || '',
   changed: defer => defer ? connection?.scheduleChanges() : connection?.changed(), notify: text => message(text),
   detailsCollapsed:(list,takeoff)=>connection?.detailPreferences.collapsed(list,takeoff)??true,
   setDetailsCollapsed:(list,takeoff,value)=>connection?.detailPreferences.set(list,takeoff,value)

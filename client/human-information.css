@@ -14,6 +14,11 @@
 #human-info-tree{display:flex;flex-direction:column;gap:5px;font-size:13px}#human-info-tree button{text-align:left;overflow-wrap:anywhere;border-color:transparent;background:transparent;line-height:1.5}
 #human-info-tree button[aria-pressed=true]{background:var(--paper);border-color:var(--rule);box-shadow:inset 3px 0 var(--teal)}
 #human-information-page #human-info-save{background:var(--ink);color:var(--paper)}
+#notesPanel #noteAdd,#notesPanel #notesOpenHuman{display:block;width:100%;margin:8px 0}
+#notesPanel .human-note-row{display:flex;width:100%;flex-direction:column;gap:5px;text-align:left;padding:9px;margin:5px 0;border:1px solid var(--rule);border-radius:5px;background:var(--card);color:var(--ink);cursor:pointer}
+#notesPanel .human-note-row:hover{border-color:var(--amber);background:var(--calc)}
+#notesPanel .human-note-row strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:600 12px var(--f-sans)}
+#notesPanel .human-note-row span{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;color:var(--muted);font:11px/1.45 var(--f-sans);white-space:pre-wrap}
 #human-information-page>footer{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:16px 0;font-size:13px}
 @media(max-width:700px){#human-information-page{padding:16px}.human-info-layout{grid-template-columns:1fr}.human-info-layout>aside{border-right:0;border-bottom:1px solid var(--rule)}.human-info-layout>main{padding:18px}#human-info-tree{max-height:220px;overflow:auto}}
 @media(max-width:420px){#human-information-page>header{flex-direction:column;gap:12px}}
