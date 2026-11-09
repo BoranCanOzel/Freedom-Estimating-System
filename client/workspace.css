@@ -299,9 +299,23 @@ body #sheetTable tr.section-head.tree-child .sec-add{background:transparent;bord
 body #sheetTable tr.section-head.tree-child .sec-add:hover{color:var(--ink);border-color:var(--muted)}
 
 /* Pinned category folders reuse the library's ordinary folder drop targets. */
-#library .lib-actions{flex:0 1 auto;min-height:0;max-height:45%;overflow:auto;padding:10px 14px;border-top:1px solid var(--rule);background:var(--card)}
-#library .lib-actions .lib-block{margin-bottom:10px}
-#library .lib-actions .lib-newfolder{margin-bottom:0}
+#libBreadcrumbs{flex:none;padding:8px 14px 0;min-width:0}
+#libBreadcrumbs .lib-trail{margin-bottom:6px}
+#library .lib-actions{position:relative;z-index:12;display:grid;grid-template-columns:32px minmax(0,1fr) 32px;gap:6px;flex:none;margin:0 14px 8px}
+#library .lib-actions>details{min-width:0}
+#library .lib-actions summary{display:flex;align-items:center;justify-content:center;gap:6px;height:32px;box-sizing:border-box;padding:5px 8px;border:1px solid var(--rule);border-radius:5px;background:var(--card);color:var(--ink);font:600 12px var(--f-sans);list-style:none;cursor:pointer;white-space:nowrap}
+#library .lib-actions summary::-webkit-details-marker{display:none}
+#library .lib-actions summary:hover,#library .lib-actions details[open]>summary{background:var(--calc);border-color:var(--amber)}
+#library .lib-actions :is(summary,button):focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+#libCreate>summary{font-size:23px!important;font-weight:500!important}
+#library .lib-actions svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+#library .lib-action-popup{position:absolute;top:calc(100% + 5px);left:0;right:0;box-sizing:border-box;max-height:min(52vh,420px);overflow:auto;padding:10px;border:1px solid var(--rule);border-radius:6px;background:var(--card);box-shadow:0 8px 24px #0004;color:var(--ink);font:12px var(--f-sans)}
+#library .lib-create-choices{display:grid;gap:2px;padding:4px}
+#library .lib-create-choices button{display:grid;gap:3px;width:100%;text-align:left;padding:8px;border:0;border-radius:4px;background:transparent;color:var(--ink);cursor:pointer;font:12px var(--f-sans)}
+#library .lib-create-choices button:hover{background:var(--calc)}
+#library .lib-create-choices small{color:var(--muted);font-size:11px}
+#library .lib-folder-panel label{display:block;margin-bottom:8px}
+#library .lib-newfolder{margin:0}
 #libMainFolders{display:grid;grid-template-columns:repeat(auto-fit,minmax(60px,1fr));gap:5px;padding:12px 10px;flex:none;border-top:1px solid var(--rule);background:var(--slate-bg)}
 #libMainFolders .lib-main-folder{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-width:0;margin:0;padding:9px 3px;border:1px solid transparent;border-radius:6px;background:transparent;color:#f2cb54;cursor:pointer;font:600 11px var(--f-sans);text-align:center;line-height:1.3;white-space:normal}
 #libMainFolders .lib-main-folder svg{width:29px;height:31px;flex:none}

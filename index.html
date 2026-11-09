@@ -768,19 +768,6 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
     font-family:var(--f-mono);font-size:9.5px;line-height:1.5;color:var(--faint);
   }
   .lib-foot b{color:var(--muted)}
-  .lib-create{border:1px solid var(--rule);border-radius:6px;background:var(--card);overflow:hidden}
-  .lib-create>summary{display:flex;justify-content:space-between;align-items:center;padding:11px 13px;cursor:pointer;font:600 13px var(--f-sans);color:var(--ink);list-style:none}
-  .lib-create>summary::-webkit-details-marker{display:none}
-  .lib-create[open]>summary{border-bottom:1px solid var(--rule)}
-  .lib-create[open]>summary span{transform:rotate(180deg)}
-  .lib-create-choices{display:grid;padding:4px}
-  #library .lib-create-choices button{display:grid;gap:3px;width:100%;text-align:left;padding:9px;border:0;border-radius:4px;background:transparent;color:var(--ink);cursor:pointer;font:12px var(--f-sans)}
-  #library .lib-create-choices button:hover{background:var(--calc)}
-  .lib-create-choices small{color:var(--muted);font-size:11px}
-  .lib-create :is(summary,button):focus-visible,.lib-save-existing>summary:focus-visible{outline:2px solid var(--amber);outline-offset:-2px}
-  .lib-save-existing{margin-top:10px}
-  .lib-save-existing>summary{cursor:pointer;color:var(--muted);font:12px var(--f-sans);padding:5px 0}
-  .lib-save-existing #libCapScope{margin:8px 0}
 
   .tpl{
     display:flex;align-items:center;gap:8px;padding:7px 8px;
@@ -2777,33 +2764,25 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
     <div class="lib-pick">
       <input id="libName" class="lib-name" aria-label="Library name">
       <button type="button" class="tpl-btn" id="libSwitch" title="Switch library">&#9662;</button>
-      <button type="button" class="tpl-btn" id="libAdd" title="Add a new library">+</button>
+      <button type="button" class="tpl-btn" id="libAdd" title="Add a new library" aria-label="Add a new library">+</button>
       <button type="button" class="btn alt tiny" id="libBack" hidden>&larr; Templates</button>
     </div>
     <button type="button" class="lib-close" id="libClose" aria-label="Close the library">&times;</button>
   </div>
-  <div class="lib-body">
-    <datalist id="folderList"></datalist>
-
-    <div id="libTemplates">
-    <div class="lib-block">
-      <div class="lib-list" id="libAll"></div>
-    </div>
-
-    </div>
-  </div>
-  <section class="lib-actions" aria-label="Library actions">
-    <div class="lib-block" id="libCreateBlock">
-      <details class="lib-create" id="libCreate">
-        <summary>+ Create template <span aria-hidden="true">⌄</span></summary>
-        <div class="lib-create-choices">
-          <button type="button" id="libNewLabor"><strong>Labor</strong><small>Labor line item</small></button>
-          <button type="button" id="libNewEquipment"><strong>Equipment</strong><small>Equipment line item</small></button>
-          <button type="button" id="libNewMaterial"><strong>Material</strong><small>Material line item</small></button>
-        </div>
-      </details>
-      <details class="lib-save-existing">
-        <summary>Save from this page</summary>
+  <div id="libBreadcrumbs"></div>
+  <section class="lib-actions" id="libCreateBlock" aria-label="Library actions">
+    <details class="lib-create" id="libCreate" name="library-actions">
+      <summary aria-label="Create template" title="Create template"><span aria-hidden="true">+</span></summary>
+      <div class="lib-create-choices lib-action-popup">
+        <button type="button" id="libNewLabor"><strong>Labor</strong><small>Labor line item</small></button>
+        <button type="button" id="libNewEquipment"><strong>Equipment</strong><small>Equipment line item</small></button>
+        <button type="button" id="libNewMaterial"><strong>Material</strong><small>Material line item</small></button>
+        <button type="button" id="libNewSection"><strong>Section</strong><small>A reusable group of line items</small></button>
+      </div>
+    </details>
+    <details class="lib-save-existing" id="libSave" name="library-actions">
+      <summary title="Save items or sections from the current page to this folder"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8m-3-3 3 3 3-3M2 10v4h12v-4"/></svg><span>Save from page</span><span aria-hidden="true">&#9662;</span></summary>
+      <div class="lib-action-popup lib-save-panel">
         <label class="lib-capture-field">What do you want to save?
           <select id="libCaptureType"><option value="">Choose what to save</option><option value="item">Item</option><option value="section">Section or subsection</option><option value="page">Entire page</option></select>
         </label>
@@ -2811,14 +2790,20 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
         <p id="libCaptureDestination" class="lib-hint"></p>
         <button type="button" class="btn alt tiny" id="libCapScope" hidden>Save entire page</button>
         <div class="lib-list" id="libCapture"></div>
-      </details>
-    </div>
-
-    <div class="lib-newfolder">
-      <input id="folderNew" placeholder="New folder name">
-      <button type="button" class="btn alt tiny" id="folderAdd">Add</button>
-    </div>
+      </div>
+    </details>
+    <details class="lib-newfolder-menu" id="libNewFolder" name="library-actions">
+      <summary aria-label="New folder" title="New folder"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 13V3h4l2 2h6v8zM8 7v4m-2-2h4"/></svg></summary>
+      <div class="lib-action-popup lib-folder-panel">
+        <label for="folderNew">Folder name</label>
+        <div class="lib-newfolder"><input id="folderNew" placeholder="New folder name"><button type="button" class="btn alt tiny" id="folderAdd">Add</button></div>
+      </div>
+    </details>
   </section>
+  <div class="lib-body">
+    <datalist id="folderList"></datalist>
+    <div id="libTemplates"><div class="lib-block"><div class="lib-list" id="libAll"></div></div></div>
+  </div>
   <nav id="libMainFolders" aria-label="Main library folders"></nav>
   <div class="lib-foot">Drag onto a folder to organize, or onto the sheet to place an item.</div>
 </aside>
@@ -8138,7 +8123,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       sep.textContent = '\u203A';
       trail.append(sep, crumb(seg, all.slice(0, i + 1).join('/'), i === all.length - 1));
     });
-    box.appendChild(trail);
+    document.getElementById('libBreadcrumbs').replaceChildren(trail);
 
     const kids = childFolders(names, libPath);
     kids.filter(p=>libPath||!MAIN_LIBRARY_FOLDERS.some(folder=>folder.name===p)).forEach(p => box.appendChild(folderRow(p, entries)));
@@ -8150,7 +8135,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       const hint = document.createElement('div');
       hint.className = 'lib-hint';
       hint.textContent = libPath ? 'Empty — drag a template here.'
-                                 : 'No templates yet — make one below.';
+                                 : 'No templates yet. Choose + above to create one.';
       box.appendChild(hint);
     }
   }
@@ -8175,6 +8160,8 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     renderLibrary();
     save();
     flash('folder added');
+    document.getElementById('libNewFolder').open=false;
+    document.querySelector('#libNewFolder>summary').focus();
   });
 
   /* ---------- scope templates ---------- */
@@ -10044,18 +10031,17 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   libraryCreate.addEventListener('click', event => {
     if (event.target.closest('button')) libraryCreate.open = false;
   });
-  libraryCreate.addEventListener('keydown', event => {
-    if (event.key === 'Escape'){
-      event.preventDefault(); event.stopPropagation();
-      libraryCreate.open = false; libraryCreate.querySelector('summary').focus();
-    }
-  });
-  document.addEventListener('click', event => {
-    if (!libraryCreate.contains(event.target)) libraryCreate.open = false;
+  const libraryMenus=[...document.querySelectorAll('#libCreateBlock>details')];
+  libraryMenus.forEach(menu=>{
+    menu.addEventListener('keydown',event=>{
+      if(event.key==='Escape'){event.preventDefault();event.stopPropagation();menu.open=false;menu.querySelector('summary').focus();}
+    });
+    document.addEventListener('click',event=>{if(!event.composedPath().includes(menu))menu.open=false;});
   });
   document.getElementById('libNewLabor').addEventListener('click', () => openEditor('item', {kind:'labor'}));
   document.getElementById('libNewEquipment').addEventListener('click', () => openEditor('item', {kind:'equip'}));
   document.getElementById('libNewMaterial').addEventListener('click', () => openEditor('item', {kind:'material'}));
+  document.getElementById('libNewSection').addEventListener('click', () => openEditor('section', null));
 
   function addItemRow(at){
     const row = {id:id(), kind:'labor', name:'', note:'', count:1, time:1, days:1, cost:'', markup:0};
@@ -10540,16 +10526,18 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     save();
   });
 
-  document.getElementById('libAdd').addEventListener('click', () => {
-    activeLib();
-    const lib = {id:id(), name:'Library ' + (book.libs.length + 1),
-                 templates:{items:[], sections:[], scopes:[]}, folders:[]};
-    book.libs.push(lib);
-    book.activeLib = lib.id;
-    renderLibrary();
-    save();
-    flash('library added');
-    document.getElementById('libName').focus();
+  document.getElementById('libAdd').addEventListener('click', event => {
+    confirmPop(event.currentTarget, 'Create a new, empty library?', () => {
+      activeLib();
+      const lib = {id:id(), name:'Library ' + (book.libs.length + 1),
+                   templates:{items:[], sections:[], scopes:[]}, folders:[]};
+      book.libs.push(lib);
+      book.activeLib = lib.id;
+      renderLibrary();
+      save();
+      flash('library added');
+      document.getElementById('libName').focus();
+    }, 'Create library');
   });
 
   document.getElementById('libSwitch').addEventListener('click', e => {

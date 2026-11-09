@@ -114,7 +114,16 @@ export function setupHumanInformation(api){
     $('parent').value=item.parent;
   }
   function setBusy(value){busy=value;for(const root of [page,drawer]){root.setAttribute('aria-busy',String(value));root.querySelectorAll('button,input,textarea,select').forEach(el=>el.disabled=value&&el.dataset.action!=='close'&&el.id!=='notesClose');}}
-  async function request(options={}){const signal=operation?.signal;const result=await api('/human-information',{...options,signal});signal?.throwIfAborted();return result;}
+  async function request(options={}){
+    const signal=operation?.signal;
+    try{const result=await api('/human-information',{...options,signal});signal?.throwIfAborted();return result;}
+    catch(error){
+      if(error.status===422&&error.message==='Only text entries and folders are supported.'&&options.method==='PUT'&&/"(?:starred|pinned)":/.test(options.body||'')){
+        throw new Error('The running server does not support stars and pins yet. Deploy the latest code and restart the Node project in aaPanel, then reload notes and retry. Your unsaved changes are still here.');
+      }
+      throw error;
+    }
+  }
   async function run(fn){
     if(busy)return;const controller=new AbortController();operation=controller;setBusy(true);
     const timer=setTimeout(()=>controller.abort(new Error('The request timed out. Your unsaved notes are still here. Reload to check whether a save completed before retrying.')),20000);

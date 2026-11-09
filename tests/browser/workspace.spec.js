@@ -791,6 +791,13 @@ test('notes support shared stars and pins without saving unfinished text edits',
   await page.locator('#notesToggle').click();
   const drawer=page.locator('#notesPanel'),rows=drawer.locator('#notesList .human-note-row strong'),filters=drawer.locator('.human-note-filters');
   await expect(rows).toHaveText(['Alpha','Bravo','Charlie']);
+  const olderServer=route=>route.fulfill({status:422,contentType:'application/json',body:JSON.stringify({error:'Only text entries and folders are supported.'})});
+  await page.route('**/api/human-information',route=>route.request().method()==='PUT'?olderServer(route):route.continue());
+  await drawer.getByRole('button',{name:'Star Bravo',exact:true}).click();
+  await expect(drawer.locator('#human-info-drawer-status')).toContainText('restart the Node project in aaPanel');
+  await expect(drawer.getByRole('button',{name:'Star Bravo',exact:true})).toHaveAttribute('aria-pressed','false');
+  await expect(rows).toHaveText(['Alpha','Bravo','Charlie']);
+  await page.unroute('**/api/human-information');
   await drawer.getByRole('button',{name:'Star Bravo',exact:true}).click();await expect(drawer.locator('#human-info-drawer-status')).toHaveText('Saved.');
   await drawer.getByRole('button',{name:'Pin Charlie',exact:true}).click();await expect(drawer.getByRole('button',{name:'Unpin Charlie',exact:true})).toHaveAttribute('aria-pressed','true');
   await expect(rows).toHaveText(['Charlie','Bravo','Alpha']);
@@ -2088,17 +2095,35 @@ test('large estimate scrolls without changing rows or totals', async ({page}) =>
   await expect(page.locator('#tGrand')).toHaveText(total);
 });
 
+test('adding a library requires confirmation and cancellation leaves existing libraries unchanged',async({page})=>{
+  await openWorkbook(page);await page.locator('#libToggle').click();
+  const snapshot=()=>page.evaluate(()=>{const book=window.estimator.exportBook();return{libs:book.libs,active:book.activeLib};});
+  const original=await snapshot(),dialog=page.getByRole('alertdialog');
+  await page.getByRole('button',{name:'Add a new library',exact:true}).click();
+  await expect(dialog).toContainText('Create a new, empty library?');
+  await expect(dialog.getByRole('button',{name:'Cancel',exact:true})).toBeFocused();
+  expect(await snapshot()).toEqual(original);
+  await dialog.getByRole('button',{name:'Cancel',exact:true}).click();expect(await snapshot()).toEqual(original);
+  await page.locator('#libAdd').click();await dialog.press('Escape');expect(await snapshot()).toEqual(original);
+  await page.locator('#libAdd').click();await dialog.getByRole('button',{name:'Create library',exact:true}).click();
+  const created=await snapshot();expect(created.libs).toHaveLength(original.libs.length+1);
+  expect(created.libs.slice(0,-1)).toEqual(original.libs);expect(created.active).toBe(created.libs.at(-1).id);
+  await expect(page.locator('#libName')).toHaveValue(created.libs.at(-1).name);
+  await expect(page.locator('#server-status')).toHaveText('All changes saved');await page.reload();
+  expect((await snapshot()).libs).toEqual(created.libs);
+});
+
 test('compact library creation menu opens each editor and supports keyboard dismissal', async ({page}) => {
   const data=workbook();data.templates={items:Array.from({length:60},(_,i)=>({id:'footer-item-'+i,name:'Library item '+i,kind:'labor',cost:25})),sections:[],scopes:[]};
   await openWorkbook(page,data);
   await page.locator('#libToggle').click();
   const actions=page.locator('#library .lib-actions'),list=page.locator('#library .lib-body'),categories=page.locator('#libMainFolders');
-  await expect(actions.locator('#libCreateBlock,#folderNew')).toHaveCount(2);
+  await expect(actions.locator(':scope > details')).toHaveCount(3);
   await expect(list.locator('#libCreateBlock,#folderNew')).toHaveCount(0);
-  const before=await actions.boundingBox(),body=await list.boundingBox(),tabs=await categories.boundingBox();
-  expect(before.y).toBeGreaterThanOrEqual(body.y+body.height-1);expect(before.y+before.height).toBeLessThanOrEqual(tabs.y+1);
+  const before=await actions.boundingBox(),body=await list.boundingBox(),crumbs=await page.locator('#libBreadcrumbs').boundingBox();
+  expect(before.y).toBeGreaterThanOrEqual(crumbs.y+crumbs.height-1);expect(before.y+before.height).toBeLessThanOrEqual(body.y+1);expect(before.height).toBeLessThanOrEqual(34);
   await list.evaluate(el=>el.scrollTop=el.scrollHeight);expect((await actions.boundingBox()).y).toBe(before.y);
-  await expect(page.locator('#folderNew')).toBeInViewport();
+  await expect(page.locator('#folderNew')).toBeHidden();await expect(page.locator('#libNewFolder>summary')).toBeInViewport();
   const create=page.locator('#libCreate');
   for(const [button,kind] of [['libNewLabor','labor'],['libNewEquipment','equip'],['libNewMaterial','material']]){
     await expect(page.locator('#'+button)).not.toBeVisible();
@@ -2111,14 +2136,24 @@ test('compact library creation menu opens each editor and supports keyboard dism
   }
   await create.locator('summary').press('Enter');
   await expect(page.locator('#libNewLabor')).toBeVisible();
+  await expect(create.locator('.lib-create-choices strong')).toHaveText(['Labor','Equipment','Material','Section']);
   await create.locator('summary').press('Escape');
   await expect(page.locator('#libNewLabor')).not.toBeVisible();
-  await page.locator('#folderNew').fill('Footer folder');await page.locator('#folderAdd').click();
-  expect(await page.evaluate(()=>window.estimator.exportBook().folders)).toContain('Footer folder');
+  await create.locator('summary').click();await page.locator('#libNewSection').click();
+  await expect(page.locator('#edTitle')).toHaveText('New section');
+  await page.locator('#editor').getByLabel('Section name',{exact:true}).fill('Reusable crew section');
+  await page.locator('#edSave').click();
+  expect(await page.evaluate(()=>window.estimator.exportBook().templates.sections.find(section=>section.name==='Reusable crew section')?.items.length)).toBe(1);
+  await page.locator('#libNewFolder>summary').click();await page.locator('#folderNew').fill('Toolbar folder');await page.locator('#folderAdd').click();
+  expect(await page.evaluate(()=>window.estimator.exportBook().folders)).toContain('Toolbar folder');await expect(page.locator('#folderNew')).toBeHidden();
   await page.locator('.lib-save-existing > summary').click();
   await page.locator('#libCaptureType').selectOption('page');
   await expect(page.locator('#libCapScope')).toBeVisible();
+  expect((await list.boundingBox()).y).toBe(body.y);
+  await page.locator('#libSave>summary').press('Escape');await expect(page.locator('#libCaptureType')).toBeHidden();
+  await page.screenshot({path:'test-results/library-compact-toolbar.png'});
   await page.setViewportSize({width:390,height:600});await expect(categories).toBeInViewport();
+  await expect(actions).toBeInViewport();await page.locator('#libCreate>summary').click();await expect(page.locator('#libNewSection')).toBeInViewport();
 });
 
 test('library folders can be renamed with contents preserved and conflicting names rejected', async ({page}) => {
@@ -3679,28 +3714,28 @@ test('main library icon folders accept dragged items and allow moving them back 
   await openWorkbook(page,data);await page.locator('#libToggle').click();
   await page.locator('#library').evaluate(el=>Promise.all(el.getAnimations().map(animation=>animation.finished)));
   const dock=page.locator('#libMainFolders');
-  await expect(dock.getByRole('button')).toHaveCount(5);
-  for(const name of ['Labor','Disposal','Blades','Concrete Pour','Equipment'])await expect(dock.getByRole('button',{name:name+' folder',exact:true})).toBeVisible();
+  await expect(dock.getByRole('button')).toHaveCount(6);
+  for(const name of ['Labor','Disposal','Blades','Concrete Pour','Equipment','Material'])await expect(dock.getByRole('button',{name:name+' folder',exact:true})).toBeVisible();
   const drag=async(target)=>{
     const source=await page.locator('#libAll .tpl-name').filter({hasText:'Test crew'}).boundingBox(),dest=await target.boundingBox();
     await page.mouse.move(source.x+source.width/2,source.y+source.height/2);await page.mouse.down();
     await page.mouse.move(dest.x+dest.width/2,dest.y+dest.height/2,{steps:16});await page.mouse.up();
   };
   const folder=()=>page.evaluate(()=>window.estimator.exportBook().templates.items.find(t=>t.id==='crew').folder||'');
-  for(const name of ['Labor','Disposal','Blades','Concrete Pour','Equipment']){
+  for(const name of ['Labor','Disposal','Blades','Concrete Pour','Equipment','Material']){
     await drag(dock.getByRole('button',{name:name+' folder',exact:true}));
     await expect.poll(folder).toBe(name);
     await dock.getByRole('button',{name:name+' folder',exact:true}).click();
     await expect(page.locator('#libAll .tpl-name').filter({hasText:'Test crew'})).toBeVisible();
   }
   await page.screenshot({path:'test-results/library-main-folders.png',fullPage:true});
-  await drag(page.locator('#libAll .crumb').filter({hasText:/^Library$/}));
+  await drag(page.locator('#libBreadcrumbs .crumb').filter({hasText:/^Library$/}));
   await expect.poll(folder).toBe('');
-  await page.locator('#libAll .crumb').filter({hasText:/^Library$/}).click();
+  await page.locator('#libBreadcrumbs .crumb').filter({hasText:/^Library$/}).click();
   await expect(page.locator('#libAll .tpl-name').filter({hasText:'Test crew'})).toBeVisible();
   await expect(page.locator('#server-status')).toHaveText('All changes saved');
   await page.reload();await page.locator('#libToggle').click();
-  await expect(page.locator('#libMainFolders button')).toHaveCount(5);
+  await expect(page.locator('#libMainFolders button')).toHaveCount(6);
   await expect.poll(folder).toBe('');
 });
 
@@ -3714,7 +3749,7 @@ test('save from this page searches items and subsections and saves into the sele
   ];
   await openWorkbook(page,data);await page.locator('#libToggle').click();
   await page.getByRole('button',{name:'Labor folder',exact:true}).click();
-  await page.getByText('Save from this page',{exact:true}).click();
+  await page.getByText('Save from page',{exact:true}).click();
   await expect(page.locator('#libCapture')).toBeEmpty();
   await page.locator('#libCaptureType').selectOption('section');
   await page.locator('#libCaptureSearch').fill('Ramp');
