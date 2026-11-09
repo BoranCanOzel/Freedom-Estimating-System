@@ -783,6 +783,40 @@ test('AI Information drag and drop moves folders with descendants, reorders and 
   await expect(page.locator('#ai-info-tree button')).toHaveText(['▸  Rates','▸  Concrete','—  Cutting','—  Crew','▸  Standards']);
 });
 
+test('right notes drawer edits shared notes in place and preserves drafts across notebook views',async({page})=>{
+  await openWorkbook(page);
+  const initial=await (await page.request.get('/api/human-information')).json();
+  await page.request.put('/api/human-information',{data:{revision:initial.revision,items:[{id:'side-note',kind:'entry',parent:'',title:'Supplier reminder',text:'Call Friday.'}]}});
+  await page.locator('#notesToggle').click();
+  await page.locator('#notesList .human-note-row').filter({hasText:'Supplier reminder'}).click();
+  const drawer=page.locator('#notesPanel'),full=page.locator('#human-information-page');
+  await expect(full).toBeHidden();await expect(drawer.locator('#human-info-editor')).toBeVisible();
+  await expect(page.locator('#title')).toBeEnabled();
+  await drawer.locator('#human-info-text').fill('Call Monday instead.');
+  await page.locator('#notesClose').click();await page.locator('#notesToggle').click();
+  await expect(drawer.locator('#human-info-text')).toHaveValue('Call Monday instead.');
+  await drawer.locator('#human-info-save').click();await expect(drawer.locator('#human-info-drawer-status')).toHaveText('Saved.');
+  let stored=await (await page.request.get('/api/human-information')).json();expect(stored.items[0].text).toBe('Call Monday instead.');
+  await drawer.locator('#human-info-text').fill('Draft from the side.');
+  await page.locator('#notesOpenHuman').click();await expect(full).toBeVisible();
+  await expect(full.locator('#human-info-text')).toHaveValue('Draft from the side.');
+  await full.getByRole('button',{name:'Back to estimating',exact:true}).click();
+  await expect(full).toBeHidden();await expect(drawer.locator('#human-info-text')).toHaveValue('Draft from the side.');
+  await drawer.locator('#human-info-save').click();await expect(drawer.locator('#human-info-drawer-status')).toHaveText('Saved.');
+  await drawer.getByRole('button',{name:'Back to notes',exact:true}).click();
+  await page.locator('#noteAdd').click();await expect(full).toBeHidden();
+  await drawer.locator('#human-info-title').fill('New side note');await drawer.locator('#human-info-text').fill('Created beside the takeoff.');
+  await drawer.locator('#human-info-save').click();await expect(drawer.locator('#human-info-drawer-status')).toHaveText('Saved.');
+  stored=await (await page.request.get('/api/human-information')).json();expect(stored.items.find(item=>item.title==='New side note').text).toBe('Created beside the takeoff.');
+  const latest={...stored.items.at(-1),text:'Updated by a teammate.'};
+  await page.request.put('/api/human-information',{data:{revision:stored.revision,items:stored.items.map(item=>item.id===latest.id?latest:item)}});
+  await drawer.locator('#human-info-text').fill('Keep my draft.');await drawer.locator('#human-info-save').click();
+  await expect(drawer.locator('#human-info-drawer-status')).toContainText('Someone changed Human Information');
+  await expect(drawer.locator('#human-info-text')).toHaveValue('Keep my draft.');
+  await page.setViewportSize({width:390,height:844});
+  expect(await drawer.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
+});
+
 test('Human Information saves team notes, protects drafts when switching pages and keeps AI information separate',async({page})=>{
   await openWorkbook(page);
   const existing=await (await page.request.get('/api/human-information')).json();

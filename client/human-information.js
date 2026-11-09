@@ -11,8 +11,24 @@ export function setupHumanInformation(api){
     <form id="human-info-editor" hidden><p id="human-info-kind" class="human-info-eyebrow"></p><label>Title<input id="human-info-title" required maxlength="160" placeholder="Give this note a title"></label><label>Folder<select id="human-info-parent"></select></label><label id="human-info-text-label">Notes<textarea id="human-info-text" rows="16" maxlength="100000" placeholder="Write anything your team needs to remember..."></textarea></label><div class="human-info-tools"><button id="human-info-save" type="submit">Save changes</button><button type="button" data-action="delete">Delete</button></div></form></main></div>
     <footer><span id="human-info-status" role="status"></span><button type="button" data-action="reload">Reload notes</button></footer>`;
   document.body.append(page);
-  const $=id=>page.querySelector('#human-info-'+id),message=text=>$('status').textContent=text;
-  let library={items:[],revision:''},saved=structuredClone(library),selected='',dirty=false,busy=false,operation=null;
+  const $=id=>document.getElementById('human-info-'+id);
+  const drawer=document.getElementById('notesPanel'),drawerBody=drawer.querySelector('.lib-body');
+  const drawerEditor=document.createElement('section');drawerEditor.id='human-info-drawer-editor';drawerEditor.hidden=true;
+  const back=document.createElement('button');back.type='button';back.className='btn alt tiny';back.textContent='Back to notes';
+  drawerEditor.append(back);drawerBody.append(drawerEditor);
+  const drawerStatus=document.createElement('p');drawerStatus.id='human-info-drawer-status';drawerStatus.setAttribute('role','status');drawerBody.append(drawerStatus);
+  const form=$('editor'),pageMain=form.parentElement;
+  const message=text=>{$('status').textContent=text;drawerStatus.textContent=text;};
+  let library={items:[],revision:''},saved=structuredClone(library),selected='',dirty=false,busy=false,operation=null,drawerEditing=false,returnToDrawer=false;
+  function mountEditor(inDrawer){
+    drawerEditing=inDrawer;drawerEditor.hidden=!inDrawer;
+    document.getElementById('notesList').hidden=inDrawer;
+    (inDrawer?drawerEditor:pageMain).append(form);
+  }
+  function editInDrawer(entryId){
+    if(busy||!discard())return;selected=entryId;mountEditor(true);render();message('');$('title').focus();
+  }
+  back.onclick=()=>{if(busy||!discard())return;mountEditor(false);render();paintDrawer();message('');};
   const hiddenContent=[];
   function background(hidden){
     if(hidden){for(const el of document.body.children)if(el!==page&&el.id!=='server-bar'&&!el.inert){el.inert=true;hiddenContent.push(el);}}
@@ -41,13 +57,13 @@ export function setupHumanInformation(api){
     for(const folder of library.items.filter(item=>item.kind==='folder'&&!excluded.has(item.id)))$('parent').add(new Option(path(folder.id),folder.id));
     $('parent').value=item.parent;
   }
-  function setBusy(value){busy=value;page.setAttribute('aria-busy',String(value));page.querySelectorAll('button,input,textarea,select').forEach(el=>el.disabled=value&&el.dataset.action!=='close');}
+  function setBusy(value){busy=value;for(const root of [page,drawer]){root.setAttribute('aria-busy',String(value));root.querySelectorAll('button,input,textarea,select').forEach(el=>el.disabled=value&&el.dataset.action!=='close'&&el.id!=='notesClose');}}
   async function request(options={}){const signal=operation?.signal;const result=await api('/human-information',{...options,signal});signal?.throwIfAborted();return result;}
   async function run(fn){
     if(busy)return;const controller=new AbortController();operation=controller;setBusy(true);
     const timer=setTimeout(()=>controller.abort(new Error('The request timed out. Your unsaved notes are still here. Reload to check whether a save completed before retrying.')),20000);
     const aborted=new Promise((_,reject)=>controller.signal.addEventListener('abort',()=>reject(controller.signal.reason),{once:true}));
-    try{await Promise.race([fn(),aborted]);}catch(error){if(operation===controller){message(error.message);const box=document.getElementById('notesList');if(page.hidden&&box)box.textContent=error.message;}}
+    try{await Promise.race([fn(),aborted]);}catch(error){if(operation===controller)message(error.message);}
     finally{clearTimeout(timer);if(operation===controller){operation=null;setBusy(false);}}
   }
   async function reload(){library=await request();saved=structuredClone(library);dirty=false;if(!current())selected='';render();paintDrawer();message('Notes loaded.');}
@@ -86,20 +102,24 @@ export function setupHumanInformation(api){
       const row=document.createElement('button');row.type='button';row.className='human-note-row';
       const title=document.createElement('strong');title.textContent=item.title;
       const excerpt=document.createElement('span');excerpt.textContent=item.text.split('\n').find(line=>line.trim())||'No note text';
-      row.append(title,excerpt);row.title='Edit in Human Information';row.onclick=()=>run(()=>open(item.id));box.append(row);
+      row.append(title,excerpt);row.title='View and edit note';row.onclick=()=>editInDrawer(item.id);box.append(row);
     });
   }
-  async function open(entryId=selected,create=false){
-    if(!page.hidden&&!discard())return;
+  async function open(entryId=selected){
+    if(drawerEditing){returnToDrawer=true;mountEditor(false);page.hidden=false;background(true);button.setAttribute('aria-current','page');return;}
+    if(!discard())return;
     page.hidden=false;background(true);button.setAttribute('aria-current','page');
     message('Loading notes...');await reload();await migrateLegacyNotes();
-    if(create){const created={id:crypto.randomUUID(),kind:'entry',parent:'',title:'Untitled note',text:''};library.items.push(created);selected=created.id;dirty=true;render();message('Name it, then save.');$('title').focus();$('title').select();}
-    else{selected=entryId;render();message('');$('title').focus();}
+    selected=entryId;render();message('');$('title').focus();
   }
   button.onclick=event=>{if(!currentTabClick(event))return;event.preventDefault();run(async()=>{if(page.hidden){await open();page.querySelector('[data-action="close"]').focus();}});};
-  function close(){if(!discard())return;operation?.abort();operation=null;setBusy(false);page.hidden=true;background(false);button.setAttribute('aria-current','false');clearPageLink('human-information');button.focus();}
+  function close(){if(!returnToDrawer&&!discard())return;operation?.abort();operation=null;setBusy(false);if(!dirty)render();page.hidden=true;background(false);button.setAttribute('aria-current','false');clearPageLink('human-information');if(returnToDrawer){returnToDrawer=false;mountEditor(true);$('title').focus();}else button.focus();}
   page.querySelector('[data-action="close"]').onclick=close;
-  window.humanInformation={open:()=>run(()=>open()),createFromDrawer:()=>run(()=>open('',true)),renderDrawer:()=>run(renderDrawer)};
+  window.humanInformation={open:()=>run(()=>open()),createFromDrawer:()=>run(async()=>{
+    if(!discard())return;await reload();await migrateLegacyNotes();
+    const created={id:crypto.randomUUID(),kind:'entry',parent:'',title:'Untitled note',text:''};
+    library.items.push(created);selected=created.id;dirty=true;mountEditor(true);render();message('Name it, then save.');$('title').focus();$('title').select();
+  }),renderDrawer:()=>run(renderDrawer)};
   document.getElementById('server-bar').addEventListener('click',event=>{
     if(event.target.closest('a[href]')&&!currentTabClick(event))return;
     if(page.hidden||button.contains(event.target))return;
@@ -114,7 +134,7 @@ export function setupHumanInformation(api){
     const item=current();if(!item)return;const updated={...item,title:$('title').value.trim(),parent:$('parent').value,text:item.kind==='entry'?$('text').value:''};
     if(!updated.title)throw Error('Enter a title.');await persist(library.items.map(item=>item.id===selected?updated:item));
   });};
-  page.querySelector('[data-action="delete"]').onclick=()=>run(async()=>{
+  form.querySelector('[data-action="delete"]').onclick=()=>run(async()=>{
     const item=current();if(!item)return;const removed=descendants(item.id);
     if(!confirm(`Delete “${item.title}”${removed.size>1?' and all notes and folders inside it':''}? This cannot be undone.`))return;
     await persist(library.items.filter(item=>!removed.has(item.id)));selected='';render();

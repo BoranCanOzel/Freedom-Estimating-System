@@ -19,6 +19,17 @@
 #notesPanel .human-note-row:hover{border-color:var(--amber);background:var(--calc)}
 #notesPanel .human-note-row strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:600 12px var(--f-sans)}
 #notesPanel .human-note-row span{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;color:var(--muted);font:11px/1.45 var(--f-sans);white-space:pre-wrap}
+#notesPanel #human-info-drawer-editor[hidden],#notesPanel #notesList[hidden]{display:none}
+#human-info-drawer-editor>button{margin-bottom:16px}
+#notesPanel #human-info-editor label{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;font:12px var(--f-sans);color:var(--ink)}
+#notesPanel #human-info-editor label[hidden],#notesPanel #human-info-editor[hidden]{display:none}
+#notesPanel #human-info-editor :is(input,textarea,select){box-sizing:border-box;width:100%;min-width:0;max-width:100%;padding:9px;border:1px solid var(--rule);border-radius:4px;background:var(--paper);color:var(--ink);font:13px/1.5 var(--f-sans)}
+#notesPanel #human-info-editor textarea{min-height:240px;resize:vertical}
+#notesPanel #human-info-editor .human-info-tools{margin-bottom:12px}
+#notesPanel #human-info-editor button{padding:8px 12px;border:1px solid var(--rule);border-radius:4px;background:var(--paper);color:var(--ink);cursor:pointer;font:12px var(--f-sans)}
+#notesPanel #human-info-save{background:var(--ink)!important;color:var(--paper)!important}
+#notesPanel :is(button,input,textarea,select):disabled{opacity:.6;cursor:default}
+#human-info-drawer-status{font:12px/1.5 var(--f-sans);color:var(--muted);overflow-wrap:anywhere}
 #human-information-page>footer{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:16px 0;font-size:13px}
 @media(max-width:700px){#human-information-page{padding:16px}.human-info-layout{grid-template-columns:1fr}.human-info-layout>aside{border-right:0;border-bottom:1px solid var(--rule)}.human-info-layout>main{padding:18px}#human-info-tree{max-height:220px;overflow:auto}}
 @media(max-width:420px){#human-information-page>header{flex-direction:column;gap:12px}}
