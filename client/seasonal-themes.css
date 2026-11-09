@@ -164,12 +164,12 @@ text-shadow:0 0 6px rgba(176,124,255,.7);box-shadow:0 0 12px -3px rgba(176,124,2
 body.server-mode.halloween .lib-tab{border-right:0}
 body.server-mode.halloween .proj-tab{border-left:0}
 body.server-mode.halloween .lib-tab:hover,body.server-mode.halloween .proj-tab:hover{background:#26192B;color:#FFFFFF;box-shadow:0 0 16px -2px rgba(176,124,255,.75)}
-body.server-mode.halloween.lib-open #libToggle,body.server-mode.halloween.cat-open #catToggle,body.server-mode.halloween.notes-open #notesToggle,
+body.server-mode.halloween.lib-open #libToggle,body.server-mode.halloween.notes-open #notesToggle,
 body.server-mode.halloween.hist-open #histToggle,body.server-mode.halloween.wage-open #wageToggle,body.server-mode.halloween.load-open #loadToggle,
 body.server-mode.halloween.review-open #reviewToggle,body.server-mode.halloween.link-open #linkToggle,body.server-mode.halloween.sov-open #sovToggle,body.server-mode.halloween.proj-open #projToggle,
 body.server-mode.halloween.file-open #fileToggle,body.server-mode.halloween.page-open #pageToggle,body.server-mode.halloween.pref-open #prefToggle,
 body.server-mode.halloween.ai-open #aiToggle,
-body.server-mode.halloween.lib-open #libToggle:hover,body.server-mode.halloween.cat-open #catToggle:hover,body.server-mode.halloween.notes-open #notesToggle:hover,
+body.server-mode.halloween.lib-open #libToggle:hover,body.server-mode.halloween.notes-open #notesToggle:hover,
 body.server-mode.halloween.hist-open #histToggle:hover,body.server-mode.halloween.wage-open #wageToggle:hover,body.server-mode.halloween.load-open #loadToggle:hover,
 body.server-mode.halloween.review-open #reviewToggle:hover,body.server-mode.halloween.link-open #linkToggle:hover,body.server-mode.halloween.sov-open #sovToggle:hover,body.server-mode.halloween.proj-open #projToggle:hover,
 body.server-mode.halloween.file-open #fileToggle:hover,body.server-mode.halloween.page-open #pageToggle:hover,body.server-mode.halloween.pref-open #prefToggle:hover,
@@ -535,12 +535,12 @@ text-shadow:0 0 6px rgba(91,214,154,.7);box-shadow:0 0 12px -3px rgba(91,214,154
 body.server-mode.christmas .lib-tab{border-right:0}
 body.server-mode.christmas .proj-tab{border-left:0}
 body.server-mode.christmas .lib-tab:hover,body.server-mode.christmas .proj-tab:hover{background:#163224;color:#FFFFFF;box-shadow:0 0 16px -2px rgba(91,214,154,.75)}
-body.server-mode.christmas.lib-open #libToggle,body.server-mode.christmas.cat-open #catToggle,body.server-mode.christmas.notes-open #notesToggle,
+body.server-mode.christmas.lib-open #libToggle,body.server-mode.christmas.notes-open #notesToggle,
 body.server-mode.christmas.hist-open #histToggle,body.server-mode.christmas.wage-open #wageToggle,body.server-mode.christmas.load-open #loadToggle,
 body.server-mode.christmas.review-open #reviewToggle,body.server-mode.christmas.link-open #linkToggle,body.server-mode.christmas.sov-open #sovToggle,body.server-mode.christmas.proj-open #projToggle,
 body.server-mode.christmas.file-open #fileToggle,body.server-mode.christmas.page-open #pageToggle,body.server-mode.christmas.pref-open #prefToggle,
 body.server-mode.christmas.ai-open #aiToggle,
-body.server-mode.christmas.lib-open #libToggle:hover,body.server-mode.christmas.cat-open #catToggle:hover,body.server-mode.christmas.notes-open #notesToggle:hover,
+body.server-mode.christmas.lib-open #libToggle:hover,body.server-mode.christmas.notes-open #notesToggle:hover,
 body.server-mode.christmas.hist-open #histToggle:hover,body.server-mode.christmas.wage-open #wageToggle:hover,body.server-mode.christmas.load-open #loadToggle:hover,
 body.server-mode.christmas.review-open #reviewToggle:hover,body.server-mode.christmas.link-open #linkToggle:hover,body.server-mode.christmas.sov-open #sovToggle:hover,body.server-mode.christmas.proj-open #projToggle:hover,
 body.server-mode.christmas.file-open #fileToggle:hover,body.server-mode.christmas.page-open #pageToggle:hover,body.server-mode.christmas.pref-open #prefToggle:hover,

@@ -178,12 +178,12 @@ font-family:var(--f-sans);font-weight:400;letter-spacing:.08em;text-shadow:none;
 body.server-mode.win98 .lib-tab{border-radius:3px 0 0 3px}
 body.server-mode.win98 .proj-tab{border-radius:0 3px 3px 0}
 body.server-mode.win98 .lib-tab:hover,body.server-mode.win98 .proj-tab:hover{background:#C0C0C0;color:#000080}
-body.server-mode.win98.lib-open #libToggle,body.server-mode.win98.cat-open #catToggle,body.server-mode.win98.notes-open #notesToggle,
+body.server-mode.win98.lib-open #libToggle,body.server-mode.win98.notes-open #notesToggle,
 body.server-mode.win98.hist-open #histToggle,body.server-mode.win98.wage-open #wageToggle,body.server-mode.win98.load-open #loadToggle,
 body.server-mode.win98.review-open #reviewToggle,body.server-mode.win98.link-open #linkToggle,body.server-mode.win98.sov-open #sovToggle,body.server-mode.win98.proj-open #projToggle,
 body.server-mode.win98.file-open #fileToggle,body.server-mode.win98.page-open #pageToggle,body.server-mode.win98.pref-open #prefToggle,
 body.server-mode.win98.ai-open #aiToggle,
-body.server-mode.win98.lib-open #libToggle:hover,body.server-mode.win98.cat-open #catToggle:hover,body.server-mode.win98.notes-open #notesToggle:hover,
+body.server-mode.win98.lib-open #libToggle:hover,body.server-mode.win98.notes-open #notesToggle:hover,
 body.server-mode.win98.hist-open #histToggle:hover,body.server-mode.win98.wage-open #wageToggle:hover,body.server-mode.win98.load-open #loadToggle:hover,
 body.server-mode.win98.review-open #reviewToggle:hover,body.server-mode.win98.link-open #linkToggle:hover,body.server-mode.win98.sov-open #sovToggle:hover,body.server-mode.win98.proj-open #projToggle:hover,
 body.server-mode.win98.file-open #fileToggle:hover,body.server-mode.win98.page-open #pageToggle:hover,body.server-mode.win98.pref-open #prefToggle:hover,

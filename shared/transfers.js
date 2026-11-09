@@ -39,7 +39,7 @@ export function transferChoices(raw, kind, fallback='Imported estimate') {
 export function transferDependencies(raw){
   const book=raw.dependencies||raw;
   const dependencies={};
-  for(const key of ['libs','catalog','wageGroups','customFields','customFieldSettings','statuses'])if(book[key]!==undefined)dependencies[key]=structuredClone(book[key]);
+  for(const key of ['libs','wageGroups','customFields','customFieldSettings','statuses'])if(book[key]!==undefined)dependencies[key]=structuredClone(book[key]);
   if(!dependencies.libs?.length&&book.templates)dependencies.libs=[{name:'Imported library',templates:structuredClone(book.templates),folders:structuredClone((book.folders||[]).filter(folder=>typeof folder==='string'))}];
   return dependencies;
 }
@@ -58,7 +58,7 @@ export function importTransfer(book,kind,record,target,dependencies={},uuid=()=>
     if(v.scopeAssignments)v.scopeAssignments=Object.fromEntries(Object.entries(v.scopeAssignments).map(([item,page])=>[item,ids.get(page)||page]));
     if(v.units&&!Array.isArray(v.units))v.units=Object.fromEntries(Object.entries(v.units).map(([unit,value])=>[ids.get(unit)||unit,value]));
     for(const [k,x]of Object.entries(v)){
-      if(typeof x==='string'&&ids.has(x)&&(/id$/i.test(k)||['active','activeFolder','sid','ref','template','subtype','service','construct'].includes(k)))v[k]=ids.get(x);
+      if(typeof x==='string'&&ids.has(x)&&(/id$/i.test(k)||['active','activeFolder','sid','ref','template','service','construct'].includes(k)))v[k]=ids.get(x);
       else if(k!=='scopeData')rewrite(x);
     }
     if(!Array.isArray(v)&&!v.id&&('rows'in v||'sheets'in v||'takeoffs'in v||'projects'in v||'templates'in v))v.id=uuid();
@@ -70,7 +70,6 @@ export function importTransfer(book,kind,record,target,dependencies={},uuid=()=>
   const key=kind==='customer'?'companies':kind==='project'?'projects':'takeoffs';
   (parent[key] ||= []).push(bundle.record);
   for(const key of ['libs','wageGroups'])if(Array.isArray(bundle.dependencies[key]))(next[key] ||= []).push(...bundle.dependencies[key]);
-  if(bundle.dependencies.catalog){next.catalog ||= {};for(const [key,value]of Object.entries(bundle.dependencies.catalog))if(Array.isArray(value))next.catalog[key]=[...(next.catalog[key]||[]),...value];}
   if(bundle.dependencies.customFields){
     next.customFields ||= {};
     for(const kind of ['company','project','takeoff']){

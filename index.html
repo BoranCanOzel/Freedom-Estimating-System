@@ -714,7 +714,7 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
     display:flex;flex-direction:column;align-items:flex-end;gap:3px;
     transition:right .22s ease;
   }
-  body.lib-open .tab-rail,body.cat-open .tab-rail,body.notes-open .tab-rail{right:var(--libW)}
+  body.lib-open .tab-rail,body.notes-open .tab-rail{right:var(--libW)}
   /* swapping drawers: the old one goes and the new one arrives in the same frame,
      so the edge never looks empty under tabs that are not moving */
   body.no-slide .lib,body.no-slide .proj,body.no-slide .tab-rail,
@@ -730,13 +730,11 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
   }
   .lib-tab:hover{background:var(--slate-2)}
   /* the open drawer's own tab stays put, wider and in the accent colour */
-  body.lib-open #libToggle,
-  body.cat-open #catToggle{
+  body.lib-open #libToggle{
     background:var(--amber);color:#241F16;padding:24px 9px;font-size:12.5px;
     box-shadow:0 10px 26px -12px rgba(0,0,0,.65);
   }
-  body.lib-open #libToggle:hover,
-  body.cat-open #catToggle:hover{background:#F0A518}
+  body.lib-open #libToggle:hover{background:#F0A518}
 
   .lib{
     position:fixed;top:0;right:0;bottom:0;width:var(--libW);z-index:190;
@@ -1353,7 +1351,6 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
     display:block;width:100%;border:1px solid var(--rule-strong);border-radius:3px;padding:6px 8px;
     font-family:var(--f-sans);font-size:13px;background:var(--card);
   }
-  .cat-tick{color:var(--material);font-size:12px;flex:none}
   @media print{.proj,.proj-tab,.tab-rail{display:none!important}}
 
   /* scope of work view: real columns */
@@ -1362,7 +1359,7 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
   .pic-btn-row.has-note{opacity:.8}
   .card-btn:hover{color:var(--slate)}
 
-  /* catalog panel sits beside the library */
+  /* shared notes drawer */
   .notes-panel{z-index:192}
   body.notes-open #notesPanel{transform:none}
   body.notes-open{padding-right:calc(var(--libW) + 14px + var(--tabW))}
@@ -1374,15 +1371,11 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
   body.notes-open .ed{right:calc(var(--libW) + 30px)}
 
   @media print{.notes-panel{display:none!important}}
-  .cat-panel{z-index:191}
-  body.cat-open #catalog{transform:none}
-  body.cat-open{padding-right:calc(var(--libW) + 14px + var(--tabW))}
 
   /* editor floats clear of the drawer with softer corners */
   .ed{border-radius:16px;top:16px;bottom:16px;right:calc(var(--libW) + 30px);
     border:1px solid var(--rule);box-shadow:-20px 0 50px -28px rgba(19,23,25,.9)}
-  body:not(.lib-open):not(.cat-open) .ed{right:26px}
-  body.cat-open .ed{right:calc(var(--libW) + 30px)}
+  body:not(.lib-open):not(.notes-open) .ed{right:26px}
   .ed-namebox,.ed-meta,.ed-folder,.ed-attach{border-radius:14px}
   .ed-card{
     border-radius:14px;
@@ -1424,7 +1417,7 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
   .panel-grab{
     position:absolute;top:0;bottom:0;width:6px;cursor:col-resize;z-index:5;
   }
-  .lib .panel-grab,.cat-panel .panel-grab{left:0}
+  .lib .panel-grab{left:0}
   .proj .panel-grab{right:0}
   .panel-grab:hover{background:rgba(227,148,0,.35)}
 
@@ -1469,7 +1462,7 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
   .panel-grab{
     position:absolute;top:0;bottom:0;width:6px;cursor:col-resize;z-index:6;
   }
-  #library .panel-grab,#catalog .panel-grab{left:0}
+  #library .panel-grab{left:0}
   #projects .panel-grab{right:0}
   .panel-grab:hover{background:rgba(227,148,0,.4)}
   .ed-grab{left:0;border-radius:16px 0 0 16px}
@@ -2373,14 +2366,12 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
   body.medieval .proj-tab{border-left:0}
   body.medieval .lib-tab:hover,body.medieval .proj-tab:hover{background:var(--tx-speckd),var(--tx-stone),#46515A}
   body.medieval.lib-open #libToggle,
-  body.medieval.cat-open #catToggle,
   body.medieval.notes-open #notesToggle,
   body.medieval.proj-open .proj-tab{
     background:linear-gradient(90deg,#D8742E,#B5561B 55%,#9C4613);
     color:#FFF1E0;border-color:#5A2507;
   }
   body.medieval.lib-open #libToggle:hover,
-  body.medieval.cat-open #catToggle:hover,
   body.medieval.notes-open #notesToggle:hover,
   body.medieval.proj-open .proj-tab:hover{background:linear-gradient(90deg,#E6863E,#C26124 55%,#A74E17)}
   body.medieval .lib,body.medieval .proj,body.medieval .ed{
@@ -2905,7 +2896,6 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
 
 <div class="tab-rail" id="tabRail">
   <button type="button" id="libToggle" class="lib-tab" title="Open the template library">LIBRARY</button>
-  <button type="button" id="catToggle" class="lib-tab" title="Open the catalog options">CATALOG</button>
   <button type="button" id="notesToggle" class="lib-tab" title="Open the notes">NOTES</button>
 </div>
 <button type="button" id="projToggle" class="proj-tab" title="Open the project list">PROJECTS</button>
@@ -2923,25 +2913,6 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
     </div>
     <div class="lib-block"><div class="lib-list" id="notesList"></div></div>
   </div>
-</aside>
-
-<aside id="catalog" class="lib cat-panel" aria-label="Catalog options">
-  <div class="lib-head">
-    <span class="eyebrow">Catalog options</span>
-    <button type="button" class="lib-close" id="catClose" aria-label="Close">&times;</button>
-  </div>
-  <div class="lib-body">
-    <div class="lib-newfolder">
-      <input id="catFolderNew" placeholder="New catalog folder">
-      <button type="button" class="btn alt tiny" id="catFolderAdd">Add</button>
-    </div>
-    <datalist id="catFolderList"></datalist>
-    <div class="lib-block"><div class="lib-list" id="catAll"></div></div>
-    <div class="lib-block">
-      <button type="button" class="btn alt tiny" id="catNew">+ New subtype</button>
-    </div>
-  </div>
-  <div class="lib-foot">Tick where a subtype should be offered: item, section or scope.</div>
 </aside>
 
 <aside id="projects" class="proj" aria-label="Project list">
@@ -5732,7 +5703,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   // looks empty for a fifth of a second under tabs that are staying put
   function swapDrawer(){
     const b = document.body;
-    if (!b.classList.contains('lib-open') && !b.classList.contains('cat-open')
+    if (!b.classList.contains('lib-open')
         && !b.classList.contains('notes-open')) return;
     b.classList.add('no-slide');
     requestAnimationFrame(() => requestAnimationFrame(() => b.classList.remove('no-slide')));
@@ -5753,7 +5724,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     ]],
     ['Getting about', [
       ['', 'Tabs along the top are the pages on this job; Scope contains measured work and colours'],
-      ['', 'Tabs down the right edge open the library, the catalog and your notes'],
+      ['', 'Tabs down the right edge open the library and your notes'],
       ['', 'Projects at the top left opens saved workbooks, companies, projects and takeoffs'],
       ['', 'Drag a template out of the library onto the sheet, or a line into it to save one']
     ]]
@@ -7078,6 +7049,8 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
   function adoptBook(bk){
     book = bk;
+    delete book.catalog;
+    if (book.edW) delete book.edW.subtype;
     book.sheets.forEach((sh, i) => {
       normalize(sh);
       if (!sh.id) sh.id = id();
@@ -7991,7 +7964,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   document.getElementById('libToggle').addEventListener('click', () => {
     const open = document.body.classList.contains('lib-open');
     if (!open) swapDrawer();
-    document.body.classList.remove('cat-open','notes-open');
+    document.body.classList.remove('notes-open');
     document.body.classList.toggle('lib-open', !open);
     if (!open) renderLibrary();
     setTimeout(() => { layout(); sumLayout(); }, 260);
@@ -8868,23 +8841,20 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     return r;
   }
 
-  function metaBlock(d, metaKind){
+  function metaBlock(d){
     d.meta = d.meta || {category:'', sku:'', subtypes:[]};
     if (!Array.isArray(d.meta.subtypes)) d.meta.subtypes = [];
     const m = d.meta;
-
     const box = document.createElement('div');
     box.className = 'ed-meta' + (d.metaLocked ? ' locked' : '');
-    box.appendChild(blockHead(d, 'Catalog', 'metaLocked', 'metaOpen'));
+    box.appendChild(blockHead(d, 'Details', 'metaLocked', 'metaOpen'));
     if (d.metaOpen === false) return box;
-
     if (d.metaLocked){
       box.appendChild(readOnlyLine('Category', m.category));
       box.appendChild(readOnlyLine('SKU', m.sku));
-      m.subtypes.forEach(st => box.appendChild(readOnlyLine(st.label || 'Subtype', st.value)));
+      m.subtypes.forEach(field => box.appendChild(readOnlyLine(field.label || 'Field', field.value)));
       return box;
     }
-
     const grid = document.createElement('div');
     grid.className = 'lib-grid two';
     grid.append(
@@ -8892,100 +8862,17 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       edField('SKU', m.sku, v => { m.sku = v; }, {ph:'FS-160'})
     );
     box.appendChild(grid);
-
-    m.subtypes.forEach((st, i) => {
-      const row = document.createElement('div');
-      row.className = 'ed-sub';
-      const lab = document.createElement('input');
-      lab.className = 'sub-lab';
-      lab.placeholder = 'Subtype';
-      lab.value = st.label || '';
-      lab.addEventListener('input', () => { st.label = lab.value; });
-      const src = st.subId ? catalog().subtypes.find(x => x.id === st.subId) : null;
-      let val;
-      if (src && (src.options || []).length){
-        val = document.createElement('select');
-        val.className = 'sub-val';
-        const blank = document.createElement('option');
-        blank.value = '';
-        blank.textContent = '—';
-        val.appendChild(blank);
-        src.options.forEach(o => {
-          const op = document.createElement('option');
-          op.value = o;
-          op.textContent = o;
-          if (st.value === o) op.selected = true;
-          val.appendChild(op);
-        });
-        val.addEventListener('change', () => { st.value = val.value; });
-      } else {
-        val = document.createElement('input');
-        val.className = 'sub-val';
-        val.placeholder = 'Value';
-        val.value = st.value || '';
-        val.addEventListener('input', () => { st.value = val.value; });
-      }
-      if (src) lab.readOnly = true;
-      row.append(lab, val, edBtn('&times;', 'Remove this subtype',
-        () => { m.subtypes.splice(i, 1); renderEditor(); }, 'rm'));
+    m.subtypes.forEach((field, index) => {
+      const row = document.createElement('div');row.className = 'ed-sub';
+      const label = document.createElement('input');label.className = 'sub-lab';label.placeholder = 'Field';label.value = field.label || '';
+      label.addEventListener('input', () => { field.label = label.value; });
+      const value = document.createElement('input');value.className = 'sub-val';value.placeholder = 'Value';value.value = field.value || '';
+      value.addEventListener('input', () => { field.value = value.value; });
+      row.append(label, value, edBtn('&times;', 'Remove this field', () => { m.subtypes.splice(index, 1); renderEditor(); }, 'rm'));
       box.appendChild(row);
     });
-
-    const add = document.createElement('button');
-    add.type = 'button';
-    add.className = 'btn alt tiny';
-    add.textContent = '+ Add subtype';
-    add.addEventListener('click', e => {
-      e.stopPropagation();
-      const offered = offersFor(metaKind || 'item');
-      document.querySelectorAll('.print-menu').forEach(el => el.remove());
-      const menu = document.createElement('div');
-      menu.className = 'print-menu';
-
-      offered.forEach(x => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'pm-opt';
-        b.textContent = x.name || 'Untitled';
-        b.addEventListener('click', ev => {
-          ev.stopPropagation();
-          menu.remove();
-          m.subtypes.push({label:x.name, value:'', subId:x.id});
-          renderEditor();
-        });
-        menu.appendChild(b);
-      });
-      if (!offered.length){
-        const hint = document.createElement('div');
-        hint.className = 'lib-hint';
-        hint.style.padding = '6px 10px';
-        hint.textContent = 'No catalog subtypes offered yet.';
-        menu.appendChild(hint);
-      }
-      const custom = document.createElement('button');
-      custom.type = 'button';
-      custom.className = 'pm-opt danger-text';
-      custom.style.color = 'var(--slate)';
-      custom.textContent = 'Custom field…';
-      custom.addEventListener('click', ev => {
-        ev.stopPropagation();
-        menu.remove();
-        m.subtypes.push({label:'', value:''});
-        renderEditor();
-      });
-      menu.appendChild(custom);
-
-      document.body.appendChild(menu);
-      const b = add.getBoundingClientRect();
-      menu.style.left = Math.max(8, Math.min(b.left, window.innerWidth - menu.offsetWidth - 12)) + 'px';
-      menu.style.top = Math.min(b.bottom + 6, window.innerHeight - menu.offsetHeight - 12) + 'px';
-      setTimeout(() => {
-        document.addEventListener('click', function away(){
-          menu.remove();
-          document.removeEventListener('click', away);
-        }, {once:true});
-      }, 0);
-    });
+    const add = document.createElement('button');add.type = 'button';add.className = 'btn alt tiny';add.textContent = '+ Add field';
+    add.addEventListener('click', () => { m.subtypes.push({label:'', value:''});renderEditor(); });
     box.appendChild(add);
     return box;
   }
@@ -9145,7 +9032,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     hint.textContent = 'Count, time and days get set once the part is placed on a sheet.';
     box.appendChild(hint);
 
-    box.appendChild(metaBlock(d, 'item'));
+    box.appendChild(metaBlock(d));
     box.appendChild(attachBlock(d));
     box.appendChild(folderField(d));
   }
@@ -9271,7 +9158,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     mkWrap.appendChild(mc);
     box.appendChild(mkWrap);
 
-    box.appendChild(metaBlock(d, 'item'));
+    box.appendChild(metaBlock(d));
     box.appendChild(attachBlock(d));
     box.appendChild(folderField(d));
   }
@@ -9457,7 +9344,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         fmt.format(line) + '</b></div>';
     box.appendChild(tot);
 
-    box.appendChild(metaBlock(d, 'item'));
+    box.appendChild(metaBlock(d));
     box.appendChild(attachBlock(d));
     box.appendChild(folderField(d));
   }
@@ -9500,7 +9387,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     nameBox.appendChild(miniGrid(d));
     box.appendChild(nameBox);
 
-    box.appendChild(metaBlock(d, 'item'));
+    box.appendChild(metaBlock(d));
     box.appendChild(attachBlock(d));
     box.appendChild(folderField(d));
     box.appendChild(notesBlock(d));
@@ -9582,7 +9469,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     packHead.appendChild(blockHead(secDraft, 'Lines', 'linesLocked', 'linesOpen'));
     box.appendChild(packHead);
     if (secDraft.linesOpen === false){
-      if (offersFor('section').length) box.appendChild(metaBlock(secDraft, 'section'));
+      box.appendChild(metaBlock(secDraft));
       box.appendChild(attachBlock(secDraft));
       box.appendChild(folderField(secDraft));
       return;
@@ -9617,7 +9504,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     add.textContent = '+ Add line';
     add.addEventListener('click', () => { secDraft.items.push(blankLine()); renderEditor(); });
     box.appendChild(add);
-    if (offersFor('section').length) box.appendChild(metaBlock(secDraft, 'section'));
+    box.appendChild(metaBlock(secDraft));
     box.appendChild(attachBlock(secDraft));
     box.appendChild(folderField(secDraft));
   }
@@ -9866,86 +9753,17 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     bar.append(addSec, addLine);
     box.appendChild(bar);
 
-    if (offersFor('scope').length) box.appendChild(metaBlock(d, 'scope'));
+    box.appendChild(metaBlock(d));
     box.appendChild(attachBlock(d));
     box.appendChild(folderField(d));
   }
 
-  let subDraft = null;
   let coDraft = null, prDraft = null, tkDraft = null;
 
   const CO_FIELDS = [['name','Company name'],['address','Address'],['phone','Phone'],
                      ['email','Email'],['fax','Fax'],['website','Website']];
   const PR_FIELDS = [['name','Project name'],['address','Address'],['zztakeoffLink','ZZTakeoff link'],['contacts','Contacts'],
                      ['email','Email'],['fax','Fax']];
-
-  function renderSubEd(box){
-    const d = subDraft;
-    box.appendChild(edField('Subtype name', d.name, v => { d.name = v; }, {ph:'Blade size'}));
-
-    const offers = document.createElement('div');
-    offers.className = 'ed-namebox';
-    const oh = document.createElement('div');
-    oh.className = 'ed-folder-head';
-    oh.innerHTML = '<span>Offer this in</span>';
-    offers.appendChild(oh);
-    [['offerItem','Item template'],['offerSection','Section template'],['offerScope','Scope template']]
-      .forEach(([k, lab]) => {
-        const l = document.createElement('label');
-        l.className = 'ed-check';
-        const cb = document.createElement('input');
-        cb.type = 'checkbox';
-        cb.checked = k === 'offerItem' ? !!(d.offerItem || d.selectable) : !!d[k];
-        cb.addEventListener('change', () => {
-          d[k] = cb.checked;
-          if (k === 'offerItem') d.selectable = cb.checked;
-        });
-        l.append(cb, document.createTextNode(lab));
-        offers.appendChild(l);
-      });
-    box.appendChild(offers);
-
-    const lab = document.createElement('div');
-    lab.className = 'ed-f';
-    lab.textContent = 'Choices — leave empty for free text';
-    box.appendChild(lab);
-
-    const list = document.createElement('div');
-    list.className = 's-lines';
-    (d.options || []).forEach((o, i) => {
-      const r = document.createElement('div');
-      r.className = 'ed-sub';
-      const inp = document.createElement('input');
-      inp.className = 'sub-val';
-      inp.value = o;
-      inp.placeholder = 'Choice';
-      inp.addEventListener('input', () => { d.options[i] = inp.value; });
-      r.append(inp, edBtn('&times;', 'Remove', () => { d.options.splice(i, 1); renderEditor(); }, 'rm'));
-      list.appendChild(r);
-    });
-    if (!(d.options || []).length) list.innerHTML = '<div class="lib-hint">No choices — the value is typed in.</div>';
-    box.appendChild(list);
-
-    const add = document.createElement('button');
-    add.type = 'button';
-    add.className = 'btn alt tiny';
-    add.textContent = '+ Add choice';
-    add.addEventListener('click', () => { d.options = d.options || []; d.options.push(''); renderEditor(); });
-    box.appendChild(add);
-
-    const f = document.createElement('div');
-    f.className = 'ed-folder';
-    f.appendChild(blockHead(d, 'Folder', 'folderLocked', 'folderOpen'));
-    if (d.folderOpen !== false){
-      const inp = document.createElement('input');
-      inp.setAttribute('list', 'catFolderList');
-      inp.placeholder = 'Unfiled';
-      inp.value = d.folder || '';
-      inp.addEventListener('input', () => { d.folder = inp.value; });
-      f.appendChild(inp);
-    }
-    box.appendChild(f);
-  }
 
   function customBlock(d, kind){
     const list = customFields(kind);
@@ -10163,7 +9981,6 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     if (edMode === 'service') return renderSvcEd(box);
     if (edMode === 'item') renderItemEd(box);
     else if (edMode === 'section') renderSecEd(box);
-    else if (edMode === 'subtype') renderSubEd(box);
     else renderScopeEd(box);
   }
 
@@ -10181,6 +9998,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         ? {id:t.id, name:t.name || '', note:t.note || '', folder:t.folder || '',
            img:t.img, files:(t.files || []).map(f => Object.assign({}, f)),
            folderLocked:t.folderLocked, folderOpen:t.folderOpen,
+           meta:t.meta, metaLocked:t.metaLocked, metaOpen:t.metaOpen,
            items:(t.items || []).map(i => Object.assign({}, i))}
         : {id:null, name:'', note:'', folder:'', items:[blankLine()]};
     } else if (mode === 'part'){
@@ -10209,15 +10027,12 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
         : {id:null, name:'', note:'', custom:{}, projectId:(t && t.projectId) || null};
     } else if (mode === 'listopts'){
       statuses(); customFields('company'); customFields('project'); customFields('takeoff');
-    } else if (mode === 'subtype'){
-      subDraft = t
-        ? Object.assign({options:[]}, t, {options:(t.options || []).slice()})
-        : {id:null, name:'', folder:'', selectable:true, options:[]};
     } else {
       scopeDraft = t
         ? {id:t.id, name:t.name || '', note:t.note || '', folder:t.folder || '',
            img:t.img, files:(t.files || []).map(f => Object.assign({}, f)),
            folderLocked:t.folderLocked, folderOpen:t.folderOpen,
+           meta:t.meta, metaLocked:t.metaLocked, metaOpen:t.metaOpen,
            parts:(t.parts || []).map(p => JSON.parse(JSON.stringify(p))), fees:t.fees, units:t.units}
         : {id:null, name:'', note:'', folder:'', parts:[]};
     }
@@ -10231,7 +10046,6 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     document.getElementById('edHint').textContent =
       mode === 'item' ? 'One card'
       : mode === 'section' ? 'A pack of lines'
-      : mode === 'subtype' ? 'Catalog option'
       : 'Sections and lines';
     document.getElementById('edSave').hidden = mode === 'listopts';
     document.getElementById('edCancel').textContent = mode === 'listopts' ? 'Done' : 'Cancel';
@@ -10509,23 +10323,15 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       const rec = {id: secDraft.id || id(), name:secDraft.name, note:secDraft.note,
                    folder:secDraft.folder, img:secDraft.img, files:secDraft.files || [],
                    folderLocked:secDraft.folderLocked, folderOpen:secDraft.folderOpen,
+                   meta:secDraft.meta, metaLocked:secDraft.metaLocked, metaOpen:secDraft.metaOpen,
                    items:secDraft.items};
       const i = tpl.sections.findIndex(x => x.id === rec.id);
       if (i >= 0) tpl.sections[i] = rec; else tpl.sections.push(rec);
-    } else if (edMode === 'subtype'){
-      const rec = Object.assign({}, subDraft, {id: subDraft.id || id()});
-      const list = catalog().subtypes;
-      const i = list.findIndex(x => x.id === rec.id);
-      if (i >= 0) list[i] = rec; else list.push(rec);
-      closeEditor();
-      renderCatalog();
-      save();
-      flash('subtype saved');
-      return;
     } else {
       const rec = {id: scopeDraft.id || id(), name:scopeDraft.name, note:scopeDraft.note,
                    folder:scopeDraft.folder, img:scopeDraft.img, files:scopeDraft.files || [],
                    folderLocked:scopeDraft.folderLocked, folderOpen:scopeDraft.folderOpen,
+                   meta:scopeDraft.meta, metaLocked:scopeDraft.metaLocked, metaOpen:scopeDraft.metaOpen,
                    parts:scopeDraft.parts, fees:scopeDraft.fees, units:scopeDraft.units};
       const i = tpl.scopes.findIndex(x => x.id === rec.id);
       if (i >= 0) tpl.scopes[i] = rec; else tpl.scopes.push(rec);
@@ -11207,7 +11013,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   document.getElementById('notesToggle').addEventListener('click', () => {
     const open = document.body.classList.contains('notes-open');
     if (!open) swapDrawer();
-    document.body.classList.remove('lib-open','cat-open');
+    document.body.classList.remove('lib-open');
     document.body.classList.toggle('notes-open', !open);
     if (!open) renderNotesList();
     setTimeout(() => { layout(); sumLayout(); }, 260);
@@ -11216,159 +11022,6 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   document.getElementById('notesClose').addEventListener('click', () => {
     document.body.classList.remove('notes-open');
     setTimeout(() => { layout(); sumLayout(); }, 260);
-  });
-
-  /* ---------- catalog of subtypes ---------- */
-  function catalog(){
-    book.catalog = book.catalog || {};
-    if (!Array.isArray(book.catalog.subtypes)) book.catalog.subtypes = [];
-    if (!Array.isArray(book.catalog.folders)) book.catalog.folders = [];
-    return book.catalog;
-  }
-
-  function catFolderNames(){
-    const set = new Set();
-    const add = p => {
-      const parts = String(p).split('/').map(x => x.trim()).filter(Boolean);
-      parts.forEach((_, i) => set.add(parts.slice(0, i + 1).join('/')));
-    };
-    catalog().folders.forEach(add);
-    catalog().subtypes.forEach(t => { if (t.folder) add(t.folder); });
-    return Array.from(set).sort((a,b) => a.localeCompare(b));
-  }
-
-  function offeredIn(t){
-    const out = [];
-    if (t.offerItem || t.selectable) out.push('item');
-    if (t.offerSection) out.push('section');
-    if (t.offerScope) out.push('scope');
-    return out;
-  }
-  function offersFor(kind){
-    return catalog().subtypes.filter(t =>
-      kind === 'item' ? (t.offerItem || t.selectable)
-      : kind === 'section' ? t.offerSection
-      : t.offerScope);
-  }
-
-  function catCard(t){
-    const el = document.createElement('div');
-    el.className = 'tpl';
-    el.innerHTML =
-      '<span class="tpl-main"><span class="tpl-name">' + esc(t.name || 'Untitled') + '</span>' +
-      '<span class="tpl-meta">' + esc((t.options && t.options.length)
-        ? t.options.length + (t.options.length === 1 ? ' choice' : ' choices')
-        : 'free text') + '</span></span>';
-
-    const where = offeredIn(t);
-    if (where.length){
-      const tick = document.createElement('span');
-      tick.className = 'cat-tick';
-      tick.title = 'Offered in: ' + where.join(', ');
-      tick.textContent = where.map(w => w[0].toUpperCase()).join('');
-      el.appendChild(tick);
-    }
-    el.append(
-      edBtn('&times;', 'Delete this subtype', e => {
-        e.stopPropagation();
-        confirmPop(el, 'Delete "' + (t.name || 'this subtype') + '"?', () => {
-          catalog().subtypes = catalog().subtypes.filter(x => x.id !== t.id);
-          renderCatalog();
-          save();
-        });
-      }, 'rm')
-    );
-    el.addEventListener('click', () => openEditor('subtype', t));
-    return el;
-  }
-
-  function renderCatFolder(box, node, depth){
-    node.kids.forEach(kid => {
-      const mine = catalog().subtypes.filter(t => (t.folder || '') === kid.path);
-      const shut = folderShut.has('cat::' + kid.path);
-      const head = document.createElement('div');
-      head.className = 'folder-head';
-      head.style.paddingLeft = (4 + depth * 13) + 'px';
-      head.innerHTML = '<span class="caret tpl-caret' + (shut ? ' shut' : '') + '">' + caretSvg() + '</span>' +
-        '<span class="folder-name">' + esc(kid.name) + '</span>' +
-        '<span class="folder-count">' + mine.length + '</span>';
-      head.addEventListener('click', e => {
-        if (e.target.closest('.folder-x')) return;
-        if (shut) folderShut.delete('cat::' + kid.path); else folderShut.add('cat::' + kid.path);
-        renderCatalog();
-      });
-      const x = document.createElement('button');
-      x.type = 'button';
-      x.className = 'tpl-btn rm folder-x';
-      x.innerHTML = '&times;';
-      x.title = 'Delete this folder — its subtypes move to Unfiled';
-      x.addEventListener('click', ev => {
-        ev.stopPropagation();
-        confirmPop(x, 'Delete the folder "' + kid.path + '"? Its subtypes will move to Unfiled.', () => {
-          const under = f => f === kid.path || String(f).indexOf(kid.path + '/') === 0;
-          catalog().folders = catalog().folders.filter(f => !under(f));
-          catalog().subtypes.forEach(t => { if (under(t.folder || '')) t.folder = ''; });
-          renderCatalog();
-          save();
-        }, 'Delete');
-      });
-      head.appendChild(x);
-      box.appendChild(head);
-
-      if (!shut){
-        const kids = document.createElement('div');
-        kids.className = 'folder-body';
-        renderCatFolder(kids, kid, depth + 1);
-        mine.forEach(t => kids.appendChild(catCard(t)));
-        if (!kids.childNodes.length) kids.innerHTML = '<div class="lib-hint">Empty.</div>';
-        box.appendChild(kids);
-      }
-    });
-  }
-
-  function renderCatalog(){
-    const box = document.getElementById('catAll');
-    box.innerHTML = '';
-    const names = catFolderNames();
-    document.getElementById('catFolderList').innerHTML =
-      names.map(n => '<option value="' + esc(n) + '">').join('');
-
-    if (!catalog().subtypes.length && !names.length){
-      box.innerHTML = '<div class="lib-hint">No subtypes yet — make one below.</div>';
-      return;
-    }
-    renderCatFolder(box, buildFolderTree(names), 0);
-    const loose = catalog().subtypes.filter(t => !t.folder);
-    if (names.length && loose.length){
-      const h = document.createElement('div');
-      h.className = 'folder-head plain';
-      h.innerHTML = '<span class="folder-name">Unfiled</span><span class="folder-count">' + loose.length + '</span>';
-      box.appendChild(h);
-    }
-    loose.forEach(t => box.appendChild(catCard(t)));
-  }
-
-  document.getElementById('catToggle').addEventListener('click', () => {
-    const open = document.body.classList.contains('cat-open');
-    if (!open) swapDrawer();
-    document.body.classList.remove('lib-open','notes-open');
-    document.body.classList.toggle('cat-open', !open);
-    if (!open) renderCatalog();
-    setTimeout(() => { layout(); sumLayout(); }, 260);
-  });
-  document.getElementById('catClose').addEventListener('click', () => {
-    document.body.classList.remove('cat-open');
-    setTimeout(() => { layout(); sumLayout(); }, 260);
-  });
-  document.getElementById('catNew').addEventListener('click', () => openEditor('subtype', null));
-  document.getElementById('catFolderAdd').addEventListener('click', () => {
-    const inp = document.getElementById('catFolderNew');
-    const name = inp.value.trim();
-    if (!name) return;
-    if (!catalog().folders.includes(name)) catalog().folders.push(name);
-    inp.value = '';
-    renderCatalog();
-    save();
   });
 
   /* ---------- project list ---------- */
@@ -12080,7 +11733,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   }
 
   function addPanelGrabs(){
-    [['library','libW',true],['catalog','libW',true],['projects','projW',false]].forEach(([pid, key, fromLeft]) => {
+    [['library','libW',true],['projects','projW',false]].forEach(([pid, key, fromLeft]) => {
       const panel = document.getElementById(pid);
       if (!panel || panel.querySelector('.panel-grab')) return;
       const g = document.createElement('div');
@@ -12412,14 +12065,14 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       if (document.getElementById('editor').hidden) return null;
       const draft = ({item:itemDraft, section:secDraft, scope:scopeDraft, part:partDraft,
         construct:conDraft, service:svcDraft, company:coDraft, project:prDraft,
-        takeoff:tkDraft, subtype:subDraft})[edMode];
+        takeoff:tkDraft})[edMode];
       return draft ? {session:editorSession, value:structuredClone(draft)} : null;
     },
     restoreEditorHistory(snapshot){
       if (snapshot.session !== editorSession) return;
       const draft = ({item:itemDraft, section:secDraft, scope:scopeDraft, part:partDraft,
         construct:conDraft, service:svcDraft, company:coDraft, project:prDraft,
-        takeoff:tkDraft, subtype:subDraft})[edMode];
+        takeoff:tkDraft})[edMode];
       if (!draft) return;
       Object.keys(draft).forEach(key => delete draft[key]);
       Object.assign(draft, structuredClone(snapshot.value));
@@ -12462,7 +12115,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
       const previousState=state,previousView=book.view;
       const draft = ({item:itemDraft, section:secDraft, scope:scopeDraft, part:partDraft,
         construct:conDraft, service:svcDraft, company:coDraft, project:prDraft,
-        takeoff:tkDraft, subtype:subDraft})[edMode];
+        takeoff:tkDraft})[edMode];
       const recordId = draft && (draft.__rowId || draft.id);
       const before = recordId ? findRecord(book, recordId) : null;
       if (fresh) {

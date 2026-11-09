@@ -3492,6 +3492,29 @@ test('AI Information times out stalled requests and enables retry without a new 
   await expect(page.locator('#ai-info-status')).toHaveText('Library loaded.');
 });
 
+test('removing Catalog preserves template details and the remaining right drawers',async({page})=>{
+  const data=workbook(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+  data.catalog={folders:['Blades'],subtypes:[{id:'blade-size',name:'Blade size',options:['14 inch'],offerItem:true}]};
+  data.edW={subtype:420};
+  data.templates={items:[{id:'blade',name:'Blade template',kind:'material',cost:25,meta:{category:'Blades',sku:'B14',subtypes:[{subId:'blade-size',label:'Blade size',value:'14 inch'}]}}],sections:[],scopes:[]};
+  await openWorkbook(page,data);
+  await expect(page.locator('#tabRail button')).toHaveText(['LIBRARY','NOTES']);
+  await expect(page.locator('#catalog, #catToggle')).toHaveCount(0);
+  await page.locator('#libToggle').click();
+  await page.locator('#libAll .tpl-wrap').filter({hasText:'Blade template'}).getByRole('button',{name:'Edit',exact:true}).click();
+  await expect(page.locator('#edBody input[placeholder="Field"]')).toHaveValue('Blade size');
+  await expect(page.locator('#edBody input[placeholder="Value"]')).toHaveValue('14 inch');
+  await page.locator('#edBody input[placeholder="Value"]').fill('16 inch');await page.locator('#edSave').click();
+  const saved=await page.evaluate(()=>window.estimator.exportBook());
+  expect(saved.catalog).toBeUndefined();expect(saved.edW?.subtype).toBeUndefined();
+  expect(saved.templates.items[0].meta.subtypes[0].value).toBe('16 inch');
+  await page.locator('#notesToggle').click();await expect(page.locator('body')).toHaveClass(/notes-open/);
+  await expect(page.locator('body')).not.toHaveClass(/lib-open/);
+  await page.locator('#notesClose').click();await page.locator('#libToggle').click();
+  await expect(page.locator('#libAll .tpl-name').filter({hasText:'Blade template'})).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test('main library icon folders accept dragged items and allow moving them back out',async({page})=>{
   const data=workbook();data.templates={items:[{id:'crew',name:'Test crew',kind:'labor',cost:25}],sections:[],scopes:[]};
   await openWorkbook(page,data);await page.locator('#libToggle').click();
