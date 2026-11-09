@@ -21,6 +21,12 @@
 #notesPanel .human-note-row span{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;color:var(--muted);font:11px/1.45 var(--f-sans);white-space:pre-wrap}
 #notesPanel #human-info-drawer-editor[hidden],#notesPanel #notesList[hidden]{display:none}
 #human-info-drawer-editor>button{margin-bottom:16px}
+#human-info-drawer-view[hidden],#human-info-cancel[hidden]{display:none}
+#human-info-drawer-view>header{display:flex;align-items:start;justify-content:space-between;gap:12px}
+#human-info-view-title{margin:0;font:600 19px/1.4 var(--f-sans);color:var(--ink);overflow-wrap:anywhere;min-width:0}
+#human-info-edit{flex:none}
+#human-info-view-folder{font:11px/1.5 var(--f-sans);color:var(--muted);overflow-wrap:anywhere;margin:8px 0 18px}
+#human-info-view-text{font:14px/1.7 var(--f-sans);color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere;user-select:text}
 #notesPanel #human-info-editor label{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;font:12px var(--f-sans);color:var(--ink)}
 #notesPanel #human-info-editor label[hidden],#notesPanel #human-info-editor[hidden]{display:none}
 #notesPanel #human-info-editor :is(input,textarea,select){box-sizing:border-box;width:100%;min-width:0;max-width:100%;padding:9px;border:1px solid var(--rule);border-radius:4px;background:var(--paper);color:var(--ink);font:13px/1.5 var(--f-sans)}

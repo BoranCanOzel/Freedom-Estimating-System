@@ -783,20 +783,36 @@ test('AI Information drag and drop moves folders with descendants, reorders and 
   await expect(page.locator('#ai-info-tree button')).toHaveText(['▸  Rates','▸  Concrete','—  Cutting','—  Crew','▸  Standards']);
 });
 
-test('right notes drawer edits shared notes in place and preserves drafts across notebook views',async({page})=>{
+test('right notes drawer opens in view mode and edits only after pressing Edit',async({page})=>{
   await openWorkbook(page);
   const initial=await (await page.request.get('/api/human-information')).json();
   await page.request.put('/api/human-information',{data:{revision:initial.revision,items:[{id:'side-note',kind:'entry',parent:'',title:'Supplier reminder',text:'Call Friday.'}]}});
   await page.locator('#notesToggle').click();
   await page.locator('#notesList .human-note-row').filter({hasText:'Supplier reminder'}).click();
   const drawer=page.locator('#notesPanel'),full=page.locator('#human-information-page');
-  await expect(full).toBeHidden();await expect(drawer.locator('#human-info-editor')).toBeVisible();
+  await expect(full).toBeHidden();await expect(drawer.locator('#human-info-editor')).toBeHidden();
+  await expect(drawer.locator('#human-info-view-title')).toHaveText('Supplier reminder');
+  await expect(drawer.locator('#human-info-view-text')).toHaveText('Call Friday.');
+  await drawer.getByRole('button',{name:'Edit',exact:true}).click();
+  await expect(drawer.locator('#human-info-editor')).toBeVisible();
   await expect(page.locator('#title')).toBeEnabled();
   await drawer.locator('#human-info-text').fill('Call Monday instead.');
   await page.locator('#notesClose').click();await page.locator('#notesToggle').click();
   await expect(drawer.locator('#human-info-text')).toHaveValue('Call Monday instead.');
   await drawer.locator('#human-info-save').click();await expect(drawer.locator('#human-info-drawer-status')).toHaveText('Saved.');
+  await expect(drawer.locator('#human-info-editor')).toBeHidden();
+  await expect(drawer.locator('#human-info-view-text')).toHaveText('Call Monday instead.');
   let stored=await (await page.request.get('/api/human-information')).json();expect(stored.items[0].text).toBe('Call Monday instead.');
+  await page.locator('#notesOpenHuman').click();await expect(full).toBeVisible();
+  await full.getByRole('button',{name:'Back to estimating',exact:true}).click();
+  await expect(drawer.locator('#human-info-editor')).toBeHidden();
+  await expect(drawer.getByRole('button',{name:'Edit',exact:true})).toBeFocused();
+  await drawer.getByRole('button',{name:'Edit',exact:true}).click();
+  await drawer.locator('#human-info-text').fill('Cancel this change.');
+  await drawer.getByRole('button',{name:'Cancel',exact:true}).click();
+  await expect(drawer.locator('#human-info-view-text')).toHaveText('Call Monday instead.');
+  await expect(drawer.locator('#human-info-editor')).toBeHidden();
+  await drawer.getByRole('button',{name:'Edit',exact:true}).click();
   await drawer.locator('#human-info-text').fill('Draft from the side.');
   await page.locator('#notesOpenHuman').click();await expect(full).toBeVisible();
   await expect(full.locator('#human-info-text')).toHaveValue('Draft from the side.');
@@ -810,6 +826,7 @@ test('right notes drawer edits shared notes in place and preserves drafts across
   stored=await (await page.request.get('/api/human-information')).json();expect(stored.items.find(item=>item.title==='New side note').text).toBe('Created beside the takeoff.');
   const latest={...stored.items.at(-1),text:'Updated by a teammate.'};
   await page.request.put('/api/human-information',{data:{revision:stored.revision,items:stored.items.map(item=>item.id===latest.id?latest:item)}});
+  await drawer.getByRole('button',{name:'Edit',exact:true}).click();
   await drawer.locator('#human-info-text').fill('Keep my draft.');await drawer.locator('#human-info-save').click();
   await expect(drawer.locator('#human-info-drawer-status')).toContainText('Someone changed Human Information');
   await expect(drawer.locator('#human-info-text')).toHaveValue('Keep my draft.');

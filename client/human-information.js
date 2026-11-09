@@ -16,18 +16,27 @@ export function setupHumanInformation(api){
   const drawerEditor=document.createElement('section');drawerEditor.id='human-info-drawer-editor';drawerEditor.hidden=true;
   const back=document.createElement('button');back.type='button';back.className='btn alt tiny';back.textContent='Back to notes';
   drawerEditor.append(back);drawerBody.append(drawerEditor);
+  const preview=document.createElement('article');preview.id='human-info-drawer-view';preview.hidden=true;
+  preview.innerHTML='<header><h2 id="human-info-view-title"></h2><button type="button" class="btn alt tiny" id="human-info-edit">Edit</button></header><p id="human-info-view-folder"></p><div id="human-info-view-text"></div>';
+  drawerEditor.append(preview);
   const drawerStatus=document.createElement('p');drawerStatus.id='human-info-drawer-status';drawerStatus.setAttribute('role','status');drawerBody.append(drawerStatus);
   const form=$('editor'),pageMain=form.parentElement;
+  const cancel=document.createElement('button');cancel.type='button';cancel.id='human-info-cancel';cancel.textContent='Cancel';cancel.hidden=true;form.querySelector('.human-info-tools').append(cancel);
   const message=text=>{$('status').textContent=text;drawerStatus.textContent=text;};
-  let library={items:[],revision:''},saved=structuredClone(library),selected='',dirty=false,busy=false,operation=null,drawerEditing=false,returnToDrawer=false;
+  let library={items:[],revision:''},saved=structuredClone(library),selected='',dirty=false,busy=false,operation=null,drawerActive=false,drawerMode='view',returnToDrawer=false;
   function mountEditor(inDrawer){
-    drawerEditing=inDrawer;drawerEditor.hidden=!inDrawer;
+    drawerActive=inDrawer;drawerEditor.hidden=!inDrawer;
     document.getElementById('notesList').hidden=inDrawer;
     (inDrawer?drawerEditor:pageMain).append(form);
+    preview.hidden=!inDrawer||drawerMode!=='view'||!current();
+    form.hidden=!current()||(inDrawer&&drawerMode==='view');
+    cancel.hidden=!inDrawer||drawerMode!=='edit';
   }
-  function editInDrawer(entryId){
-    if(busy||!discard())return;selected=entryId;mountEditor(true);render();message('');$('title').focus();
+  function viewInDrawer(entryId){
+    if(busy||!discard())return;selected=entryId;drawerMode='view';mountEditor(true);render();message('');$('edit').focus();
   }
+  $('edit').onclick=()=>{if(busy)return;drawerMode='edit';render();$('title').focus();};
+  cancel.onclick=()=>{if(busy)return;library=structuredClone(saved);dirty=false;drawerMode='view';render();paintDrawer();message('');};
   back.onclick=()=>{if(busy||!discard())return;mountEditor(false);render();paintDrawer();message('');};
   const hiddenContent=[];
   function background(hidden){
@@ -51,7 +60,11 @@ export function setupHumanInformation(api){
     if(!$('tree').children.length)$('tree').textContent=query?'No matching notes.':'No notes yet.';
   }
   function render(){
-    tree();const item=current();$('editor').hidden=!item;$('empty').hidden=!!item;if(!item)return;
+    tree();const item=current();if(drawerActive&&!item)mountEditor(false);
+    const viewing=drawerActive&&drawerMode==='view';
+    form.hidden=!item||viewing;preview.hidden=!item||!viewing;cancel.hidden=!drawerActive||drawerMode!=='edit';
+    $('empty').hidden=!!item;if(!item)return;
+    $('view-title').textContent=item.title;$('view-folder').textContent=path(item.parent)||'Top level';$('view-text').textContent=item.text||'No note text yet.';
     $('kind').textContent=item.kind==='folder'?'FOLDER':'NOTE';$('title').value=item.title;$('text').value=item.text;$('text-label').hidden=item.kind==='folder';
     $('parent').replaceChildren(new Option('Top level',''));const excluded=descendants(item.id);
     for(const folder of library.items.filter(item=>item.kind==='folder'&&!excluded.has(item.id)))$('parent').add(new Option(path(folder.id),folder.id));
@@ -67,7 +80,7 @@ export function setupHumanInformation(api){
     finally{clearTimeout(timer);if(operation===controller){operation=null;setBusy(false);}}
   }
   async function reload(){library=await request();saved=structuredClone(library);dirty=false;if(!current())selected='';render();paintDrawer();message('Notes loaded.');}
-  async function persist(items){library=await request({method:'PUT',body:JSON.stringify({revision:library.revision,items})});saved=structuredClone(library);dirty=false;render();paintDrawer();message('Saved.');}
+  async function persist(items){library=await request({method:'PUT',body:JSON.stringify({revision:library.revision,items})});saved=structuredClone(library);dirty=false;if(drawerActive||returnToDrawer)drawerMode='view';render();paintDrawer();message('Saved.');}
   async function migrateLegacyNotes(){
     const legacy=window.estimator?.getLegacyNotes?.()||[];
     if(!legacy.length){window.estimator?.clearLegacyNotes?.(legacy);return;}
@@ -92,6 +105,7 @@ export function setupHumanInformation(api){
   }
   async function renderDrawer(){
     if(dirty)return;
+    drawerMode='view';
     await reload();await migrateLegacyNotes();paintDrawer();
   }
   function paintDrawer(){
@@ -102,23 +116,23 @@ export function setupHumanInformation(api){
       const row=document.createElement('button');row.type='button';row.className='human-note-row';
       const title=document.createElement('strong');title.textContent=item.title;
       const excerpt=document.createElement('span');excerpt.textContent=item.text.split('\n').find(line=>line.trim())||'No note text';
-      row.append(title,excerpt);row.title='View and edit note';row.onclick=()=>editInDrawer(item.id);box.append(row);
+      row.append(title,excerpt);row.title='View note';row.onclick=()=>viewInDrawer(item.id);box.append(row);
     });
   }
   async function open(entryId=selected){
-    if(drawerEditing){returnToDrawer=true;mountEditor(false);page.hidden=false;background(true);button.setAttribute('aria-current','page');return;}
+    if(drawerActive){returnToDrawer=true;mountEditor(false);page.hidden=false;background(true);button.setAttribute('aria-current','page');return;}
     if(!discard())return;
     page.hidden=false;background(true);button.setAttribute('aria-current','page');
     message('Loading notes...');await reload();await migrateLegacyNotes();
     selected=entryId;render();message('');$('title').focus();
   }
   button.onclick=event=>{if(!currentTabClick(event))return;event.preventDefault();run(async()=>{if(page.hidden){await open();page.querySelector('[data-action="close"]').focus();}});};
-  function close(){if(!returnToDrawer&&!discard())return;operation?.abort();operation=null;setBusy(false);if(!dirty)render();page.hidden=true;background(false);button.setAttribute('aria-current','false');clearPageLink('human-information');if(returnToDrawer){returnToDrawer=false;mountEditor(true);$('title').focus();}else button.focus();}
+  function close(){if(!returnToDrawer&&!discard())return;operation?.abort();operation=null;setBusy(false);if(!dirty)render();page.hidden=true;background(false);button.setAttribute('aria-current','false');clearPageLink('human-information');if(returnToDrawer){returnToDrawer=false;mountEditor(true);(drawerMode==='view'?$('edit'):$('title')).focus();}else button.focus();}
   page.querySelector('[data-action="close"]').onclick=close;
   window.humanInformation={open:()=>run(()=>open()),createFromDrawer:()=>run(async()=>{
     if(!discard())return;await reload();await migrateLegacyNotes();
     const created={id:crypto.randomUUID(),kind:'entry',parent:'',title:'Untitled note',text:''};
-    library.items.push(created);selected=created.id;dirty=true;mountEditor(true);render();message('Name it, then save.');$('title').focus();$('title').select();
+    library.items.push(created);selected=created.id;dirty=true;drawerMode='edit';mountEditor(true);render();message('Name it, then save.');$('title').focus();$('title').select();
   }),renderDrawer:()=>run(renderDrawer)};
   document.getElementById('server-bar').addEventListener('click',event=>{
     if(event.target.closest('a[href]')&&!currentTabClick(event))return;
