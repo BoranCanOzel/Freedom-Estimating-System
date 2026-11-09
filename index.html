@@ -261,7 +261,7 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
   .tab:hover .tab-tip{opacity:1;transform:translateY(0)}
 
   .tab-palette{
-    position:fixed;z-index:300;background:var(--card);
+    position:fixed;z-index:700;background:var(--card);
     border:1px solid var(--rule-strong);border-radius:6px;padding:10px;
     box-shadow:0 16px 34px -16px rgba(0,0,0,.55);
   }
@@ -6501,7 +6501,9 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     const y = before?.offsetParent != null ? before.getBoundingClientRect().top
       : previous.length ? previous.at(-1).getBoundingClientRect().bottom : headBottom;
     const table = document.getElementById('sheetTable').getBoundingClientRect();
-    const left = Math.max(bounds.left + 2, table.left, 0), right = Math.min(bounds.right - 2, table.right, innerWidth);
+    const depth = before?.offsetParent != null ? Math.max(0, Number(before.dataset.depth) || 0) : 0;
+    const left = Math.max(bounds.left + 2, table.left + depth * 28 * (parseFloat(getComputedStyle(document.body).zoom) || 1), 0);
+    const right = Math.min(bounds.right - 2, table.right, innerWidth);
     const top = Math.max(bounds.top, headBottom, 0), bottom = Math.min(bounds.bottom, footTop, innerHeight);
     if (right <= left || bottom < top){ line.hidden = true; return; }
     const zoom = parseFloat(getComputedStyle(document.body).zoom) || 1;
