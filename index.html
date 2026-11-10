@@ -638,6 +638,12 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
     flex:1;min-width:0;border:0;background:transparent;padding:3px 2px;
     font-family:var(--f-sans);font-size:13.5px;font-weight:500;color:var(--ink);
   }
+  #sheetTable tbody tr.unused .name-in,
+  #sheetTable tbody tr.unused .cell-in,
+  #sheetTable tbody tr.unused .money .v{
+    color:var(--muted)!important;text-decoration-line:line-through!important;
+    text-decoration-style:dashed!important;text-decoration-color:currentColor!important;
+  }
   .name-in:focus{outline:2px solid var(--amber);outline-offset:-1px;border-radius:2px}
 
   .item-wrap{display:flex;flex-direction:column;min-width:0}
@@ -3412,7 +3418,11 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
     name.value = row.name;
     name.placeholder = row.kind === 'none' ? 'Section label, or leave empty' : 'Describe the item';
     name.setAttribute('aria-label','Item name');
-    name.addEventListener('input', () => { row.name = name.value; save(); });
+    name.addEventListener('input', () => {
+      row.name = name.value;
+      tr.classList.toggle('unused', isUnusedItemRow(row));
+      save();
+    });
     const kindPick = document.createElement('div');
     kindPick.className = 'kind-pick';
     const kindBtn = document.createElement('button');
@@ -5718,7 +5728,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     document.getElementById('timelineCard').hidden = v !== 'timeline';
     document.getElementById('loadCard').hidden = v !== 'load';
     document.getElementById('wageCard').hidden = v !== 'wage';
-    document.getElementById('libToggle').hidden = v !== 'sheet' || folderEmpty;
+    document.getElementById('libToggle').hidden = v !== 'sheet';
     if (v !== 'sheet' || folderEmpty) document.body.classList.remove('lib-open');
     renderTabs();
     if (v === 'summary') renderSummary();
@@ -6201,6 +6211,10 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
   let rowRecalcFrame = 0, pendingRowRecalcs = new Set();
   const rowCalculations = new WeakMap();
+  function isUnusedItemRow(row){
+    return row.kind !== 'none' && !!String(row.name || '').trim() &&
+      num(row.count) * mult(row,'time',state) * mult(row,'days',state) === 0;
+  }
   function scheduleRowRecalc(row){
     pendingRowRecalcs.add(row.id);
     if (!rowRecalcFrame) rowRecalcFrame = requestAnimationFrame(() => {
@@ -6267,6 +6281,7 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
 
       if (ref && ref.tr) ref.tr.classList.toggle('in-section', sections.length > 0);
       if (ref && ref.paintKind) ref.paintKind();   // card edits can change the derived type
+      if (ref && ref.tr) ref.tr.classList.toggle('unused', isUnusedItemRow(r));
       if (r.kind === 'none') return;
 
       let c = changedRows && !changedRows.has(r.id) && rowCalculations.get(r);
