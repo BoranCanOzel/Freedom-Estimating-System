@@ -4911,7 +4911,6 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     host.innerHTML = '';
     if (!on) return;
     host.appendChild(loadBlock(state, renderSheetLoad, false));
-    const help=document.createElement('p');help.className='sheet-load-help';help.textContent='Length / width in feet · depth in inches · truck capacity in CY. Enter moves to the next field; Shift+Enter moves back.';host.prepend(help);
   }
 
   function paintLoad(refs, foot){

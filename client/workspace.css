@@ -365,7 +365,6 @@ body.server-mode #sheetLoadDock:has(#sheetLoad[hidden]) #sheetLoadSummary{font-s
 #sheetLoad{padding:0 12px 10px;max-height:min(40vh,360px);overflow:auto;overscroll-behavior:contain}
 #sheetLoad .load-block{margin:0;min-width:960px}
 #sheetLoad .calc-table input{min-height:36px;font-size:14px}
-#sheetLoad .sheet-load-help{margin:2px 0 10px;font:12px/1.5 var(--f-sans);color:var(--muted)}
 @media(max-width:760px){
   #sheetLoadDock{position:sticky;bottom:0;z-index:25;box-shadow:0 -4px 16px #0003}
   #sheetLoad{max-height:42vh}
@@ -382,7 +381,7 @@ body.server-mode #sheetLoadDock:has(#sheetLoad[hidden]) #sheetLoadSummary{font-s
   #sheetLoad .calc-table tfoot td:first-child::before{display:none}
 }
 @media print{
-  .sheet-load-dock-head,.sheet-load-help{display:none!important}
+  .sheet-load-dock-head{display:none!important}
   #sheetLoadDock{border:0;position:static;box-shadow:none}
   #sheetLoad{max-height:none;overflow:visible;padding:0}
   #sheetLoad .load-block{min-width:0}
