@@ -396,13 +396,18 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
   }
   #title{
     width:100%;border:0;background:transparent;padding:0 0 4px;
-    display:block;resize:none;overflow:hidden;
+    display:block;resize:none;overflow:auto;min-height:calc(1.3em + 6px);
     font-family:var(--f-cond);font-weight:700;
     font-size:clamp(19px,2.6vw,27px);line-height:1.2;letter-spacing:-.01em;color:var(--ink);
     border-bottom:2px solid transparent;
   }
   #title:hover{border-bottom-color:var(--rule-hair)}
   #title:focus{outline:none;border-bottom-color:var(--amber)}
+  #titleResize{height:12px;display:flex;align-items:center;justify-content:center;cursor:ns-resize;touch-action:none;user-select:none}
+  #titleResize::after{content:'';width:44px;height:3px;border-radius:2px;background:var(--rule)}
+  #titleResize:hover::after,#titleResize:focus-visible::after{background:var(--amber)}
+  #titleResize:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+  @media print{#titleResize{display:none}}
 
   /* ---------- table ---------- */
   .scroll{overflow:auto;flex:1;min-height:0}
@@ -2569,6 +2574,7 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
         <button type="button" class="note-btn head-note" id="titleNote" aria-label="Add detail"></button>
       </div>
       <textarea id="title" rows="1" aria-label="Scope of work" placeholder="Describe the scope of work"></textarea>
+      <div id="titleResize" role="separator" tabindex="0" aria-label="Resize scope of work" aria-orientation="horizontal" aria-controls="title" aria-valuemin="0" aria-valuenow="0" title="Drag up or down to resize. Use arrow keys to adjust. Double-click to fit all text."></div>
     </div>
 
     <div class="scroll">
@@ -3062,10 +3068,26 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
   }
 
   // textareas size themselves to their content
+  const scopeHeights = new Map();
+  function syncScopeResize(el){
+    if(el.id !== 'title')return;
+    const handle = document.getElementById('titleResize');
+    handle.setAttribute('aria-valuemax', String(Math.max(el.offsetHeight, Math.round(innerHeight * .6))));
+    handle.setAttribute('aria-valuenow', String(el.offsetHeight));
+    handle.setAttribute('aria-valuetext', el.offsetHeight + ' pixels tall');
+  }
+  function applyScopeHeight(el){
+    if(el?.id !== 'title' || !scopeHeights.has(state.id))return false;
+    el.style.height = scopeHeights.get(state.id) + 'px';
+    syncScopeResize(el);
+    return true;
+  }
   function grow(el){
     if (!el || el.offsetParent === null) return;
+    if(applyScopeHeight(el))return;
     el.style.height = 'auto';
     el.style.height = el.scrollHeight + 'px';
+    syncScopeResize(el);
   }
   const pendingGrowth = new Set();
   let growthFrame = 0;
@@ -3074,19 +3096,21 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
     if(growthFrame)return;
     growthFrame=requestAnimationFrame(()=>{
       growthFrame=0;
-      const fields=[...pendingGrowth].filter(field=>field.isConnected&&field.offsetParent!==null);pendingGrowth.clear();
+      const fields=[...pendingGrowth].filter(field=>field.isConnected&&field.offsetParent!==null&&!applyScopeHeight(field));pendingGrowth.clear();
       fields.forEach(field=>{field.style.height='auto';});
       const heights=fields.map(field=>field.scrollHeight);
       fields.forEach((field,i)=>{field.style.height=heights[i]+'px';});
+      fields.forEach(syncScopeResize);
     });
   }
   function growAll(){
     // Batch geometry reads and writes instead of forcing layout for every note.
     const fields = [...document.querySelectorAll('.item-note'), document.getElementById('title')]
-      .filter(el => el && el.offsetParent !== null);
+      .filter(el => el && el.offsetParent !== null && !applyScopeHeight(el));
     fields.forEach(el => { el.style.height = 'auto'; });
     const heights = fields.map(el => el.scrollHeight);
     fields.forEach((el, i) => { el.style.height = heights[i] + 'px'; });
+    fields.forEach(syncScopeResize);
   }
 
   function openLightbox(url){
@@ -6950,6 +6974,40 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
   }
 
   /* ---------- header controls ---------- */
+  const titleField = document.getElementById('title');
+  const titleResize = document.getElementById('titleResize');
+  function resizeScope(height){
+    const style = getComputedStyle(titleField);
+    const minimum = parseFloat(style.minHeight);
+    height = Math.round(Math.max(minimum, Math.min(height, Math.max(minimum, innerHeight * .6))));
+    scopeHeights.set(state.id, height);
+    titleField.style.height = height + 'px';
+    syncScopeResize(titleField);
+  }
+  let scopeDrag = null;
+  titleResize.addEventListener('pointerdown', e => {
+    if(e.button !== 0)return;
+    e.preventDefault();
+    scopeDrag = {pointer:e.pointerId, y:e.clientY, height:titleField.offsetHeight};
+    titleResize.setPointerCapture(e.pointerId);
+    titleResize.focus({preventScroll:true});
+  });
+  titleResize.addEventListener('pointermove', e => {
+    if(scopeDrag?.pointer === e.pointerId)resizeScope(scopeDrag.height + e.clientY - scopeDrag.y);
+  });
+  titleResize.addEventListener('lostpointercapture', () => {scopeDrag = null;});
+  titleResize.addEventListener('pointerup', e => {
+    if(titleResize.hasPointerCapture(e.pointerId))titleResize.releasePointerCapture(e.pointerId);
+  });
+  titleResize.addEventListener('dblclick', () => {
+    scopeHeights.delete(state.id);
+    grow(titleField);
+  });
+  titleResize.addEventListener('keydown', e => {
+    if(!['ArrowUp','ArrowDown'].includes(e.key))return;
+    e.preventDefault();
+    resizeScope(titleField.offsetHeight + (e.key === 'ArrowUp' ? -20 : 20));
+  });
   document.getElementById('title').addEventListener('input', e => {
     state.title = e.target.value;
     scheduleGrow(e.target);
