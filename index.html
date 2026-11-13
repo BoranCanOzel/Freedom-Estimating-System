@@ -2755,7 +2755,7 @@ window.freedomStartup=location.pathname==='/'?fetch('/api/startup',{method:'POST
     <div class="lib-pick">
       <input id="listName" class="lib-name" aria-label="Project list name">
       <button type="button" class="tpl-btn" id="listSwitch" title="Switch list">&#9662;</button>
-      <button type="button" class="tpl-btn" id="listAdd" title="Add another list">+</button>
+      <button type="button" class="tpl-btn" id="listAdd" title="Add another list" aria-label="Add another list">+</button>
     </div>
     <button type="button" class="lib-close" id="projClose" aria-label="Close">&times;</button>
   </div>
@@ -11337,18 +11337,20 @@ document.addEventListener('click', () => { document.getElementById('tabPalette')
     activeList().name = e.target.value;
     save();
   });
-  document.getElementById('listAdd').addEventListener('click', () => {
-    activeList();
-    const l = {id:id(), name:'List ' + (book.lists.length + 1), companies:[]};
-    book.lists.push(l);
-    book.activeList = l.id;
-    projectTree();
-    activeTakeoff();
-    state = book.sheets.find(x => x.id === book.active) || book.sheets[0];
-    renderProjects();
-    showView();
-    save();
-    document.getElementById('listName').focus();
+  document.getElementById('listAdd').addEventListener('click', event => {
+    confirmPop(event.currentTarget, 'Create a new, empty project list?', () => {
+      activeList();
+      const l = {id:id(), name:'List ' + (book.lists.length + 1), companies:[]};
+      book.lists.push(l);
+      book.activeList = l.id;
+      projectTree();
+      activeTakeoff();
+      state = book.sheets.find(x => x.id === book.active) || book.sheets[0];
+      renderProjects();
+      showView();
+      save();
+      document.getElementById('listName').focus();
+    }, 'Create list');
   });
   document.getElementById('listSwitch').addEventListener('click', e => {
     e.stopPropagation();

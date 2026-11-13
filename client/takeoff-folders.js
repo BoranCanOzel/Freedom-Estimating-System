@@ -3,7 +3,13 @@ import './takeoff-folders.css';
 export function setupTakeoffFolders(bridge) {
   const bar=document.createElement('nav');
   bar.id='takeoff-folders';bar.setAttribute('aria-label','Takeoff folders');
-  document.getElementById('rail').before(bar);
+  const rail=document.getElementById('rail');
+  function placeBar(){
+    const addPage=rail.querySelector('.tab-add');
+    if(bar.classList.contains('compact')&&addPage)addPage.after(bar);
+    else rail.before(bar);
+  }
+  rail.before(bar);
   const dialog=document.createElement('dialog');dialog.id='takeoff-folder-dialog';
   dialog.innerHTML='<form><h2 id="takeoff-folder-heading">New folder</h2><label>Folder name<input name="name" required maxlength="200" autocomplete="off"></label><div class="folder-dialog-actions"><button type="button" class="btn alt">Cancel</button><button type="submit" class="btn">Save folder</button></div></form>';
   dialog.setAttribute('aria-labelledby','takeoff-folder-heading');document.body.append(dialog);
@@ -78,7 +84,8 @@ export function setupTakeoffFolders(bridge) {
   function render(){
     cancelDrag?.(false);
     const scrollLeft=bar.querySelector('.takeoff-folder-tabs')?.scrollLeft||0;
-    const data=bridge.getTakeoffFolders();bar.hidden=!data;bar.replaceChildren();if(!data)return;
+    const data=bridge.getTakeoffFolders();bar.hidden=!data;bar.replaceChildren();
+    bar.classList.toggle('compact',data?.groups.length===1);placeBar();if(!data)return;
     const tabs=document.createElement('div');tabs.className='takeoff-folder-tabs';
     for(const folder of data.groups){
       const tab=button(folder.name,()=>bridge.openTakeoffFolder(folder.id),'takeoff-folder-tab');
@@ -119,5 +126,6 @@ export function setupTakeoffFolders(bridge) {
     }
     bar.append(actions);
   }
+  document.addEventListener('estimator:tabs',placeBar);
   document.addEventListener('estimator:view',render);render();
 }

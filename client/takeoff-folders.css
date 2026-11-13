@@ -47,4 +47,9 @@
 #sumTable tbody.summary-folder-group .s-row .s-scope::after{content:'';position:absolute;left:18px;top:50%;width:12px;border-top:1px solid color-mix(in srgb,var(--amber) 65%,var(--rule))}
 #sumTable tbody.summary-folder-group .s-folder-total>th{padding-left:38px}
 @media(max-width:760px){#takeoff-folders{align-items:stretch;flex-direction:column;gap:6px}.takeoff-folder-tabs{flex:auto}.takeoff-folder-actions{gap:8px}.takeoff-folder-move{margin-left:auto}.takeoff-folder-move select{max-width:140px}}
+#takeoff-folders.compact{flex:none;align-self:center;padding:0 0 2px;background:transparent;border:0}
+#takeoff-folders.compact .takeoff-folder-tabs,#takeoff-folders.compact .takeoff-folder-move{display:none}
+#takeoff-folders.compact .takeoff-folder-actions{flex-wrap:nowrap}
+#takeoff-folders.compact button{white-space:nowrap}
+#rail #takeoff-folders.compact + .tab-calc{margin-left:auto}
 @media print{#takeoff-folders,#emptyTakeoffFolder{display:none!important}}
